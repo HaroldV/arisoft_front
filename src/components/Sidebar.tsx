@@ -25,7 +25,7 @@ const menuConfig = [
   {
     title: 'General',
     items: [
-      { label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
+      { label: 'Dashboard', icon: LayoutDashboard, href: '/' },
     ]
   },
   {
