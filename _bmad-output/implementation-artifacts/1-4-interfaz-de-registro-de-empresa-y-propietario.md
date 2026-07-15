@@ -1,5 +1,5 @@
 # Story 1.4: Interfaz de Registro de Empresa y Propietario (Frontend)
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -30,15 +30,16 @@ Status: ready-for-dev
 
 ## Tasks / Subtasks
 
-- [ ] **Desarrollo del Formulario**
-  - [ ] Implementar los inputs controlados en `RegisterForm.tsx`.
-  - [ ] Añadir validaciones regex para RIF y formato de email.
-- [ ] **Integración de API**
-  - [ ] Realizar llamada `apiClient.post('/auth/register', { ... })`.
-  - [ ] Controlar errores de duplicidad (Ej: RIF o Email ya registrado) y mostrarlos en el banner de error.
-  - [ ] Redirigir a `/login?registered=true` tras el registro exitoso.
+- [x] **Desarrollo del Formulario**
+  - [x] Implementar los inputs controlados en `RegisterForm.tsx` (desarrollado directo en la página `register/page.tsx`).
+  - [x] Añadir validaciones regex para RIF y formato de email.
+- [x] **Integración de API**
+  - [x] Realizar llamada `apiClient.post('/auth/register', { ... })`.
+  - [x] Controlar errores de duplicidad (Ej: RIF o Email ya registrado) y mostrarlos en el banner de error.
+  - [x] Redirigir a `/login?registered=true` tras el registro exitoso.
 
 ## Dev Notes
 
 *   **API Client:** Usar `@/infrastructure/api/api-client`.
 *   **Diseño:** El diseño de la página de registro debe ser moderno, limpio, con soporte responsivo y estados visuales para deshabilitar el botón durante el envío (`isSubmitting`).
+

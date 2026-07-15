@@ -1,6 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import { 
   TrendingUp, 
   Users, 
@@ -11,6 +13,22 @@ import {
 } from 'lucide-react';
 
 export default function WelcomeDashboard() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const [currentDate, setCurrentDate] = useState('');
+
+  useEffect(() => {
+    const options: Intl.DateTimeFormatOptions = { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    };
+    const formatted = new Date().toLocaleDateString('es-ES', options);
+    // Capitalize first letter
+    setCurrentDate(formatted.charAt(0).toUpperCase() + formatted.slice(1));
+  }, []);
+
   const stats = [
     { label: 'Ingresos Mensuales', value: '$45,231.89', change: '+20.1%', icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50' },
     { label: 'Usuarios Activos', value: '+2350', change: '+180.1%', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -18,16 +36,23 @@ export default function WelcomeDashboard() {
     { label: 'Alertas de Inventario', value: '7', change: '-2', icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
   ];
 
+  const getFirstName = (fullName?: string) => {
+    if (!fullName) return 'Usuario';
+    return fullName.trim().split(/\s+/)[0];
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Bienvenido, Harold</h1>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+            Bienvenido, {getFirstName(user?.full_name)}
+          </h1>
           <p className="text-slate-500">Aquí tienes un resumen de lo que está pasando en tu ERP hoy.</p>
         </div>
-        <div className="flex items-center space-x-3 bg-white p-2 rounded-xl shadow-sm border border-slate-200">
+        <div className="flex items-center space-x-3 bg-white p-2.5 rounded-xl shadow-sm border border-slate-200">
           <Clock className="h-4 w-4 text-primary-500" />
-          <span className="text-sm font-medium text-slate-600">Miércoles, 13 de Mayo 2026</span>
+          <span className="text-sm font-medium text-slate-600">{currentDate || 'Cargando fecha...'}</span>
         </div>
       </div>
 
@@ -52,7 +77,10 @@ export default function WelcomeDashboard() {
         <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-bold text-slate-900">Actividad de Inventario</h3>
-            <button className="text-primary-600 text-sm font-semibold flex items-center hover:text-primary-700">
+            <button 
+              onClick={() => router.push('/inventory/stock')}
+              className="text-primary-600 text-sm font-semibold flex items-center hover:text-primary-700"
+            >
               Ver reporte completo <ArrowUpRight className="ml-1 h-4 w-4" />
             </button>
           </div>
@@ -65,12 +93,15 @@ export default function WelcomeDashboard() {
           <h3 className="text-lg font-bold text-slate-900 mb-6">Acciones Rápidas</h3>
           <div className="space-y-4">
             {[
-              { label: 'Nuevo Producto', color: 'bg-blue-500' },
-              { label: 'Registrar Movimiento', color: 'bg-slate-800' },
-              { label: 'Generar Reporte PDF', color: 'bg-primary-600' },
-              { label: 'Ajustes de Perfil', color: 'bg-slate-200 text-slate-700' },
+              { label: 'Nuevo Producto', color: 'bg-blue-500', path: '/inventory/stock' },
+              { label: 'Registrar Movimiento', color: 'bg-slate-800', path: '/inventory/moves' },
+              { label: 'Ajustes de Perfil', color: 'bg-primary-600', path: '/settings/company' },
             ].map((action) => (
-              <button key={action.label} className={`w-full py-3 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02] shadow-sm ${action.color}`}>
+              <button 
+                key={action.label} 
+                onClick={() => router.push(action.path)}
+                className={`w-full py-3 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02] shadow-sm cursor-pointer ${action.color}`}
+              >
                 {action.label}
               </button>
             ))}

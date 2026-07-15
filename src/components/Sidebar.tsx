@@ -2,16 +2,18 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { 
-  LayoutDashboard, 
-  Building2, 
-  Settings, 
-  PackageSearch, 
+import {
+  LayoutDashboard,
+  Building2,
+  Settings,
+  PackageSearch,
   ChevronDown,
   LogOut,
   UserCircle,
   ShoppingCart,
-  Users
+  Users,
+  Landmark,
+  History
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -23,53 +25,73 @@ function cn(...inputs: ClassValue[]) {
 
 const menuConfig = [
   {
-    title: 'General',
-    items: [
-      { label: 'Dashboard', icon: LayoutDashboard, href: '/' },
-    ]
-  },
-  {
-    title: 'Ventas',
-    module: 'POS',
-    items: [
-      { label: 'Punto de Venta', icon: ShoppingCart, href: '/pos' },
-    ]
-  },
-  {
     title: 'Operaciones',
     items: [
-      { 
-        label: 'Inventario', 
-        icon: PackageSearch, 
+      { label: 'Dashboard', icon: LayoutDashboard, href: '/' },
+      {
+        label: 'Ventas',
+        icon: ShoppingCart,
+        module: 'POS',
+        children: [
+          { label: 'Punto de Venta', href: '/pos' },
+          { label: 'Facturación de Venta', href: '/sales' },
+          { label: 'Clientes', href: '/sales/clients' },
+        ]
+      },
+      {
+        label: 'Compras',
+        icon: Building2,
         module: 'INVENTORY',
         children: [
-          { label: 'Stock Actual', href: '/inventory/stock' },
-          { label: 'Movimientos', href: '/inventory/moves' },
-        ] 
+          { label: 'Registrar Compra', href: '/inventory/purchases/new' },
+          { label: 'Facturación de Compra', href: '/inventory/purchases' },
+          { label: 'Proveedores', href: '/inventory/providers' },
+        ]
       },
-      { 
-        label: 'Nómina', 
-        icon: Users, 
+      {
+        label: 'Control de Inventario',
+        icon: PackageSearch,
+        module: 'INVENTORY',
+        children: [
+          { label: 'Crear Productos', href: '/inventory/initial' },
+          { label: 'Listado de Productos', href: '/inventory/stock' },
+          { label: 'Almacenes', href: '/inventory/warehouse' },
+          { label: 'Categorías', href: '/inventory/categories' },
+          { label: 'Movimientos', href: '/inventory/moves' },
+        ]
+      },
+      {
+        label: 'Nómina',
+        icon: Users,
         module: 'PAYROLL',
         children: [
           { label: 'Procesar Nómina', href: '/payroll' },
           { label: 'Fórmulas Legales', href: '/payroll/formulas' },
-        ] 
+        ]
+      },
+      {
+        label: 'Cuentas',
+        icon: Landmark,
+        children: [
+          { label: 'Cuentas Bancarias', href: '/accounts/banks' },
+          { label: 'Cuentas por Cobrar / Pagar', href: '/accounts/receivables-payables' },
+          { label: 'Historial', href: '/accounts/history' },
+        ]
       },
     ]
   },
   {
     title: 'Configuración',
     items: [
-      { 
-        label: 'Ajustes', 
-        icon: Settings, 
-        module: 'SETTINGS',
+      {
+        label: 'Ajustes',
+        icon: Settings,
         children: [
           { label: 'Perfil de Empresa', href: '/settings/company' },
+          { label: 'Control Fiscal', href: '/settings/fiscal' },
           { label: 'Usuarios y Roles', href: '/settings/users' },
           { label: 'Seguridad', href: '/settings/security' },
-        ] 
+        ]
       },
     ]
   }
@@ -80,21 +102,21 @@ export default function Sidebar() {
   const [openMenus, setOpenMenus] = useState<string[]>([]);
 
   const toggleMenu = (label: string) => {
-    setOpenMenus(prev => 
-      prev.includes(label) 
-        ? prev.filter(i => i !== label) 
+    setOpenMenus(prev =>
+      prev.includes(label)
+        ? prev.filter(i => i !== label)
         : [...prev, label]
     );
   };
 
-  const filteredMenu = menuConfig.map(group => {
+  const filteredMenu = (menuConfig as any[]).map(group => {
     // If group has a module, check if it's enabled
     if (group.module && !user?.enabled_modules.includes(group.module)) {
       return null;
     }
 
     // Filter items within the group
-    const filteredItems = group.items.filter(item => {
+    const filteredItems = group.items.filter((item: any) => {
       if (item.module && !user?.enabled_modules.includes(item.module)) {
         return false;
       }
@@ -107,17 +129,17 @@ export default function Sidebar() {
   }).filter(Boolean);
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-slate-900 text-slate-300 border-r border-slate-800 transition-all duration-300">
-      <div className="flex h-16 items-center px-6 border-b border-slate-800">
+    <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-slate-900 text-slate-300 border-r border-slate-800 transition-all duration-300 flex flex-col">
+      <div className="flex h-16 items-center px-6 border-b border-slate-800 shrink-0">
         <div className="h-8 w-8 rounded-lg bg-primary-500 flex items-center justify-center mr-3 shadow-lg shadow-primary-500/20">
           <span className="text-white font-bold">A</span>
         </div>
         <span className="text-xl font-bold text-white tracking-tight">ARI Soft</span>
       </div>
 
-      <div className="h-[calc(100vh-140px)] overflow-y-auto py-6 px-4 space-y-8 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto py-4 px-4 space-y-4 min-h-0 scrollbar-hide">
         {filteredMenu.map((group: any) => (
-          <div key={group.title} className="space-y-2">
+          <div key={group.title} className="space-y-1.5">
             <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
               {group.title}
             </h3>
@@ -173,7 +195,7 @@ export default function Sidebar() {
         ))}
       </div>
 
-      <div className="absolute bottom-0 left-0 w-full p-4 border-t border-slate-800 bg-slate-900">
+      <div className="p-4 border-t border-slate-800 bg-slate-900 shrink-0">
         <div className="flex items-center px-2 mb-4">
           <UserCircle className="h-8 w-8 text-primary-400 mr-3" />
           <div className="flex flex-col">
@@ -181,7 +203,7 @@ export default function Sidebar() {
             <span className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">{user?.role || 'User'}</span>
           </div>
         </div>
-        <button 
+        <button
           onClick={logout}
           className="flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
         >

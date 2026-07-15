@@ -1,0 +1,60 @@
+export const VENEZUELAN_STATES = [
+  { code: 'DC', name: 'Distrito Capital' },
+  { code: 'ZU', name: 'Zulia' },
+  { code: 'AN', name: 'Anzoátegui' },
+  { code: 'AR', name: 'Aragua' },
+  { code: 'CA', name: 'Carabobo' },
+  { code: 'LA', name: 'Lara' },
+  { code: 'ME', name: 'Mérida' },
+  { code: 'MI', name: 'Miranda' },
+  { code: 'TA', name: 'Táchira' },
+  { code: 'AM', name: 'Amazonas' },
+  { code: 'AP', name: 'Apure' },
+  { code: 'BA', name: 'Barinas' },
+  { code: 'BO', name: 'Bolívar' },
+  { code: 'CO', name: 'Cojedes' },
+  { code: 'DA', name: 'Delta Amacuro' },
+  { code: 'FA', name: 'Falcón' },
+  { code: 'GU', name: 'Guárico' },
+  { code: 'MO', name: 'Monagas' },
+  { code: 'NE', name: 'Nueva Esparta' },
+  { code: 'SU', name: 'Sucre' },
+  { code: 'TR', name: 'Trujillo' },
+  { code: 'YA', name: 'Yaracuy' },
+  { code: 'VA', name: 'La Guaira' },
+  { code: 'PO', name: 'Portuguesa' },
+];
+
+export const TAXPAYER_TYPES = [
+  { code: 'EXEMPT', name: 'No Contribuyente / Consumidor Final' },
+  { code: 'ORDINARY', name: 'Contribuyente Ordinario' },
+  { code: 'SPECIAL', name: 'Contribuyente Especial' },
+];
+
+export const VENEZUELAN_BANKS = [
+  { code: '0102', name: 'Banco de Venezuela' },
+  { code: '0104', name: 'Venezolano de Crédito' },
+  { code: '0105', name: 'Banco Mercantil' },
+  { code: '0108', name: 'Banco Provincial (BBVA)' },
+  { code: '0114', name: 'Bancaribe' },
+  { code: '0115', name: 'Banco Exterior' },
+  { code: '0128', name: 'Banco Caroní' },
+  { code: '0134', name: 'Banesco' },
+  { code: '0138', name: 'Banco Plaza' },
+  { code: '0151', name: 'BFC (Banco Fondo Común)' },
+  { code: '0156', name: '100% Banco' },
+  { code: '0157', name: 'Del Sur' },
+  { code: '0163', name: 'Banco del Tesoro' },
+  { code: '0166', name: 'Banco Agrícola de Venezuela' },
+  { code: '0168', name: 'Bancrecer' },
+  { code: '0169', name: 'Mi Banco' },
+  { code: '0171', name: 'Banco Activo' },
+  { code: '0172', name: 'Bancamiga' },
+  { code: '0174', name: 'Banplus' },
+  { code: '0175', name: 'Banco Bicentenario' },
+  { code: '0177', name: 'Banfanb' },
+  { code: '0191', name: 'BNC (Banco Nacional de Crédito)' },
+];
+export type VenezuelanStateCode = typeof VENEZUELAN_STATES[number]['code'];
+export type TaxpayerTypeCode = typeof TAXPAYER_TYPES[number]['code'];
+export type VenezuelanBankCode = typeof VENEZUELAN_BANKS[number]['code'];

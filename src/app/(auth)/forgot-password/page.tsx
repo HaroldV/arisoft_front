@@ -57,6 +57,13 @@ export default function ForgotPasswordPage() {
               <li>Copia y pega la URL en tu navegador para cambiar la contraseña.</li>
             </ol>
           </div>
+          <Link 
+            href="/login"
+            className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-all duration-200 mt-4"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Volver al inicio de sesión
+          </Link>
         </div>
       ) : (
         <form className="space-y-4" onSubmit={handleSubmit}>

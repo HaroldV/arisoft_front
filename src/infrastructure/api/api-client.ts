@@ -6,13 +6,24 @@ const apiClient = axios.create({
   withCredentials: true, // Send cookies cross-origin
 });
 
-// Request interceptor to attach access token
+// Request interceptor to attach access token and tenant ID
 apiClient.interceptors.request.use(
   (config) => {
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('ari_token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+      }
+      const userStr = localStorage.getItem('ari_user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user?.tenant_id) {
+            config.headers['x-tenant-id'] = user.tenant_id;
+          }
+        } catch (e) {
+          console.error('Error parsing user from localStorage for tenant header:', e);
+        }
       }
     }
     return config;

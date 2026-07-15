@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { RegisterForm } from '../../components/auth/RegisterForm';
-import { CurrencyConfig } from '../../components/settings/CurrencyConfig';
+import { RegisterForm } from '../../auth/RegisterForm';
+import { CurrencyConfig } from '../../settings/CurrencyConfig';
 
 /**
  * OnboardingWizard Page

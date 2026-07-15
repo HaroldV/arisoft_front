@@ -7,12 +7,13 @@
 
 development_status:
   # Épica 1: Autenticación Robusta (Nueva Planificación)
-  epic-1: in-progress
+  epic-1: done
   1-1-validacion-de-credenciales-y-resolucion-de-tenant: done
   1-2-emision-de-tokens-jwt-duales: done
   1-3-proteccion-contra-fuerza-bruta-y-rate-limiting: done
-  1-4-interfaz-de-registro-de-empresa-y-propietario: ready-for-dev
-  1-5-interfaz-de-recuperacion-y-restablecimiento-de-contrasena: ready-for-dev
+  1-4-interfaz-de-registro-de-empresa-y-propietario: done
+  1-5-interfaz-de-recuperacion-y-restablecimiento-de-contrasena: done
+  1-6-mejoras-esteticas-y-de-usabilidad-en-auth-y-dashboard-layout: done
 
   # Épica 2: Control de Acceso y UX
   epic-2: done
@@ -33,8 +34,21 @@ development_status:
   3-6-historial-de-compras-y-detalles-factura: done
   3-7-historial-de-ventas-y-justificaciones: done
   3-8-swagger-bearer-auth: done
+  3-9-interfaz-de-inventario-inicial-manual-y-masivo: done
+  3-10-tabla-de-stock-actual-con-alertas-criticas: done
+  3-11-catalogo-de-proveedores-crud-y-persistencia: done
+  3-12-registro-de-compras-e-historial-de-facturas: done
+  3-13-auditoria-y-registro-de-ventas-pos: done
+  3-14-catalogo-de-clientes-y-asociacion-con-ventas: done
+  3-15-adecuacion-y-campos-avanzados-del-catalogo-de-productos: done
+
+  # Épica 7: Cuentas Bancarias y Tesorería
+  epic-7: done
+  7-1-crud-y-registro-de-cuentas-del-comercio: done
+  7-5-panel-de-control-y-saldos-consolidados-double-currency: done
+  7-6-transacciones-de-caja-ingresos-retiros-y-transferencias: done
 
   # Historias Previas (Mantenidas para referencia)
-  4-1-interfaz-de-venta-y-carrito: ready-for-dev
-  5-1-jerarquia-de-ubicaciones-y-mapa-visual: ready-for-dev
-  6-1-motor-de-formulas-legales-dinamicas: ready-for-dev
+  4-1-interfaz-de-venta-y-carrito: done
+  5-1-jerarquia-de-ubicaciones-y-mapa-visual: done
+  6-1-motor-de-formulas-legales-dinamicas: done

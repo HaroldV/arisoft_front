@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import Sidebar from "@/components/Sidebar";
 import SandboxBanner from "@/components/SandboxBanner";
-import { Bell, Search } from 'lucide-react';
+import { Bell, Search, Wifi, WifiOff } from 'lucide-react';
 
 export default function DashboardLayout({
   children,
@@ -14,12 +14,37 @@ export default function DashboardLayout({
 }) {
   const { user, isLoading } = useAuth();
   const router = useRouter();
+  const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsOnline(navigator.onLine);
+      
+      const handleOnline = () => setIsOnline(true);
+      const handleOffline = () => setIsOnline(false);
+
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      };
+    }
+  }, []);
 
   useEffect(() => {
     if (!isLoading && !user) {
       router.push('/login');
     }
   }, [user, isLoading, router]);
+
+  const getInitials = (name?: string) => {
+    if (!name) return 'HV';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
 
   if (isLoading) {
     return (
@@ -51,14 +76,36 @@ export default function DashboardLayout({
             </div>
           </div>
           <div className="flex items-center space-x-4">
+            {/* Connection Status Badge */}
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold select-none transition-all ${
+              isOnline 
+                ? 'bg-emerald-50/50 border-emerald-100 text-emerald-700' 
+                : 'bg-rose-50 border-rose-100 text-rose-700 animate-pulse'
+            }`}>
+              {isOnline ? (
+                <>
+                  <Wifi className="h-3.5 w-3.5" />
+                  <span>Sincronizado</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff className="h-3.5 w-3.5" />
+                  <span>Modo Offline</span>
+                </>
+              )}
+            </div>
+
             <button className="p-2 text-slate-400 hover:text-primary-600 hover:bg-slate-100 rounded-full transition-all relative">
               <Bell className="h-5 w-5" />
               <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border-2 border-white"></span>
             </button>
             <div className="h-8 w-px bg-slate-200 mx-2"></div>
             <div className="flex items-center cursor-pointer group">
-              <div className="h-9 w-9 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold border border-primary-200 group-hover:border-primary-400 transition-all">
-                HV
+              <div 
+                title={user.full_name}
+                className="h-9 w-9 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold border border-primary-200 group-hover:border-primary-400 transition-all"
+              >
+                {getInitials(user.full_name)}
               </div>
             </div>
           </div>
