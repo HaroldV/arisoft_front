@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import { Modal } from '@/components/Modal';
+import { ActionTooltip } from '@/components/ActionTooltip';
 
 interface Category {
   id: string;
@@ -290,14 +291,15 @@ export default function CategoriesPage() {
                       )}
                     </td>
                     <td className="py-4 px-6 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleOpenEdit(c)}
-                          title="Editar"
-                          className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <ActionTooltip content="Editar categoría">
+                          <button
+                            onClick={() => handleOpenEdit(c)}
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/80 rounded-lg transition-all duration-200 cursor-pointer"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        </ActionTooltip>
                         <button
                           onClick={() => handleDelete(c.id)}
                           disabled={deletingId === c.id}
@@ -320,119 +322,131 @@ export default function CategoriesPage() {
         </div>
       )}
 
-      {/* Modal Create/Edit */}
+      {/* Add/Edit Modal (Sally Enterprise UX Standard) */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-            
-            {/* Modal Header */}
-            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-              <h3 className="text-base font-bold text-slate-900">
-                {editingCategory 
-                  ? (editingCategory.tenant_id === null ? 'Actualizar Código de Actividad' : 'Editar Categoría')
-                  : 'Nueva Categoría'
-                }
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            {/* Header Fijo */}
+            <div className="flex justify-between items-center px-6 py-4.5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-indigo-50/30 shrink-0">
+              <div className="flex items-center gap-3.5">
+                <div className="bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-xl p-3 shadow-md shadow-indigo-100 flex items-center justify-center">
+                  <Tag className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                    {editingCategory ? 'Editar Categoría de Producto' : 'Registrar Nueva Categoría'}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    Clasificación y Códigos de Actividad CAEV
+                  </p>
+                </div>
+              </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+                title="Cerrar modal"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleSave} className="p-6 space-y-4">
-              
-              {modalError && (
-                <div className="flex items-start gap-3 p-4 bg-rose-50 border border-rose-100 text-rose-700 rounded-xl text-sm animate-in fade-in duration-200">
-                  <AlertCircle className="w-5 h-5 shrink-0 text-rose-500 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="font-semibold text-rose-950">Error al guardar</p>
-                    <p className="text-xs text-rose-700 mt-0.5">{modalError}</p>
+            {/* Form & Body */}
+            <form onSubmit={handleSave} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-6 space-y-4.5 overflow-y-auto flex-1 custom-scrollbar">
+                {modalError && (
+                  <div className="flex items-start gap-3 p-4 bg-rose-50 border border-rose-100 text-rose-700 rounded-xl text-xs sm:text-sm font-semibold">
+                    <AlertCircle className="w-5 h-5 shrink-0 text-rose-500 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-bold text-rose-950">Error al guardar</p>
+                      <p className="text-xs text-rose-700 mt-0.5">{modalError}</p>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {modalSuccess && (
-                <div className="flex items-start gap-3 p-4 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-xl text-sm animate-in fade-in duration-200">
-                  <CheckCircle className="w-5 h-5 shrink-0 text-emerald-500 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="font-semibold text-emerald-950">¡Éxito!</p>
-                    <p className="text-xs text-emerald-700 mt-0.5">La categoría se guardó correctamente.</p>
+                {modalSuccess && (
+                  <div className="flex items-start gap-3 p-4 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-xl text-xs sm:text-sm font-semibold">
+                    <CheckCircle className="w-5 h-5 shrink-0 text-emerald-500 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-bold text-emerald-950">¡Éxito!</p>
+                      <p className="text-xs text-emerald-700 mt-0.5">La categoría se guardó correctamente.</p>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Name */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Nombre de la Categoría</label>
-                <input
-                  type="text"
-                  disabled={editingCategory?.tenant_id === null}
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Ej. Artículos del Hogar, Víveres Finos"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-50 disabled:bg-slate-100 disabled:cursor-not-allowed transition-all text-sm"
-                />
-                {editingCategory?.tenant_id === null && (
-                  <span className="text-[11px] text-indigo-600 block mt-1">
-                    Las categorías globales del sistema no permiten alterar su nombre descriptivo.
-                  </span>
+                {/* Name */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                    Nombre de la Categoría
+                  </label>
+                  <input
+                    type="text"
+                    disabled={editingCategory?.tenant_id === null}
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Ej. Artículos del Hogar, Víveres Finos, Bebidas"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-50 disabled:bg-slate-100 disabled:cursor-not-allowed transition-all text-sm font-medium"
+                  />
+                  {editingCategory?.tenant_id === null && (
+                    <span className="text-xs font-medium text-indigo-600 block mt-1">
+                      🔒 Las categorías globales del sistema no permiten alterar su nombre descriptivo.
+                    </span>
+                  )}
+                </div>
+
+                {/* CAEV Code */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                    Código de Actividad Económica CAEV (Opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.code}
+                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                    placeholder="Ej. 47111"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-mono font-semibold"
+                  />
+                </div>
+
+                {/* Active Checkbox */}
+                {editingCategory && (
+                  <div className="flex items-center gap-3 pt-2 bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 shadow-2xs">
+                    <input
+                      type="checkbox"
+                      id="is_active"
+                      checked={formData.is_active}
+                      onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                      className="w-4 h-4 rounded text-indigo-600 bg-slate-50 border-slate-200 focus:ring-indigo-500"
+                    />
+                    <label htmlFor="is_active" className="text-xs font-bold text-slate-700 select-none cursor-pointer">
+                      Categoría Activa en el Comercio y Catálogo
+                    </label>
+                  </div>
                 )}
               </div>
 
-              {/* CAEV Code */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Código Actividad CAEV (Opcional)</label>
-                <input
-                  type="text"
-                  value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  placeholder="Ej. 47111"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-mono"
-                />
-              </div>
-
-              {/* Active Checkbox */}
-              {editingCategory && (
-                <div className="flex items-center gap-3 pt-2">
-                  <input
-                    type="checkbox"
-                    id="is_active"
-                    checked={formData.is_active}
-                    onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                    className="w-4 h-4 rounded text-indigo-600 bg-slate-50 border-slate-200 focus:ring-indigo-500"
-                  />
-                  <label htmlFor="is_active" className="text-sm font-medium text-slate-600 select-none cursor-pointer">
-                    Categoría Activa en el Comercio
-                  </label>
-                </div>
-              )}
-
-              {/* Modal Actions */}
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-6">
+              {/* Modal Actions Footer */}
+              <div className="flex justify-between items-center px-6 py-4 border-t border-slate-100 bg-slate-50/80 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-medium rounded-xl transition-all cursor-pointer text-sm"
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold rounded-xl transition-all text-sm cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-medium rounded-xl transition-all disabled:opacity-50 cursor-pointer text-sm"
+                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:from-indigo-700 active:to-violet-700 text-white font-semibold rounded-xl transition-all shadow-md shadow-indigo-200 text-sm cursor-pointer active:scale-98 disabled:opacity-50"
                 >
                   {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Guardar
+                  Guardar Categoría
                 </button>
               </div>
-
             </form>
           </div>
         </div>
       )}
+
       {/* Global Alert/Confirm Modal */}
       <Modal
         {...confirmModal}

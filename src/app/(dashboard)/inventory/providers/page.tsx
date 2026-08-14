@@ -17,10 +17,14 @@ import {
   Phone,
   MapPin,
   Map,
-  ShieldAlert
+  ShieldAlert,
+  Truck
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import { VENEZUELAN_STATES, TAXPAYER_TYPES } from '@/constants/venezuela';
+import { ActionTooltip } from '@/components/ActionTooltip';
+import { RifInput } from '@/components/RifInput';
+import { SearchableSelect } from '@/components/SearchableSelect';
 
 interface Provider {
   id: string;
@@ -32,6 +36,10 @@ interface Provider {
   delivery_address?: string;
   zone_code: string;
   taxpayer_type: string;
+  is_retention_agent?: boolean;
+  retention_percentage?: number;
+  islr_percentage?: number;
+  islr_concept_code?: string;
 }
 
 export default function ProvidersPage() {
@@ -51,11 +59,16 @@ export default function ProvidersPage() {
     address: '',
     delivery_address: '',
     zone_code: 'DC',
-    taxpayer_type: 'ORDINARY'
+    taxpayer_type: 'ORDINARY',
+    is_retention_agent: false,
+    retention_percentage: 75,
+    islr_percentage: 2.0,
+    islr_concept_code: 'SERVICES'
   });
   const [isSaving, setIsSaving] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalSuccess, setModalSuccess] = useState(false);
+  const [errorFields, setErrorFields] = useState<{ [key: string]: boolean }>({});
 
   // Delete control
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -93,17 +106,18 @@ export default function ProvidersPage() {
     setError(null);
     try {
       const response = await apiClient.get('/providers');
-      const allProviders = response.data;
+      const allProviders: Provider[] = Array.isArray(response.data) ? response.data : (response.data?.items || []);
       if (query) {
         setProviders(allProviders.filter((p: Provider) => 
-          p.name.toLowerCase().includes(query.toLowerCase()) || 
-          p.tax_id.toLowerCase().includes(query.toLowerCase())
+          (p.name || '').toLowerCase().includes(query.toLowerCase()) || 
+          (p.tax_id || '').toLowerCase().includes(query.toLowerCase())
         ));
       } else {
         setProviders(allProviders);
       }
     } catch (err: any) {
-      setError('Error al obtener la lista de proveedores. Por favor reintenta.');
+      console.error('Error fetching providers:', err);
+      setError(err.response?.data?.message || 'Error al obtener la lista de proveedores. Por favor reintenta.');
     } finally {
       setIsLoading(false);
     }
@@ -118,21 +132,26 @@ export default function ProvidersPage() {
   }, [search]);
 
   const handleOpenAdd = () => {
+    setEditingProvider(null);
     setTaxPrefix('J');
     setTaxNumber('');
-    setEditingProvider(null);
     setFormData({
       name: '',
-      tax_id: '',
+      tax_id: 'J-',
       email: '',
       phone: '',
       address: '',
       delivery_address: '',
       zone_code: 'DC',
-      taxpayer_type: 'ORDINARY'
+      taxpayer_type: 'EXEMPT',
+      is_retention_agent: false,
+      retention_percentage: 75.0,
+      islr_percentage: 2.0,
+      islr_concept_code: 'SERVICES'
     });
     setModalError(null);
     setModalSuccess(false);
+    setErrorFields({});
     setIsOpen(true);
   };
 
@@ -149,15 +168,36 @@ export default function ProvidersPage() {
       address: provider.address || '',
       delivery_address: provider.delivery_address || '',
       zone_code: provider.zone_code || 'DC',
-      taxpayer_type: provider.taxpayer_type || 'ORDINARY'
+      taxpayer_type: provider.taxpayer_type || 'EXEMPT',
+      is_retention_agent: provider.is_retention_agent ?? false,
+      retention_percentage: provider.retention_percentage ?? 75.0,
+      islr_percentage: provider.islr_percentage ?? 2.0,
+      islr_concept_code: provider.islr_concept_code || 'SERVICES'
     });
     setModalError(null);
     setModalSuccess(false);
+    setErrorFields({});
     setIsOpen(true);
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    const errs: { [key: string]: boolean } = {};
+
+    if (!formData.name.trim()) {
+      errs['name'] = true;
+    }
+    if (!taxNumber.trim()) {
+      errs['taxNumber'] = true;
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setErrorFields(errs);
+      setModalError('Por favor completa todos los campos requeridos marcados en rojo.');
+      return;
+    }
+
+    setErrorFields({});
     setIsSaving(true);
     setModalError(null);
     setModalSuccess(false);
@@ -165,13 +205,17 @@ export default function ProvidersPage() {
     try {
       const payload = {
         name: formData.name.trim(),
-        tax_id: formData.tax_id.trim().toUpperCase(),
+        tax_id: getFormattedTaxId(taxPrefix, taxNumber),
         email: formData.email.trim() || undefined,
         phone: formData.phone.trim() || undefined,
         address: formData.address.trim() || undefined,
         delivery_address: formData.delivery_address.trim() || undefined,
         zone_code: formData.zone_code,
-        taxpayer_type: formData.taxpayer_type
+        taxpayer_type: formData.taxpayer_type,
+        is_retention_agent: formData.is_retention_agent,
+        retention_percentage: Number(formData.retention_percentage),
+        islr_percentage: Number(formData.islr_percentage),
+        islr_concept_code: formData.islr_concept_code
       };
 
       if (editingProvider) {
@@ -214,11 +258,13 @@ export default function ProvidersPage() {
     }
   };
 
-  const getZoneName = (code: string) => {
+  const getZoneName = (code?: string) => {
+    if (!code) return 'Distrito Capital';
     return VENEZUELAN_STATES.find(s => s.code === code)?.name || code;
   };
 
-  const getTaxpayerName = (code: string) => {
+  const getTaxpayerName = (code?: string) => {
+    if (!code) return 'Ordinario';
     return TAXPAYER_TYPES.find(t => t.code === code)?.name || code;
   };
 
@@ -301,37 +347,48 @@ export default function ProvidersPage() {
                         {p.zone_code}
                       </span>
                     </td>
-                    <td className="py-4 px-6">
-                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                        p.taxpayer_type === 'SPECIAL' 
-                          ? 'bg-purple-50 text-purple-700 border border-purple-100' 
-                          : p.taxpayer_type === 'ORDINARY'
-                          ? 'bg-blue-50 text-blue-700 border border-blue-100'
-                          : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {getTaxpayerName(p.taxpayer_type)}
-                      </span>
+                    <td className="py-4 px-6 space-y-1">
+                      <div>
+                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                          p.taxpayer_type === 'SPECIAL' 
+                            ? 'bg-purple-50 text-purple-700 border border-purple-100' 
+                            : p.taxpayer_type === 'ORDINARY'
+                            ? 'bg-blue-50 text-blue-700 border border-blue-100'
+                            : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {getTaxpayerName(p.taxpayer_type)}
+                        </span>
+                      </div>
+                      {p.is_retention_agent && (
+                        <div>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 inline-block">
+                            Agente Retenedor IVA {p.retention_percentage || 75}%
+                          </span>
+                        </div>
+                      )}
                     </td>
                     <td className="py-4 px-6 text-slate-500 space-y-0.5">
                       <div className="text-xs">{p.email || '-'}</div>
                       <div className="text-[10px] font-mono text-slate-400">{p.phone || ''}</div>
                     </td>
                     <td className="py-4 px-6 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleOpenEdit(p)}
-                          className="p-1.5 text-slate-500 hover:text-primary-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                          title="Editar"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => setDeletingId(p.id)}
-                          className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                          title="Desactivar"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <ActionTooltip content="Editar proveedor">
+                          <button
+                            onClick={() => handleOpenEdit(p)}
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/80 rounded-lg transition-all duration-200 cursor-pointer"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                        </ActionTooltip>
+                        <ActionTooltip content="Desactivar proveedor">
+                          <button
+                            onClick={() => setDeletingId(p.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50/80 rounded-lg transition-all duration-200 cursor-pointer"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </ActionTooltip>
                       </div>
                     </td>
                   </tr>
@@ -342,158 +399,125 @@ export default function ProvidersPage() {
         )}
       </div>
 
-      {/* Add/Edit Modal */}
+      {/* Add/Edit Modal (Sally Enterprise UX Standard) */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-slate-100 overflow-hidden animate-in scale-in duration-200">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h3 className="font-bold text-slate-900">
-                {editingProvider ? 'Editar Proveedor' : 'Registrar Proveedor'}
-              </h3>
-              <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="h-5 w-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            {/* Header Fijo */}
+            <div className="flex justify-between items-center px-6 py-4.5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-indigo-50/30 shrink-0">
+              <div className="flex items-center gap-3.5">
+                <div className="bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-xl p-3 shadow-md shadow-indigo-100 flex items-center justify-center">
+                  <Truck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                    {editingProvider ? 'Editar Datos del Proveedor' : 'Registrar Nuevo Proveedor'}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    Compras y Suministros • Clasificación Fiscal SENIAT (IVA y Retenciones)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+                title="Cerrar modal"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="p-6 space-y-4">
-              {modalSuccess && (
-                <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center gap-3 text-emerald-800 text-sm">
-                  <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0" />
-                  <span>¡Datos del proveedor guardados con éxito!</span>
-                </div>
-              )}
+            <form onSubmit={handleSave} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-6 space-y-4.5 overflow-y-auto flex-1 custom-scrollbar">
+                {modalSuccess && (
+                  <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center gap-3 text-emerald-800 text-xs sm:text-sm font-semibold">
+                    <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0" />
+                    <span>¡Datos del proveedor guardados con éxito!</span>
+                  </div>
+                )}
 
-              {modalError && (
-                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-3 text-rose-700 text-sm">
-                  <AlertCircle className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
-                  <span>{modalError}</span>
-                </div>
-              )}
+                {modalError && (
+                  <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-3 text-rose-700 text-xs sm:text-sm font-semibold">
+                    <AlertCircle className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
+                    <span>{modalError}</span>
+                  </div>
+                )}
 
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Nombre / Razón Social</label>
-                <div className="relative">
-                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                    Nombre / Razón Social <span className="text-rose-500">*</span>
+                  </label>
                   <input
                     type="text"
                     required
                     placeholder="Ej. Distribuidora Polar, C.A."
-                    className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200"
+                    className={`block w-full px-3.5 py-2.5 rounded-xl text-sm outline-none transition-all duration-200 font-medium ${
+                      errorFields['name']
+                        ? 'border-2 border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/30'
+                        : 'border border-slate-200 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-slate-50 focus:bg-white'
+                    }`}
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">RIF de la Empresa</label>
-                <div className="flex gap-2">
-                  <div className="relative shrink-0 w-24">
-                    <select
-                      className="block w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none bg-white focus:ring-2 focus:ring-primary-500/20 font-semibold text-slate-700"
-                      value={taxPrefix}
-                      onChange={(e) => {
-                        const pref = e.target.value as 'V' | 'J' | 'G';
-                        setTaxPrefix(pref);
-                        setFormData(prev => ({ ...prev, tax_id: getFormattedTaxId(pref, taxNumber) }));
-                      }}
-                    >
-                      <option value="J">J-</option>
-                      <option value="G">G-</option>
-                      <option value="V">V-</option>
-                    </select>
+                <RifInput
+                  value={formData.tax_id}
+                  required
+                  label="RIF del Proveedor"
+                  onChange={(formattedRif) => {
+                    setFormData(prev => ({ ...prev, tax_id: formattedRif }));
+                    if (errorFields['taxNumber']) setErrorFields({ ...errorFields, taxNumber: false });
+                  }}
+                />
+
+                {/* Switch Agente de Retención */}
+                <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-3 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">Agente de Retención SENIAT</span>
+                      <p className="text-[11px] text-slate-500 mt-0.5">¿Este proveedor actúa como Agente de Retención de IVA / Contribuyente Especial?</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={formData.is_retention_agent}
+                        onChange={(e) => setFormData({ ...formData, is_retention_agent: e.target.checked })}
+                      />
+                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
                   </div>
-                  <div className="relative flex-1">
-                    <FileText className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                    <input
-                      type="text"
-                      required
-                      placeholder={taxPrefix === 'V' ? 'Ej. 12345678' : 'Ej. 123456789'}
-                      className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200 font-mono"
-                      value={taxNumber}
-                      onChange={(e) => {
-                        const num = e.target.value.replace(/\D/g, '');
-                        if (num.length <= 9) {
-                          setTaxNumber(num);
-                          setFormData(prev => ({ ...prev, tax_id: getFormattedTaxId(taxPrefix, num) }));
-                        }
-                      }}
-                    />
+
+                {formData.is_retention_agent && (
+                  <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-200/60 animate-in fade-in duration-200">
+                    <div>
+                      <label className="block text-[11px] font-semibold uppercase text-slate-600 mb-1">% Retención IVA Aplicable</label>
+                      <select
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        value={formData.retention_percentage}
+                        onChange={(e) => setFormData({ ...formData, retention_percentage: Number(e.target.value) })}
+                      >
+                        <option value={75}>75% (Retención Estándar)</option>
+                        <option value={100}>100% (Retención Total SENIAT)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold uppercase text-slate-600 mb-1">% Retención ISLR Predeterminado</label>
+                      <select
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        value={formData.islr_percentage}
+                        onChange={(e) => setFormData({ ...formData, islr_percentage: Number(e.target.value) })}
+                      >
+                        <option value={1.0}>1.00% (Bienes y Mercancías)</option>
+                        <option value={2.0}>2.00% (Servicios Comerciales)</option>
+                        <option value={3.0}>3.00% (Honorarios Profesionales Firma)</option>
+                        <option value={5.0}>5.00% (Comisiones y Arrendamientos)</option>
+                      </select>
+                    </div>
                   </div>
-                </div>
-                {taxNumber && (
-                  <p className="text-xs text-slate-500 mt-1.5 flex items-center gap-2">
-                    <span>Identificador final:</span>
-                    <span className="font-mono text-sm font-bold bg-indigo-50 border border-indigo-100 text-indigo-700 px-2.5 py-0.5 rounded-lg">
-                      {getFormattedTaxId(taxPrefix, taxNumber)}
-                    </span>
-                  </p>
                 )}
-              </div>
-
-              {/* Zone and Taxpayer Selects */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Zona / Estado</label>
-                  <div className="relative">
-                    <Map className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                    <select
-                      className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none bg-white focus:ring-2 focus:ring-primary-500/20"
-                      value={formData.zone_code}
-                      onChange={(e) => setFormData({ ...formData, zone_code: e.target.value })}
-                    >
-                      {VENEZUELAN_STATES.map(s => (
-                        <option key={s.code} value={s.code}>{s.name} ({s.code})</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Tipo de Contribuyente</label>
-                  <div className="relative">
-                    <ShieldAlert className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                    <select
-                      className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none bg-white focus:ring-2 focus:ring-primary-500/20"
-                      value={formData.taxpayer_type}
-                      onChange={(e) => setFormData({ ...formData, taxpayer_type: e.target.value })}
-                    >
-                      {TAXPAYER_TYPES.map(t => (
-                        <option key={t.code} value={t.code}>{t.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Email de Contacto</label>
-                  <div className="relative">
-                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                    <input
-                      type="email"
-                      placeholder="ventas@polar.com"
-                      className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Teléfono</label>
-                  <div className="relative">
-                    <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="0412-1234567"
-                      className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    />
-                  </div>
-                </div>
               </div>
 
               <div>
@@ -522,23 +546,25 @@ export default function ProvidersPage() {
                     onChange={(e) => setFormData({ ...formData, delivery_address: e.target.value })}
                   />
                 </div>
+                </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              {/* Footer Fijo */}
+              <div className="flex justify-between items-center px-6 py-4 border-t border-slate-100 bg-slate-50/80 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors"
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold rounded-xl transition-all text-sm cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:opacity-75 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all"
+                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:from-indigo-700 active:to-violet-700 text-white font-semibold rounded-xl transition-all shadow-md shadow-indigo-200 text-sm cursor-pointer active:scale-98 disabled:opacity-50"
                 >
                   {isSaving && <Loader2 className="animate-spin h-4 w-4" />}
-                  {editingProvider ? 'Guardar Cambios' : 'Registrar'}
+                  {editingProvider ? 'Guardar Cambios' : 'Registrar Proveedor'}
                 </button>
               </div>
             </form>
@@ -546,34 +572,46 @@ export default function ProvidersPage() {
         </div>
       )}
 
-      {/* Delete Confirmation */}
+      {/* Delete Confirmation (Sally Enterprise UX Standard) */}
       {deletingId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 overflow-hidden p-6 space-y-4 animate-in scale-in duration-200">
-            <div className="flex items-start gap-3">
-              <div className="p-2.5 bg-rose-50 rounded-xl text-rose-600 mt-0.5 shrink-0">
-                <Trash2 className="h-5 w-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center px-6 py-4.5 border-b border-slate-100 bg-rose-50/50 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-rose-100 text-rose-600 rounded-xl">
+                  <Trash2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900">¿Desactivar proveedor?</h3>
+                  <p className="text-xs text-slate-500 font-medium">Suspensión temporal de compras</p>
+                </div>
               </div>
-              <div className="space-y-1">
-                <h3 className="font-bold text-slate-900">¿Desactivar proveedor?</h3>
-                <p className="text-xs text-slate-500">
-                  Esta acción desactivará al proveedor. No se podrán registrar nuevas facturas de compras asociadas a él, pero se conservará su historial para fines contables.
-                </p>
-              </div>
+              <button
+                onClick={() => setDeletingId(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="p-6">
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Esta acción desactivará al proveedor. No se podrán registrar nuevas facturas de compras asociadas a él, pero se conservará su historial para fines de balance y auditoría fiscal.
+              </p>
+            </div>
+
+            <div className="flex justify-between items-center px-6 py-4 border-t border-slate-100 bg-slate-50/80 shrink-0">
               <button
                 type="button"
                 onClick={() => setDeletingId(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors"
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleDeleteConfirm}
                 disabled={isDeleting}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold transition-colors"
+                className="flex items-center gap-1.5 px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-xl transition-all shadow-md shadow-rose-200 cursor-pointer disabled:opacity-50"
               >
                 {isDeleting && <Loader2 className="animate-spin h-4 w-4" />}
                 Confirmar Desactivación

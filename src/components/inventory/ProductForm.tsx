@@ -18,9 +18,12 @@ import {
   Plus,
   Trash2,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Upload,
+  Warehouse
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
+import { SearchableSelect } from '@/components/SearchableSelect';
 
 interface Variation {
   name: string;
@@ -33,6 +36,7 @@ export const ProductForm: React.FC = () => {
   const [formData, setFormData] = useState({
     sku: '',
     name: '',
+    imageUrl: '',
     costUsd: 0,
     priceUsd: 0,
     taxRate: 16.00,
@@ -41,6 +45,70 @@ export const ProductForm: React.FC = () => {
     category: 'General',
     categoryId: '',
   });
+
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+
+  const compressAndGetBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxWidth = 800;
+
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
+          } else {
+            resolve(e.target?.result as string);
+          }
+        };
+        img.onerror = () => resolve(e.target?.result as string);
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (!file) return;
+    const MAX_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB (Estándar óptimo para catálogo ERP/Web)
+    if (file.size > MAX_SIZE_BYTES) {
+      setImageError(`⚠️ El archivo seleccionado (${(file.size / (1024 * 1024)).toFixed(1)} MB) supera el tamaño óptimo permitido de 2 MB.`);
+      return;
+    }
+
+    setImageError(null);
+    setIsUploadingImage(true);
+    try {
+      const base64 = await compressAndGetBase64(file);
+      const res = await apiClient.post('/inventory/products/upload-image', {
+        image_base64: base64,
+        filename: file.name,
+        category_name: formData.category || 'General',
+      });
+      if (res.data?.url) {
+        setFormData((prev) => ({ ...prev, imageUrl: res.data.url }));
+      }
+    } catch (err: any) {
+      setImageError('Error al procesar la imagen.');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
 
   const [taxType, setTaxType] = useState('TAXABLE');
   const [isPerishable, setIsPerishable] = useState(false);
@@ -86,6 +154,12 @@ export const ProductForm: React.FC = () => {
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Products list for name autocomplete
+  const [existingProducts, setExistingProducts] = useState<{ id: string; name: string; sku?: string; category?: string; costUsd?: number; priceUsd?: number }[]>([]);
+  const [filteredProductSuggestions, setFilteredProductSuggestions] = useState<{ id: string; name: string; sku?: string; category?: string; costUsd?: number; priceUsd?: number }[]>([]);
+  const [showNameDropdown, setShowNameDropdown] = useState(false);
+  const nameDropdownRef = useRef<HTMLDivElement>(null);
+
   const fetchCategoriesList = async () => {
     try {
       const response = await apiClient.get('/inventory/categories');
@@ -104,21 +178,60 @@ export const ProductForm: React.FC = () => {
     }
   };
 
+  const fetchProductsList = async () => {
+    try {
+      const response = await apiClient.get('/inventory/products');
+      setExistingProducts(response.data || []);
+    } catch (err) {
+      console.error('Error fetching products list for autocomplete:', err);
+    }
+  };
+
   useEffect(() => {
     fetchCategoriesList();
     fetchLocationsList();
+    fetchProductsList();
   }, []);
 
-  // Close dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setShowDropdown(false);
       }
+      if (nameDropdownRef.current && !nameDropdownRef.current.contains(e.target as Node)) {
+        setShowNameDropdown(false);
+      }
     };
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
+
+  const handleProductNameChange = (val: string) => {
+    setFormData(prev => ({ ...prev, name: val }));
+    if (val.trim()) {
+      const matches = existingProducts.filter(p =>
+        p.name.toLowerCase().includes(val.toLowerCase()) ||
+        (p.sku && p.sku.toLowerCase().includes(val.toLowerCase()))
+      );
+      setFilteredProductSuggestions(matches);
+      setShowNameDropdown(true);
+    } else {
+      setFilteredProductSuggestions([]);
+      setShowNameDropdown(false);
+    }
+  };
+
+  const handleSelectProductName = (prod: { id: string; name: string; sku?: string; category?: string; costUsd?: number; priceUsd?: number }) => {
+    setFormData(prev => ({
+      ...prev,
+      name: prod.name,
+      category: prod.category || prev.category,
+      costUsd: prod.costUsd !== undefined ? prod.costUsd : prev.costUsd,
+      priceUsd: prod.priceUsd !== undefined ? prod.priceUsd : prev.priceUsd,
+    }));
+    setShowNameDropdown(false);
+  };
 
   const handleCategoryChange = (val: string) => {
     setFormData(prev => ({ ...prev, category: val, categoryId: '' }));
@@ -202,6 +315,7 @@ export const ProductForm: React.FC = () => {
       await apiClient.post('/inventory/products', [{
         sku: formData.sku.trim().toUpperCase(),
         name: formData.name.trim(),
+        imageUrl: formData.imageUrl.trim() || undefined,
         costUsd: Number(formData.costUsd),
         priceUsd: Number(formData.priceUsd),
         taxRate: Number(formData.taxRate),
@@ -224,6 +338,7 @@ export const ProductForm: React.FC = () => {
       setFormData({
         sku: '',
         name: '',
+        imageUrl: '',
         costUsd: 0,
         priceUsd: 0,
         taxRate: 16.00,
@@ -314,7 +429,7 @@ export const ProductForm: React.FC = () => {
           </div>
         </div>
 
-        <div>
+        <div className="relative" ref={nameDropdownRef}>
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Nombre del Producto</label>
           <div className="relative">
             <Package className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
@@ -324,8 +439,103 @@ export const ProductForm: React.FC = () => {
               placeholder="Ej. Harina Pan 1kg"
               className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm placeholder-slate-400 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) => handleProductNameChange(e.target.value)}
+              onFocus={() => {
+                if (formData.name.trim()) {
+                  const matches = existingProducts.filter(p => p.name.toLowerCase().includes(formData.name.toLowerCase()));
+                  setFilteredProductSuggestions(matches);
+                  setShowNameDropdown(true);
+                }
+              }}
             />
+          </div>
+          {showNameDropdown && filteredProductSuggestions.length > 0 && (
+            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100 animate-in fade-in duration-150">
+              <div className="px-3 py-1.5 bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                Sugerencias de productos registrados (Haz clic para autocompletar)
+              </div>
+              {filteredProductSuggestions.map((prod) => (
+                <div
+                  key={prod.id}
+                  onClick={() => handleSelectProductName(prod)}
+                  className="flex justify-between items-center px-4 py-2.5 hover:bg-indigo-50/60 cursor-pointer text-sm text-slate-700 transition-colors"
+                >
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-slate-800">{prod.name}</span>
+                    {prod.sku && (
+                      <span className="text-[10px] font-mono text-slate-400">SKU: {prod.sku} • {prod.category || 'General'}</span>
+                    )}
+                  </div>
+                  {prod.priceUsd !== undefined && (
+                    <span className="text-xs font-mono font-bold text-emerald-600">
+                      ${prod.priceUsd.toFixed(2)}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+              Imagen del Producto
+            </label>
+            <span className="text-[10px] text-slate-400">Tamaño óptimo: Máximo 2 MB (JPG, PNG, WebP)</span>
+          </div>
+
+          <div className="space-y-2">
+            {imageError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-between gap-2 text-rose-700 text-xs animate-in fade-in duration-200">
+                <span>{imageError}</span>
+                <button type="button" onClick={() => setImageError(null)} className="text-rose-400 hover:text-rose-600 font-bold">
+                  ✕
+                </button>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <label className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-xl text-xs font-semibold cursor-pointer transition-all shrink-0">
+                <Upload className="w-4 h-4" />
+                <span>{isUploadingImage ? 'Guardando...' : 'Subir desde mi PC'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  disabled={isUploadingImage}
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileUpload(file);
+                  }}
+                />
+              </label>
+
+              <input
+                type="text"
+                placeholder="O pega una URL externa (https://...)"
+                className="block w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm placeholder-slate-400 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200 font-mono text-xs"
+                value={formData.imageUrl}
+                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+              />
+
+              {formData.imageUrl && (
+                <div className="w-10 h-10 rounded-xl border border-slate-200 overflow-hidden shrink-0 bg-slate-100 flex items-center justify-center shadow-xs">
+                  <img
+                    src={formData.imageUrl}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                    onError={(e: any) => { e.target.style.display = 'none'; }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {formData.imageUrl && formData.imageUrl.includes('/uploads/tenants/') && (
+              <p className="text-[11px] text-emerald-600 font-mono flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Almacenada en directorio privado de empresa
+              </p>
+            )}
           </div>
         </div>
 
@@ -389,22 +599,38 @@ export const ProductForm: React.FC = () => {
         </div>
 
         <div>
+          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Almacén / Ubicación Principal</label>
+          <SearchableSelect
+            icon={Warehouse}
+            value={selectedWarehouseId}
+            onChange={(val) => setSelectedWarehouseId(val)}
+            options={[
+              { value: '', label: '-- Sin Ubicación Asignada --' },
+              ...buildHierarchicalOptions(locations).map(loc => ({
+                value: loc.id,
+                label: loc.name,
+              }))
+            ]}
+            placeholder="Buscar o seleccionar ubicación..."
+          />
+        </div>
+
+        <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Unidad de Medida</label>
-          <div className="relative">
-            <Scale className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-            <select
-              className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200 appearance-none bg-white"
-              value={formData.unitOfMeasure}
-              onChange={(e) => setFormData({ ...formData, unitOfMeasure: e.target.value })}
-            >
-              <option value="unidades">Unidades (unidad)</option>
-              <option value="kg">Kilogramos (kg)</option>
-              <option value="gramos">Gramos (g)</option>
-              <option value="litros">Litros (l)</option>
-              <option value="ml">Mililitros (ml)</option>
-              <option value="paquetes">Paquetes</option>
-            </select>
-          </div>
+          <SearchableSelect
+            icon={Scale}
+            value={formData.unitOfMeasure}
+            onChange={(val) => setFormData(prev => ({ ...prev, unitOfMeasure: val }))}
+            options={[
+              { value: 'unidades', label: 'Unidades (unidad)' },
+              { value: 'kg', label: 'Kilogramos (kg)' },
+              { value: 'gramos', label: 'Gramos (g)' },
+              { value: 'litros', label: 'Litros (l)' },
+              { value: 'ml', label: 'Mililitros (ml)' },
+              { value: 'paquetes', label: 'Paquetes' },
+            ]}
+            placeholder="Seleccionar unidad de medida..."
+          />
         </div>
 
         <div>
@@ -616,7 +842,7 @@ export const ProductForm: React.FC = () => {
                         <th className="py-2.5 px-4">SKU</th>
                         <th className="py-2.5 px-4 text-right">Stock</th>
                         <th className="py-2.5 px-4 text-right">Costo</th>
-                        <th className="py-2.5 px-4 text-right">Acción</th>
+                        <th className="py-2.5 px-4 text-right">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -630,7 +856,8 @@ export const ProductForm: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleRemoveVariation(i)}
-                              className="text-rose-500 hover:bg-rose-50 p-1 rounded transition-colors cursor-pointer"
+                              className="text-slate-400 hover:text-rose-600 hover:bg-rose-50/80 p-1.5 rounded-lg transition-all cursor-pointer"
+                              title="Remover variación"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>

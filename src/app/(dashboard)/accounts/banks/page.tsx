@@ -17,8 +17,12 @@ import {
   Smartphone,
   ChevronRight,
   Edit2,
-  Trash2
+  Trash2,
+  SlidersHorizontal
 } from 'lucide-react';
+import { ActionTooltip } from '@/components/ActionTooltip';
+import { SearchableSelect } from '@/components/SearchableSelect';
+import { RifInput } from '@/components/RifInput';
 import apiClient from '@/infrastructure/api/api-client';
 import { VENEZUELAN_BANKS } from '@/constants/venezuela';
 
@@ -453,15 +457,15 @@ export default function BankAccountsPage() {
                 <div className="absolute right-4 top-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button 
                     onClick={() => handleOpenEdit(acc)}
-                    className="p-1 hover:bg-white/20 rounded text-white cursor-pointer"
-                    title="Editar"
+                    className="p-1.5 hover:bg-white/20 rounded-lg text-white/90 hover:text-white transition-all cursor-pointer"
+                    title="Editar cuenta"
                   >
                     <Edit2 className="h-3.5 w-3.5" />
                   </button>
                   <button 
                     onClick={() => setDeletingId(acc.id)}
-                    className="p-1 hover:bg-white/20 rounded text-rose-300 cursor-pointer"
-                    title="Eliminar"
+                    className="p-1.5 hover:bg-white/20 rounded-lg text-rose-200 hover:text-rose-100 transition-all cursor-pointer"
+                    title="Eliminar cuenta"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -472,190 +476,203 @@ export default function BankAccountsPage() {
         </div>
       )}
 
-      {/* Create/Edit Modal */}
+      {/* Create/Edit Modal (Sally Enterprise UX Standard) */}
       {activeModal === 'create' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-slate-100 overflow-hidden animate-in scale-in duration-200">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h3 className="font-bold text-slate-900">
-                {editingAccount ? 'Editar Cuenta' : 'Registrar Cuenta Bancaria'}
-              </h3>
-              <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-slate-600">
-                <X className="h-5 w-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            {/* Header Fijo */}
+            <div className="flex justify-between items-center px-6 py-4.5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-indigo-50/30 shrink-0">
+              <div className="flex items-center gap-3.5">
+                <div className="bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-xl p-3 shadow-md shadow-indigo-100 flex items-center justify-center">
+                  <Landmark className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                    {editingAccount ? 'Editar Cuenta Bancaria' : 'Registrar Cuenta Bancaria'}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    Tesorería & Conciliación • Paridad Multimoneda (USD / VES)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveModal(null)}
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+                title="Cerrar modal"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveAccount} className="p-6 space-y-4">
-              {modalSuccess && (
-                <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center gap-3 text-emerald-800 text-sm">
-                  <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0" />
-                  <span>¡Datos guardados con éxito!</span>
-                </div>
-              )}
+            <form onSubmit={handleSaveAccount} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-6 space-y-4.5 overflow-y-auto flex-1 custom-scrollbar">
+                {modalSuccess && (
+                  <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center gap-3 text-emerald-800 text-xs sm:text-sm font-semibold">
+                    <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0" />
+                    <span>¡Datos bancarios guardados con éxito!</span>
+                  </div>
+                )}
 
-              {modalError && (
-                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-100 text-rose-700 text-sm">
-                  <span>{modalError}</span>
-                </div>
-              )}
+                {modalError && (
+                  <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-100 text-rose-700 text-xs sm:text-sm font-semibold">
+                    <span>{modalError}</span>
+                  </div>
+                )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Nombre Alias</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej. Banesco Principal"
-                    className="block w-full p-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-                    value={accountForm.name}
-                    onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Banco / Entidad</label>
-                  {accountForm.currency === 'VES' ? (
-                    <select
-                      className="block w-full p-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none bg-white focus:ring-2 focus:ring-primary-500/20"
-                      value={VENEZUELAN_BANKS.find(b => b.name === accountForm.bank_name)?.code || ''}
-                      onChange={(e) => handleBankDropdownChange(e.target.value)}
-                    >
-                      <option value="">Selecciona Banco Venezolano...</option>
-                      {VENEZUELAN_BANKS.map(b => (
-                        <option key={b.code} value={b.code}>{b.name} ({b.code})</option>
-                      ))}
-                    </select>
-                  ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Nombre Alias de la Cuenta</label>
                     <input
                       type="text"
                       required
-                      placeholder="Ej. Chase Bank, Wells Fargo"
-                      className="block w-full p-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-                      value={accountForm.bank_name}
-                      onChange={(e) => setAccountForm({ ...accountForm, bank_name: e.target.value })}
+                      placeholder="Ej. Banesco Operativo Principal"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium"
+                      value={accountForm.name}
+                      onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })}
                     />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Banco / Entidad Financiera</label>
+                    {accountForm.currency === 'VES' ? (
+                      <select
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium"
+                        value={VENEZUELAN_BANKS.find(b => b.name === accountForm.bank_name)?.code || ''}
+                        onChange={(e) => handleBankDropdownChange(e.target.value)}
+                      >
+                        <option value="">Selecciona Banco Nacional...</option>
+                        {VENEZUELAN_BANKS.map(b => (
+                          <option key={b.code} value={b.code}>{b.name} ({b.code})</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ej. Chase Bank, Wells Fargo, Banesco Panamá"
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium"
+                        value={accountForm.bank_name}
+                        onChange={(e) => setAccountForm({ ...accountForm, bank_name: e.target.value })}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Moneda</label>
+                    <select
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-bold"
+                      value={accountForm.currency}
+                      disabled={!!editingAccount}
+                      onChange={(e) => {
+                        const newCur = e.target.value;
+                        setAccountForm({ 
+                          ...accountForm, 
+                          currency: newCur,
+                          bank_name: newCur === 'VES' ? VENEZUELAN_BANKS[0].name : '',
+                          p2p_bank_code: newCur === 'VES' ? VENEZUELAN_BANKS[0].code : ''
+                        });
+                      }}
+                    >
+                      <option value="USD">USD ($ - Dólar)</option>
+                      <option value="VES">VES (Bs. - Bolívares)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Tipo de Cuenta</label>
+                    <select
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium"
+                      value={accountForm.account_type}
+                      onChange={(e) => setAccountForm({ ...accountForm, account_type: e.target.value })}
+                    >
+                      <option value="CORRIENTE">Corriente</option>
+                      <option value="AHORRO">Ahorro</option>
+                      <option value="EFECTIVO">Caja de Efectivo</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Saldo Inicial</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      disabled={!!editingAccount}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-mono font-bold text-right"
+                      value={accountForm.initial_balance}
+                      onChange={(e) => setAccountForm({ ...accountForm, initial_balance: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Número de Cuenta (20 dígitos)</label>
+                  <input
+                    type="text"
+                    placeholder="0102-0000-00-0000000000"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono text-sm font-semibold"
+                    value={accountForm.account_number}
+                    onChange={(e) => setAccountForm({ ...accountForm, account_number: e.target.value })}
+                  />
+                  {warningMsg && (
+                    <p className="text-xs text-rose-500 font-semibold mt-1 animate-pulse">
+                      {warningMsg}
+                    </p>
                   )}
                 </div>
-              </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Moneda</label>
-                  <select
-                    className="block w-full p-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none bg-white focus:ring-2 focus:ring-primary-500/20"
-                    value={accountForm.currency}
-                    disabled={!!editingAccount}
-                    onChange={(e) => {
-                      const newCur = e.target.value;
-                      setAccountForm({ 
-                        ...accountForm, 
-                        currency: newCur,
-                        bank_name: newCur === 'VES' ? VENEZUELAN_BANKS[0].name : '',
-                        p2p_bank_code: newCur === 'VES' ? VENEZUELAN_BANKS[0].code : ''
-                      });
-                    }}
-                  >
-                    <option value="USD">USD ($)</option>
-                    <option value="VES">VES (Bs.)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Tipo de Cuenta</label>
-                  <select
-                    className="block w-full p-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none bg-white focus:ring-2 focus:ring-primary-500/20"
-                    value={accountForm.account_type}
-                    onChange={(e) => setAccountForm({ ...accountForm, account_type: e.target.value })}
-                  >
-                    <option value="CORRIENTE">Corriente</option>
-                    <option value="AHORRO">Ahorro</option>
-                    <option value="EFECTIVO">Caja de Efectivo</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Saldo Inicial</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    disabled={!!editingAccount}
-                    className="block w-full p-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 text-right"
-                    value={accountForm.initial_balance}
-                    onChange={(e) => setAccountForm({ ...accountForm, initial_balance: Number(e.target.value) })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Número de Cuenta (20 dígitos)</label>
-                <input
-                  type="text"
-                  placeholder="0102-0000-00-0000000000"
-                  className="block w-full p-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 font-mono text-xs"
-                  value={accountForm.account_number}
-                  onChange={(e) => setAccountForm({ ...accountForm, account_number: e.target.value })}
-                />
-                {warningMsg && (
-                  <p className="text-[10px] text-rose-500 font-semibold mt-1 animate-pulse">
-                    {warningMsg}
-                  </p>
+                {/* Pago Móvil section */}
+                {accountForm.currency === 'VES' && (
+                  <div className="border border-indigo-100 bg-indigo-50/40 rounded-2xl p-4 space-y-3">
+                    <span className="text-xs font-bold uppercase tracking-wider text-indigo-900 block">Metadatos de Pago Móvil Interbancario (P2P)</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Teléfono</label>
+                        <input
+                          type="text"
+                          placeholder="04121234567"
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono"
+                          value={accountForm.p2p_phone}
+                          onChange={(e) => setAccountForm({ ...accountForm, p2p_phone: e.target.value })}
+                        />
+                      </div>
+                      <RifInput
+                        value={accountForm.p2p_tax_id || ''}
+                        label="RIF / Cédula Pago Móvil"
+                        onChange={(formattedRif) => setAccountForm(prev => ({ ...prev, p2p_tax_id: formattedRif }))}
+                      />
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Código Banco</label>
+                        <input
+                          type="text"
+                          disabled
+                          placeholder="0102"
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono bg-slate-100 text-slate-600 font-bold"
+                          value={accountForm.p2p_bank_code}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
 
-              {/* Pago Móvil section */}
-              {accountForm.currency === 'VES' && (
-                <div className="border-t border-slate-100 pt-3 space-y-3">
-                  <span className="text-xs font-bold text-primary-600 block">Metadatos de Pago Móvil (P2P)</span>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-500 mb-1">Teléfono</label>
-                      <input
-                        type="text"
-                        placeholder="04121234567"
-                        className="block w-full p-2 border border-slate-200 rounded-xl text-xs"
-                        value={accountForm.p2p_phone}
-                        onChange={(e) => setAccountForm({ ...accountForm, p2p_phone: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-500 mb-1">RIF / C.I.</label>
-                      <input
-                        type="text"
-                        placeholder="J-12345678-9"
-                        className="block w-full p-2 border border-slate-200 rounded-xl text-xs"
-                        value={accountForm.p2p_tax_id}
-                        onChange={(e) => setAccountForm({ ...accountForm, p2p_tax_id: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-500 mb-1">Banco Código</label>
-                      <input
-                        type="text"
-                        disabled
-                        placeholder="0102"
-                        className="block w-full p-2 border border-slate-200 rounded-xl text-xs font-mono bg-slate-50 text-slate-500"
-                        value={accountForm.p2p_bank_code}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              {/* Footer Fijo */}
+              <div className="flex justify-between items-center px-6 py-4 border-t border-slate-100 bg-slate-50/80 shrink-0">
                 <button
                   type="button"
                   onClick={() => setActiveModal(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors"
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold rounded-xl transition-all text-sm cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold transition-all disabled:opacity-50"
+                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:from-indigo-700 active:to-violet-700 text-white font-semibold rounded-xl transition-all shadow-md shadow-indigo-200 text-sm cursor-pointer active:scale-98 disabled:opacity-50"
                 >
                   {isSaving && <Loader2 className="animate-spin h-4 w-4" />}
-                  {editingAccount ? 'Guardar Cambios' : 'Registrar'}
+                  {editingAccount ? 'Guardar Cambios' : 'Registrar Cuenta'}
                 </button>
               </div>
             </form>
@@ -663,108 +680,126 @@ export default function BankAccountsPage() {
         </div>
       )}
 
-      {/* Adjust Balance Modal */}
+      {/* Adjust Balance Modal (Sally Enterprise UX Standard) */}
       {activeModal === 'adjust' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 overflow-hidden animate-in scale-in duration-200">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h3 className="font-bold text-slate-900">Ajuste Manual de Saldo</h3>
-              <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-slate-600">
-                <X className="h-5 w-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            {/* Header Fijo */}
+            <div className="flex justify-between items-center px-6 py-4.5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-indigo-50/30 shrink-0">
+              <div className="flex items-center gap-3.5">
+                <div className="bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-xl p-3 shadow-md shadow-indigo-100 flex items-center justify-center">
+                  <SlidersHorizontal className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                    Ajuste Manual de Saldo
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    Calibración de saldo en libros por auditoría
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveModal(null)}
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleAdjustBalance} className="p-6 space-y-4">
-              {modalSuccess && (
-                <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center gap-3 text-emerald-800 text-sm animate-in fade-in">
-                  <CheckCircle className="h-5 w-5 text-emerald-500" />
-                  <span>Ajuste registrado con éxito.</span>
-                </div>
-              )}
+            <form onSubmit={handleAdjustBalance} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+                {modalSuccess && (
+                  <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center gap-3 text-emerald-800 text-xs sm:text-sm font-semibold">
+                    <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0" />
+                    <span>Ajuste registrado con éxito.</span>
+                  </div>
+                )}
 
-              {modalError && (
-                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-100 text-rose-700 text-sm">
-                  <span>{modalError}</span>
-                </div>
-              )}
+                {modalError && (
+                  <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-100 text-rose-700 text-xs sm:text-sm font-semibold">
+                    <span>{modalError}</span>
+                  </div>
+                )}
 
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Cuenta Bancaria</label>
-                <select
-                  required
-                  className="block w-full p-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none bg-white"
-                  value={adjustForm.accountId}
-                  onChange={(e) => setAdjustForm({ ...adjustForm, accountId: e.target.value })}
-                >
-                  <option value="">Selecciona una cuenta...</option>
-                  {accounts.map(a => (
-                    <option key={a.id} value={a.id}>{a.name} (${Number(a.current_balance).toFixed(2)} {a.currency})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Tipo Ajuste</label>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Cuenta Bancaria Destino</label>
                   <select
-                    className="block w-full p-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none bg-white"
-                    value={adjustForm.type}
-                    onChange={(e) => setAdjustForm({ ...adjustForm, type: e.target.value })}
+                    required
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium"
+                    value={adjustForm.accountId}
+                    onChange={(e) => setAdjustForm({ ...adjustForm, accountId: e.target.value })}
                   >
-                    <option value="DEPOSIT">Depósito / Ingreso (+)</option>
-                    <option value="WITHDRAWAL">Retiro / Egreso (-)</option>
+                    <option value="">Selecciona una cuenta...</option>
+                    {accounts.map(a => (
+                      <option key={a.id} value={a.id}>{a.name} (${Number(a.current_balance).toFixed(2)} {a.currency})</option>
+                    ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Monto</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    required
-                    placeholder="0.00"
-                    className="block w-full p-2.5 border border-slate-200 rounded-xl text-sm text-right font-medium"
-                    value={adjustForm.amount}
-                    onChange={(e) => setAdjustForm({ ...adjustForm, amount: e.target.value })}
-                  />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Tipo de Ajuste</label>
+                    <select
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-semibold"
+                      value={adjustForm.type}
+                      onChange={(e) => setAdjustForm({ ...adjustForm, type: e.target.value })}
+                    >
+                      <option value="DEPOSIT">Depósito / Ingreso (+)</option>
+                      <option value="WITHDRAWAL">Retiro / Egreso (-)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Monto de Ajuste</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      required
+                      placeholder="0.00"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-mono font-black text-right"
+                      value={adjustForm.amount}
+                      onChange={(e) => setAdjustForm({ ...adjustForm, amount: e.target.value })}
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Nro. Referencia (Opcional)</label>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Nro. de Referencia (Opcional)</label>
                   <input
                     type="text"
-                    placeholder="Referencia de transferencia o cheque..."
-                    className="block w-full p-2.5 border border-slate-200 rounded-xl text-sm"
+                    placeholder="Referencia de transferencia, voucher o nota contable..."
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-mono"
                     value={adjustForm.reference}
                     onChange={(e) => setAdjustForm({ ...adjustForm, reference: e.target.value })}
                   />
                 </div>
+
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Descripción / Concepto</label>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Descripción / Justificación</label>
                   <input
                     type="text"
-                    placeholder="Ej. Inyección de capital, Pago de arriendo..."
-                    className="block w-full p-2.5 border border-slate-200 rounded-xl text-sm"
+                    placeholder="Ej. Inyección de capital, Pago de arriendo, Comisión..."
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm"
                     value={adjustForm.description}
                     onChange={(e) => setAdjustForm({ ...adjustForm, description: e.target.value })}
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              {/* Footer Fijo */}
+              <div className="flex justify-between items-center px-6 py-4 border-t border-slate-100 bg-slate-50/80 shrink-0">
                 <button
                   type="button"
                   onClick={() => setActiveModal(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors"
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold rounded-xl transition-all text-sm cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving || !adjustForm.accountId}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold transition-all disabled:opacity-50"
+                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:from-indigo-700 active:to-violet-700 text-white font-semibold rounded-xl transition-all shadow-md shadow-indigo-200 text-sm cursor-pointer active:scale-98 disabled:opacity-50"
                 >
                   {isSaving && <Loader2 className="animate-spin h-4 w-4" />}
                   Aplicar Ajuste
@@ -775,102 +810,119 @@ export default function BankAccountsPage() {
         </div>
       )}
 
-      {/* Transfer Modal */}
+      {/* Transfer Modal (Sally Enterprise UX Standard) */}
       {activeModal === 'transfer' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 overflow-hidden animate-in scale-in duration-200">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h3 className="font-bold text-slate-900">Transferencia entre Cuentas</h3>
-              <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-slate-600">
-                <X className="h-5 w-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            {/* Header Fijo */}
+            <div className="flex justify-between items-center px-6 py-4.5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-indigo-50/30 shrink-0">
+              <div className="flex items-center gap-3.5">
+                <div className="bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-xl p-3 shadow-md shadow-indigo-100 flex items-center justify-center">
+                  <ArrowLeftRight className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                    Transferencia entre Cuentas
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    Movimiento de fondos interno en la misma moneda
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveModal(null)}
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleTransfer} className="p-6 space-y-4">
-              {modalSuccess && (
-                <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center gap-3 text-emerald-800 text-sm animate-in fade-in">
-                  <CheckCircle className="h-5 w-5 text-emerald-500" />
-                  <span>Transferencia completada con éxito.</span>
-                </div>
-              )}
+            <form onSubmit={handleTransfer} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+                {modalSuccess && (
+                  <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center gap-3 text-emerald-800 text-xs sm:text-sm font-semibold">
+                    <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0" />
+                    <span>Transferencia completada con éxito.</span>
+                  </div>
+                )}
 
-              {modalError && (
-                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-100 text-rose-700 text-sm">
-                  <span>{modalError}</span>
-                </div>
-              )}
+                {modalError && (
+                  <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-100 text-rose-700 text-xs sm:text-sm font-semibold">
+                    <span>{modalError}</span>
+                  </div>
+                )}
 
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Cuenta Origen</label>
-                  <select
-                    required
-                    className="block w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-white"
-                    value={transferForm.fromAccountId}
-                    onChange={(e) => setTransferForm({ ...transferForm, fromAccountId: e.target.value })}
-                  >
-                    <option value="">Selecciona cuenta de origen...</option>
-                    {accounts.map(a => (
-                      <option key={a.id} value={a.id}>{a.name} (${Number(a.current_balance).toFixed(2)} {a.currency})</option>
-                    ))}
-                  </select>
-                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Cuenta de Origen (Débito)</label>
+                    <select
+                      required
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium"
+                      value={transferForm.fromAccountId}
+                      onChange={(e) => setTransferForm({ ...transferForm, fromAccountId: e.target.value })}
+                    >
+                      <option value="">Selecciona cuenta de origen...</option>
+                      {accounts.map(a => (
+                        <option key={a.id} value={a.id}>{a.name} (${Number(a.current_balance).toFixed(2)} {a.currency})</option>
+                      ))}
+                    </select>
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Cuenta Destino</label>
-                  <select
-                    required
-                    className="block w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-white"
-                    value={transferForm.toAccountId}
-                    onChange={(e) => setTransferForm({ ...transferForm, toAccountId: e.target.value })}
-                  >
-                    <option value="">Selecciona cuenta de destino...</option>
-                    {accounts.map(a => (
-                      <option key={a.id} value={a.id}>{a.name} (${Number(a.current_balance).toFixed(2)} {a.currency})</option>
-                    ))}
-                  </select>
-                </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Cuenta de Destino (Crédito)</label>
+                    <select
+                      required
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium"
+                      value={transferForm.toAccountId}
+                      onChange={(e) => setTransferForm({ ...transferForm, toAccountId: e.target.value })}
+                    >
+                      <option value="">Selecciona cuenta de destino...</option>
+                      {accounts.map(a => (
+                        <option key={a.id} value={a.id}>{a.name} (${Number(a.current_balance).toFixed(2)} {a.currency})</option>
+                      ))}
+                    </select>
+                  </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Monto a Transferir</label>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Monto a Transferir</label>
                     <input
                       type="number"
                       step="0.01"
                       min="0.01"
                       required
                       placeholder="0.00"
-                      className="block w-full p-2.5 border border-slate-200 rounded-xl text-sm text-right font-medium"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-mono font-black text-right"
                       value={transferForm.amount}
                       onChange={(e) => setTransferForm({ ...transferForm, amount: e.target.value })}
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Descripción / Concepto</label>
-                  <input
-                    type="text"
-                    placeholder="Ej. Transferencia interna de caja a banco..."
-                    className="block w-full p-2.5 border border-slate-200 rounded-xl text-sm"
-                    value={transferForm.description}
-                    onChange={(e) => setTransferForm({ ...transferForm, description: e.target.value })}
-                  />
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Descripción / Concepto</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Transferencia interna de caja a banco operativo..."
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm"
+                      value={transferForm.description}
+                      onChange={(e) => setTransferForm({ ...transferForm, description: e.target.value })}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              {/* Footer Fijo */}
+              <div className="flex justify-between items-center px-6 py-4 border-t border-slate-100 bg-slate-50/80 shrink-0">
                 <button
                   type="button"
                   onClick={() => setActiveModal(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors"
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold rounded-xl transition-all text-sm cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving || !transferForm.fromAccountId || !transferForm.toAccountId}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold transition-all disabled:opacity-50"
+                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:from-indigo-700 active:to-violet-700 text-white font-semibold rounded-xl transition-all shadow-md shadow-indigo-200 text-sm cursor-pointer active:scale-98 disabled:opacity-50"
                 >
                   {isSaving && <Loader2 className="animate-spin h-4 w-4" />}
                   Transferir Fondos

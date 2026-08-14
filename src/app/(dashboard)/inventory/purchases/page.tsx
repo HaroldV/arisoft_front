@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  FileText, 
-  Plus, 
-  Download, 
-  Search, 
-  Loader2, 
+import {
+  FileText,
+  Plus,
+  Download,
+  Search,
+  Loader2,
   AlertCircle,
   ExternalLink,
   Eye,
@@ -15,10 +15,14 @@ import {
   ArrowRightLeft,
   Building,
   Printer,
-  ChevronRight
+  ChevronRight,
+  FileMinus,
+  FilePlus
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
+import { ActionTooltip } from '@/components/ActionTooltip';
 import { Modal } from '@/components/Modal';
+import { SearchableSelect, SelectOption } from '@/components/SearchableSelect';
 
 interface PurchaseInvoice {
   id: string;
@@ -30,13 +34,16 @@ interface PurchaseInvoice {
   proof_file_path?: string;
   created_at: string;
   creator_name?: string;
+  status?: string;
+  credit_notes?: string;
+  debit_notes?: string;
 }
 
 interface PurchaseItemDto {
   id: string;
   product_id: string;
   quantity: number;
-  unitCostUsd: number;
+  unit_cost_usd: number;
   product_sku: string;
   product_name: string;
 }
@@ -62,16 +69,11 @@ interface LocationOption {
 
 export default function PurchasesPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'purchases' | 'notes'>('purchases');
   const [purchases, setPurchases] = useState<PurchaseInvoice[]>([]);
   const [notes, setNotes] = useState<PurchaseNoteSummary[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Invoice Selector Modal State
-  const [isSelectingInvoice, setIsSelectingInvoice] = useState(false);
-  const [invoiceSearch, setInvoiceSearch] = useState('');
 
   // Details Modal state
   const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
@@ -103,6 +105,7 @@ export default function PurchasesPage() {
     unitPriceUsd: number;
     selected: boolean;
   }[]>([]);
+  const [noteTotalUsdInput, setNoteTotalUsdInput] = useState<string>('');
 
   // Feedback Notification Modal
   const [feedbackMessage, setFeedbackMessage] = useState<{ title: string; message: string; type: 'success' | 'error' } | null>(null);
@@ -120,11 +123,13 @@ export default function PurchasesPage() {
         name: item.product_name,
         originalQty: item.quantity,
         quantity: item.quantity,
-        unitPriceUsd: item.unitCostUsd,
+        unitPriceUsd: Number(item.unit_cost_usd || 0),
         selected: true,
       }));
       setNoteItems(itemsPayload);
-      
+      const total = itemsPayload.reduce((sum: number, i: any) => sum + i.quantity * i.unitPriceUsd, 0);
+      setNoteTotalUsdInput(total > 0 ? total.toFixed(2) : '');
+
       if (autoOpenEmitForm) {
         fetchLocations();
         setIsRegisteringNote(true);
@@ -207,22 +212,8 @@ export default function PurchasesPage() {
   };
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const tab = params.get('tab');
-      if (tab === 'notes') {
-        setActiveTab('notes');
-      }
-    }
+    fetchPurchases();
   }, []);
-
-  useEffect(() => {
-    if (activeTab === 'purchases') {
-      fetchPurchases();
-    } else {
-      fetchNotes();
-    }
-  }, [activeTab]);
 
   const handleNoteClick = (id: string) => {
     setSelectedNoteId(id);
@@ -241,19 +232,67 @@ export default function PurchasesPage() {
     setNoteDescription('');
     setNoteType('CREDIT');
     setNoteReason('RETURN');
+    setSelectedPurchaseId(null);
+    setPurchaseDetails(null);
   };
 
   const handleToggleItemSelect = (productId: string) => {
-    setNoteItems(prev => prev.map(item => 
-      item.productId === productId ? { ...item, selected: !item.selected } : item
-    ));
+    setNoteItems(prev => {
+      const next = prev.map(item =>
+        item.productId === productId ? { ...item, selected: !item.selected } : item
+      );
+      const total = next.filter(i => i.selected).reduce((sum, i) => sum + i.quantity * i.unitPriceUsd, 0);
+      setNoteTotalUsdInput(total > 0 ? total.toFixed(2) : '');
+      return next;
+    });
   };
 
   const handleQtyChange = (productId: string, val: number) => {
+    setNoteItems(prev => {
+      const next = prev.map(item => {
+        if (item.productId === productId) {
+          const limited = Math.min(item.originalQty, Math.max(1, val));
+          return { ...item, quantity: limited };
+        }
+        return item;
+      });
+      const total = next.filter(i => i.selected).reduce((sum, i) => sum + i.quantity * i.unitPriceUsd, 0);
+      setNoteTotalUsdInput(total > 0 ? total.toFixed(2) : '');
+      return next;
+    });
+  };
+
+  const handleUnitPriceChange = (productId: string, val: number) => {
+    setNoteItems(prev => {
+      const next = prev.map(item => {
+        if (item.productId === productId) {
+          return { ...item, unitPriceUsd: Math.max(0, val) };
+        }
+        return item;
+      });
+      const total = next.filter(i => i.selected).reduce((sum, i) => sum + i.quantity * i.unitPriceUsd, 0);
+      setNoteTotalUsdInput(total > 0 ? total.toFixed(2) : '');
+      return next;
+    });
+  };
+
+  const handleTotalAjusteChange = (valStr: string) => {
+    setNoteTotalUsdInput(valStr);
+    const val = parseFloat(valStr);
+    if (isNaN(val) || val <= 0) return;
+
+    // Distribute the total among the selected items
+    const selected = noteItems.filter(i => i.selected);
+    if (selected.length === 0) return;
+
+    const totalQty = selected.reduce((sum, item) => sum + item.quantity, 0);
+    if (totalQty === 0) return;
+
+    const pricePerUnit = val / totalQty;
+
     setNoteItems(prev => prev.map(item => {
-      if (item.productId === productId) {
-        const limited = Math.min(item.originalQty, Math.max(1, val));
-        return { ...item, quantity: limited };
+      if (item.selected) {
+        return { ...item, unitPriceUsd: pricePerUnit };
       }
       return item;
     }));
@@ -271,6 +310,15 @@ export default function PurchasesPage() {
       return;
     }
 
+    if (!noteDescription.trim()) {
+      setFeedbackMessage({
+        title: 'Error de validación',
+        message: 'La descripción / razón del ajuste es de carácter obligatorio.',
+        type: 'error'
+      });
+      return;
+    }
+
     const payload = {
       originalInvoiceId: selectedPurchaseId,
       documentNumber: noteDocumentNumber,
@@ -280,8 +328,8 @@ export default function PurchasesPage() {
       reasonDescription: noteDescription,
       currency: 'USD',
       exchangeRate: noteExchangeRate,
-      adjustStock: noteType === 'CREDIT' ? noteAdjustStock : false,
-      locationId: noteType === 'CREDIT' && noteAdjustStock ? noteLocationId : undefined,
+      adjustStock: false,
+      locationId: undefined,
       items: activeItems.map(i => ({
         productId: i.productId,
         quantity: i.quantity,
@@ -300,7 +348,7 @@ export default function PurchasesPage() {
       handleCloseRegisterNoteForm();
       setSelectedPurchaseId(null);
       setPurchaseDetails(null);
-      fetchNotes();
+      fetchPurchases();
     } catch (err: any) {
       setFeedbackMessage({
         title: 'Error de registro',
@@ -310,21 +358,12 @@ export default function PurchasesPage() {
     }
   };
 
-  const filteredPurchases = purchases.filter(p => 
+  const filteredPurchases = purchases.filter(p =>
     p.invoice_number.toLowerCase().includes(search.toLowerCase()) ||
     p.supplier_name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const filteredNotes = notes.filter(n => 
-    n.document_number.toLowerCase().includes(search.toLowerCase()) ||
-    n.control_number.toLowerCase().includes(search.toLowerCase())
-  );
 
-  // Invoices filtered inside selector modal
-  const selectorFilteredPurchases = purchases.filter(p => 
-    p.invoice_number.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
-    p.supplier_name.toLowerCase().includes(invoiceSearch.toLowerCase())
-  );
 
   // Live Note Calculations
   const selectedTotalUsd = noteItems
@@ -347,6 +386,27 @@ export default function PurchasesPage() {
     return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(JSON.stringify(qrPayload))}`;
   };
 
+  // Select Options for SearchableSelect
+  const noteTypeOptions: SelectOption[] = [
+    { value: 'CREDIT', label: 'Nota de Crédito', sublabel: 'Descuento o devolución (reduce saldo / stock)' },
+    { value: 'DEBIT', label: 'Nota de Débito', sublabel: 'Aumento de precio o recargo (incrementa saldo)' }
+  ];
+
+  const noteReasonOptions: SelectOption[] = [
+    { value: 'RETURN', label: 'Devolución de mercancía', sublabel: 'Reingreso físico y ajuste de stock' },
+    { value: 'DISCOUNT', label: 'Descuento del proveedor', sublabel: 'Ajuste financiero de cuenta por pagar' },
+    { value: 'PRICE_ERR', label: 'Error en precio facturado', sublabel: 'Discrepancia en costo acordado' },
+    { value: 'TAX_ERR', label: 'Error en cálculo de IVA', sublabel: 'Corrección de alícuotas o base imponible' },
+    { value: 'OTHER', label: 'Otro motivo especificado', sublabel: 'Causas varias no tabuladas' }
+  ];
+
+  const wmsLocationOptions: SelectOption[] = locations.map(loc => ({
+    value: loc.id,
+    label: `${'\u00A0'.repeat(loc.depth * 3)}${loc.name}`,
+    sublabel: `Tipo: ${loc.type} (Nivel ${loc.depth})`,
+    badge: loc.type
+  }));
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Header Container */}
@@ -354,45 +414,20 @@ export default function PurchasesPage() {
         <div className="flex items-center gap-4">
           <div className="bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl p-3">
             <FileText className="h-6 w-6" />
+            <FileText className="h-6 w-6 animate-pulse" />
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight text-slate-900">Registro de Compras e Impuestos</h1>
             <p className="text-xs text-slate-500">Consulta facturas de compras de proveedores y registra notas de ajuste recibidas.</p>
           </div>
         </div>
-
-        {/* Tabs and action buttons */}
-        <div className="flex items-center gap-3">
-          <div className="flex bg-slate-100 p-1 rounded-xl">
-            <button
-              onClick={() => setActiveTab('purchases')}
-              className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === 'purchases' 
-                  ? 'bg-white text-indigo-600 shadow-xs' 
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              Facturas de Compras
-            </button>
-            <button
-              onClick={() => setActiveTab('notes')}
-              className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === 'notes' 
-                  ? 'bg-white text-indigo-600 shadow-xs' 
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              Notas de Crédito / Débito
-            </button>
-          </div>
-          <button
-            onClick={() => router.push('/inventory/purchases/new')}
-            className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-550 active:bg-indigo-755 text-white text-xs font-semibold rounded-xl transition-all shadow-md shadow-indigo-600/10 hover:shadow-lg cursor-pointer animate-in fade-in"
-          >
-            <Plus className="h-4 w-4" />
-            Registrar Compra
-          </button>
-        </div>
+        <button
+          onClick={() => router.push('/inventory/purchases/new')}
+          className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-550 active:bg-indigo-755 text-white text-xs font-semibold rounded-xl transition-all shadow-md shadow-indigo-600/10 hover:shadow-lg cursor-pointer animate-in fade-in"
+        >
+          <Plus className="h-4 w-4" />
+          Registrar Compra
+        </button>
       </div>
 
       {error && (
@@ -411,21 +446,12 @@ export default function PurchasesPage() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
           <input
             type="text"
-            placeholder={activeTab === 'purchases' ? "Buscar por Factura o Proveedor..." : "Buscar por Nro Nota o Nro Control..."}
+            placeholder="Buscar por Factura o Proveedor..."
             className="w-full pl-11 pr-4 py-2 bg-slate-100 border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none text-slate-800 placeholder-slate-400"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        {activeTab === 'notes' && (
-          <button
-            onClick={() => { setIsSelectingInvoice(true); setInvoiceSearch(''); }}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition-all shadow-md shadow-indigo-600/10 hover:shadow-lg cursor-pointer shrink-0"
-          >
-            <Plus className="h-4.5 w-4.5" />
-            Registrar Nota
-          </button>
-        )}
       </div>
 
       {/* Data Table */}
@@ -435,193 +461,136 @@ export default function PurchasesPage() {
             <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
             <span className="text-sm font-semibold text-slate-500">Cargando registros...</span>
           </div>
-        ) : activeTab === 'purchases' ? (
-          filteredPurchases.length === 0 ? (
-            <div className="py-20 text-center space-y-2">
-              <FileText className="h-10 w-10 text-slate-300 mx-auto" />
-              <p className="text-sm font-bold text-slate-600">No se encontraron facturas de compras</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/50 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    <th className="py-4 px-6">Nro. Factura</th>
-                    <th className="py-4 px-6">Proveedor</th>
-                    <th className="py-4 px-6">Monto Total</th>
-                    <th className="py-4 px-6">Cargado Por</th>
-                    <th className="py-4 px-6">Fecha / Hora</th>
-                    <th className="py-4 px-6 text-right">Comprobante</th>
-                    <th className="py-4 px-6 text-right">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-                  {filteredPurchases.map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-4 px-6 font-mono text-xs font-semibold text-slate-600">{p.invoice_number}</td>
-                      <td className="py-4 px-6 font-bold text-slate-900">{p.supplier_name}</td>
-                      <td className="py-4 px-6 font-semibold text-emerald-600">${Number(p.total_amount_usd).toFixed(2)}</td>
-                      <td className="py-4 px-6 text-slate-500">{p.creator_name || 'Admin'}</td>
-                      <td className="py-4 px-6 text-slate-400 text-xs">
-                        {new Date(p.created_at).toLocaleString()}
-                      </td>
-                      <td className="py-4 px-6 text-right">
-                        {p.proof_file_path ? (
-                          <a
-                            href={p.proof_file_path}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:underline"
-                          >
-                            Ver factura
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
-                        ) : (
-                          <span className="text-xs text-slate-400 font-semibold italic">Sin archivo</span>
-                        )}
-                      </td>
-                      <td className="py-4 px-6 text-right">
-                        <button
-                          onClick={() => fetchPurchaseDetails(p.id)}
-                          className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          Ver detalle
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )
+        ) : filteredPurchases.length === 0 ? (
+          <div className="py-20 text-center space-y-2">
+            <FileText className="h-10 w-10 text-slate-300 mx-auto" />
+            <p className="text-sm font-bold text-slate-600">No se encontraron facturas de compras</p>
+          </div>
         ) : (
-          filteredNotes.length === 0 ? (
-            <div className="py-20 text-center space-y-2">
-              <FileText className="h-10 w-10 text-slate-300 mx-auto" />
-              <p className="text-sm font-bold text-slate-600">No se encontraron notas fiscales registradas</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/50 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    <th className="py-4 px-6">Nro Documento</th>
-                    <th className="py-4 px-6">Nro Control</th>
-                    <th className="py-4 px-6">Tipo</th>
-                    <th className="py-4 px-6">Motivo</th>
-                    <th className="py-4 px-6">Total USD</th>
-                    <th className="py-4 px-6">Total VES</th>
-                    <th className="py-4 px-6 text-right">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-                  {filteredNotes.map((n) => (
-                    <tr key={n.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-4 px-6 font-mono text-xs font-bold text-slate-900">{n.document_number}</td>
-                      <td className="py-4 px-6 font-mono text-xs text-slate-600">{n.control_number}</td>
-                      <td className="py-4 px-6">
-                        <span className={`px-2 py-0.5 text-xs font-semibold rounded ${
-                          n.type === 'CREDIT' 
-                            ? 'bg-blue-50 text-blue-700 border border-blue-100' 
-                            : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                        }`}>
-                          {n.type === 'CREDIT' ? 'CRÉDITO' : 'DÉBITO'}
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  <th className="py-4 px-6">Nro. Factura</th>
+                  <th className="py-4 px-6">Proveedor</th>
+                  <th className="py-4 px-6 text-center">Estado / Notas</th>
+                  <th className="py-4 px-6">Monto Total</th>
+                  <th className="py-4 px-6">Cargado Por</th>
+                  <th className="py-4 px-6">Fecha / Hora</th>
+                  <th className="py-4 px-6 text-right">Comprobante</th>
+                  <th className="py-4 px-6 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
+                {filteredPurchases.map((p) => (
+                  <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="py-4 px-6 font-mono text-xs font-semibold text-slate-600">{p.invoice_number}</td>
+                    <td className="py-4 px-6 font-bold text-slate-900">{p.supplier_name}</td>
+                    <td className="py-4 px-6 text-center">
+                      <div className="flex flex-col items-center justify-center gap-1">
+                        <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full border inline-flex items-center gap-1 ${p.status === 'ANULADA'
+                            ? 'bg-slate-100 text-slate-500 border-slate-200'
+                            : p.status === 'AJUSTADA'
+                              ? 'bg-amber-50 text-amber-700 border-amber-100'
+                              : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                          }`}>
+                          {p.status === 'ANULADA' ? 'Anulada' : p.status === 'AJUSTADA' ? 'Ajustada' : 'Registrada'}
                         </span>
-                      </td>
-                      <td className="py-4 px-6 text-slate-600 text-xs uppercase font-medium">{n.reason_code}</td>
-                      <td className="py-4 px-6 font-semibold">${Number(n.total_usd).toFixed(2)}</td>
-                      <td className="py-4 px-6 font-medium text-slate-500">{Number(n.total_ves).toLocaleString('es-VE')} Bs.</td>
-                      <td className="py-4 px-6 text-right">
-                        <button
-                          onClick={() => handleNoteClick(n.id)}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:underline cursor-pointer"
+                        {p.credit_notes && (
+                          <div className="flex flex-wrap gap-1 justify-center max-w-[150px]">
+                            {p.credit_notes.split(',').map((noteStr) => {
+                              const [docNum, noteId] = noteStr.split(':');
+                              return (
+                                <button
+                                  key={noteId}
+                                  onClick={() => handleNoteClick(noteId)}
+                                  className="font-mono text-[9px] text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-100 px-1.5 py-0.5 rounded font-bold cursor-pointer transition-colors"
+                                  title="Ver detalle de Nota de Crédito"
+                                >
+                                  NC: {docNum}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {p.debit_notes && (
+                          <div className="flex flex-wrap gap-1 justify-center max-w-[150px]">
+                            {p.debit_notes.split(',').map((noteStr) => {
+                              const [docNum, noteId] = noteStr.split(':');
+                              return (
+                                <button
+                                  key={noteId}
+                                  onClick={() => handleNoteClick(noteId)}
+                                  className="font-mono text-[9px] text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 px-1.5 py-0.5 rounded font-bold cursor-pointer transition-colors"
+                                  title="Ver detalle de Nota de Débito"
+                                >
+                                  ND: {docNum}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-4 px-6 font-semibold text-emerald-600">${Number(p.total_amount_usd).toFixed(2)}</td>
+                    <td className="py-4 px-6 text-slate-500">{p.creator_name || 'Admin'}</td>
+                    <td className="py-4 px-6 text-slate-400 text-xs">
+                      {new Date(p.created_at).toLocaleString()}
+                    </td>
+                    <td className="py-4 px-6 text-right">
+                      {p.proof_file_path ? (
+                        <a
+                          href={p.proof_file_path}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:underline"
                         >
-                          Ver Detalle
-                          <ChevronRight className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )
+                          Ver factura
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      ) : (
+                        <span className="text-xs text-slate-400 font-semibold italic">Sin archivo</span>
+                      )}
+                    </td>
+                    <td className="py-4 px-6 text-right">
+                      <div className="flex justify-end gap-1">
+                        <ActionTooltip content="Ver detalle de compra">
+                          <button
+                            onClick={() => fetchPurchaseDetails(p.id)}
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/80 rounded-lg transition-all duration-200 cursor-pointer inline-flex items-center"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                        </ActionTooltip>
+
+                        <ActionTooltip content={p.status === 'ANULADA' ? "Compra anulada" : "Registrar Nota de Ajuste (Crédito/Débito)"}>
+                          <button
+                            onClick={() => {
+                              if (p.status === 'ANULADA') return;
+                              setNoteType('CREDIT');
+                              fetchPurchaseDetails(p.id, true);
+                            }}
+                            disabled={p.status === 'ANULADA'}
+                            className={`p-1.5 rounded-lg transition-all duration-200 inline-flex items-center ${p.status === 'ANULADA'
+                                ? 'text-slate-200 cursor-not-allowed'
+                                : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 cursor-pointer'
+                              }`}
+                          >
+                            <ArrowRightLeft className="h-4 w-4" />
+                          </button>
+                        </ActionTooltip>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
-      {/* Purchase Invoice Selector Modal */}
-      {isSelectingInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-              <h3 className="text-base font-bold text-slate-900">Seleccionar Factura de Compra</h3>
-              <button 
-                onClick={() => setIsSelectingInvoice(false)} 
-                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <p className="text-xs text-slate-500">Toda nota de crédito o débito de proveedor debe modificar un registro de compra existente. Por favor busque y seleccione la factura original a ajustar:</p>
-              
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input 
-                  type="text"
-                  placeholder="Buscar por Nro Factura o Proveedor..."
-                  value={invoiceSearch}
-                  onChange={(e) => setInvoiceSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-slate-55 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                />
-              </div>
-
-              <div className="border border-slate-100 rounded-xl overflow-hidden max-h-60 overflow-y-auto divide-y divide-slate-100">
-                {selectorFilteredPurchases.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-slate-400 italic">No se encontraron registros de compra</div>
-                ) : (
-                  selectorFilteredPurchases.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => {
-                        setIsSelectingInvoice(false);
-                        setSelectedPurchaseId(p.id);
-                        fetchPurchaseDetails(p.id, true);
-                      }}
-                      className="w-full text-left p-3 hover:bg-slate-55 transition-colors flex justify-between items-center text-xs cursor-pointer"
-                    >
-                      <div>
-                        <span className="font-mono font-bold text-slate-700 block">{p.invoice_number}</span>
-                        <span className="text-slate-500">Proveedor: {p.supplier_name}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-bold text-slate-900 block">${Number(p.total_amount_usd).toFixed(2)} USD</span>
-                        <span className="text-[10px] text-slate-400">{new Date(p.created_at).toLocaleDateString()}</span>
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsSelectingInvoice(false)}
-                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl text-xs transition-all cursor-pointer"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Invoice Details Modal */}
-      {selectedPurchaseId && (
+      {selectedPurchaseId && !isRegisteringNote && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl border border-slate-100 shadow-xl w-full max-w-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 max-h-[90vh]">
             <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50">
@@ -629,8 +598,8 @@ export default function PurchasesPage() {
                 <FileText className="h-5 w-5 text-indigo-600" />
                 Detalle de Compra: {purchaseDetails?.invoice_number || '...'}
               </h3>
-              <button 
-                onClick={handleCloseDetails} 
+              <button
+                onClick={handleCloseDetails}
                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="h-5 w-5" />
@@ -704,8 +673,8 @@ export default function PurchasesPage() {
                               <td className="p-3 font-mono text-[11px] text-slate-500">{item.product_sku}</td>
                               <td className="p-3 font-bold text-slate-800">{item.product_name}</td>
                               <td className="p-3 text-right">{item.quantity}</td>
-                              <td className="p-3 text-right">${Number(item.unitCostUsd).toFixed(2)}</td>
-                              <td className="p-3 text-right">${(item.quantity * item.unitCostUsd).toFixed(2)}</td>
+                              <td className="p-3 text-right">${Number(item.unit_cost_usd).toFixed(2)}</td>
+                              <td className="p-3 text-right">${(item.quantity * item.unit_cost_usd).toFixed(2)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -716,7 +685,7 @@ export default function PurchasesPage() {
                   {/* Settlement calculations */}
                   <div className="border-t border-slate-100 pt-4 flex flex-col items-end space-y-1.5 text-sm">
                     {(() => {
-                      const computedSubtotal = purchaseDetails.items?.reduce((sum: number, item: any) => sum + (item.quantity * item.unitCostUsd), 0) || 0;
+                      const computedSubtotal = purchaseDetails.items?.reduce((sum: number, item: any) => sum + (item.quantity * item.unit_cost_usd), 0) || 0;
                       const pct = purchaseDetails.discount_percentage || 0;
                       const amt = purchaseDetails.discount_amount_usd || 0;
                       return (
@@ -765,186 +734,172 @@ export default function PurchasesPage() {
       {/* Register Note Modal Form */}
       {isRegisteringNote && purchaseDetails && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <form onSubmit={handleSubmitNote} className="bg-white w-full max-w-lg rounded-2xl shadow-xl border border-slate-100 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-              <h3 className="text-base font-bold text-slate-900">Registrar Nota Fiscal de Compra</h3>
-              <button 
+          <form onSubmit={handleSubmitNote} className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-slate-100 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-start px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">Registrar Nota Fiscal de Compra</h3>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">Registro de Nota de Crédito o Débito emitida por el proveedor</p>
+              </div>
+              <button
                 type="button"
-                onClick={handleCloseRegisterNoteForm} 
+                onClick={handleCloseRegisterNoteForm}
                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4 overflow-y-auto max-h-[75vh]">
+            <div className="p-6 space-y-5 overflow-y-auto max-h-[75vh]">
+              {/* Associated invoice details */}
+              <div className="bg-gradient-to-br from-indigo-50/70 to-blue-50/50 border border-indigo-150 p-4 rounded-2xl space-y-3 shadow-2xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-950">Factura original a ajustar:</span>
+                  <span className="font-mono font-extrabold text-sm text-indigo-950 bg-white/90 border border-indigo-100 px-3 py-1 rounded-xl shadow-3xs">
+                    {purchaseDetails.invoice_number}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-t border-indigo-100/60 pt-3">
+                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-950">Proveedor:</span>
+                  <span className="font-extrabold text-sm text-indigo-950 truncate max-w-[280px]">{purchaseDetails.supplier_name}</span>
+                </div>
+              </div>
+
               {/* Form Metadata */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Nro Documento Proveedor</label>
-                  <input 
-                    type="text" 
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Tipo de Ajuste</label>
+                  <SearchableSelect
+                    options={noteTypeOptions}
+                    value={noteType}
+                    onChange={(val) => setNoteType(val as any)}
+                    placeholder="Seleccionar tipo..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Motivo del Ajuste</label>
+                  <SearchableSelect
+                    options={noteReasonOptions}
+                    value={noteReason}
+                    onChange={(val) => setNoteReason(val as any)}
+                    placeholder="Seleccionar motivo..."
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Nro Documento Proveedor</label>
+                  <input
+                    type="text"
                     required
                     placeholder="ej. NC-10293"
                     value={noteDocumentNumber}
                     onChange={(e) => setNoteDocumentNumber(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition-all shadow-2xs"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Nro Control Proveedor</label>
-                  <input 
-                    type="text" 
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Nro Control Proveedor</label>
+                  <input
+                    type="text"
                     required
                     placeholder="ej. 00-1002"
                     value={noteControlNumber}
                     onChange={(e) => setNoteControlNumber(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition-all shadow-2xs"
                   />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Tipo de Ajuste</label>
-                  <select 
-                    value={noteType} 
-                    onChange={(e) => setNoteType(e.target.value as any)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm"
-                  >
-                    <option value="CREDIT">Nota de Crédito</option>
-                    <option value="DEBIT">Nota de Débito</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Motivo del Ajuste</label>
-                  <select 
-                    value={noteReason} 
-                    onChange={(e) => setNoteReason(e.target.value as any)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm"
-                  >
-                    <option value="RETURN">Devolución de mercancía</option>
-                    <option value="DISCOUNT">Descuento del proveedor</option>
-                    <option value="PRICE_ERR">Error en precio facturado</option>
-                    <option value="TAX_ERR">Error en cálculo de IVA</option>
-                    <option value="OTHER">Otro motivo especificado</option>
-                  </select>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Descripción / Comentarios</label>
-                <input 
-                  type="text" 
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Descripción / Razón de este Ajuste <span className="text-rose-500">*</span></label>
+                <input
+                  type="text"
                   required
-                  placeholder="Detalles sobre la nota recibida..."
+                  placeholder="Escriba obligatoriamente la razón comercial de este ajuste..."
                   value={noteDescription}
                   onChange={(e) => setNoteDescription(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition-all shadow-2xs"
                 />
               </div>
 
               {/* Items Table for notes */}
-              <div className="space-y-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Seleccionar artículos a ajustar</span>
-                <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
-                  {noteItems.map((item) => (
-                    <div key={item.productId} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200/60 bg-slate-50/20">
-                      <input 
-                        type="checkbox" 
-                        checked={item.selected}
-                        onChange={() => handleToggleItemSelect(item.productId)}
-                        className="w-4 h-4 rounded text-indigo-600 bg-slate-50 border-slate-200 focus:ring-indigo-500"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <span className="text-xs font-bold text-slate-900 block truncate">{item.name}</span>
-                        <span className="text-[10px] text-slate-500">Comprado original: {item.originalQty}</span>
-                      </div>
-                      {item.selected && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-slate-500">Cant:</span>
-                          <input 
-                            type="number"
-                            value={item.quantity}
-                            onChange={(e) => handleQtyChange(item.productId, parseInt(e.target.value) || 1)}
-                            className="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-center text-xs"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ))}
+              <div className="space-y-2.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Artículos Facturados (Solo Lectura)</label>
+                <div className="rounded-2xl border border-slate-200/80 overflow-hidden bg-white shadow-2xs">
+                  <div className="overflow-x-auto max-h-56">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50/90 border-b border-slate-200/70 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
+                          <th className="p-3">Artículo</th>
+                          <th className="p-3 text-center">Costo Unit. original</th>
+                          <th className="p-3 text-center">Costo Unit. ajuste</th>
+                          <th className="p-3 text-center">Cant. Facturada</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {noteItems.map((item) => (
+                          <tr key={item.productId} className="bg-slate-50/20 hover:bg-indigo-50/30 transition-colors">
+                            <td className="p-3">
+                              <span className="font-bold text-slate-900 block truncate max-w-[280px]">{item.name}</span>
+                            </td>
+                            <td className="p-3 text-center font-mono font-semibold text-slate-500">
+                              ${(purchaseDetails.items?.find((i: any) => i.product_id === item.productId)?.unit_cost_usd || item.unitPriceUsd).toFixed(2)}
+                            </td>
+                            <td className="p-3 text-center font-mono font-bold text-indigo-600">
+                              ${item.unitPriceUsd.toFixed(2)}
+                            </td>
+                            <td className="p-3 text-center font-mono font-bold text-slate-700">
+                              {item.originalQty}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
 
-              {/* WMS location selector for re-entry (egress for returns) */}
-              {noteType === 'CREDIT' && noteReason === 'RETURN' && (
-                <div className="p-4 rounded-2xl bg-indigo-50/40 border border-indigo-100/50 space-y-3">
-                  <div className="flex items-center gap-2 text-indigo-950 text-xs font-bold">
-                    <Building className="h-4 w-4 text-indigo-600" />
-                    <span>Control de Inventario WMS (Salida por Devolución)</span>
+              {/* Reactive Totals display (Luminous Executive Theme) */}
+              <div className="bg-gradient-to-br from-indigo-50/90 via-slate-50 to-blue-50/60 border border-indigo-100/90 rounded-2xl p-5 shadow-xs space-y-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block">Total Ajuste Proveedor ($ USD)</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={noteTotalUsdInput}
+                      onChange={(e) => handleTotalAjusteChange(e.target.value)}
+                      placeholder="0.00"
+                      className="w-36 px-3 py-2 bg-white border border-slate-250 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 rounded-xl text-center text-sm font-black text-slate-900 mt-1.5 shadow-2xs transition-all"
+                    />
                   </div>
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2 text-xs text-slate-700">
-                      <input 
-                        type="checkbox" 
-                        checked={noteAdjustStock}
-                        onChange={(e) => setNoteAdjustStock(e.target.checked)}
-                        className="w-4 h-4 rounded text-indigo-600 bg-slate-50 border-slate-200 focus:ring-indigo-500"
-                      />
-                      <span>¿Descontar stock del almacén?</span>
-                    </label>
+                  <div className="text-right">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block">Monto en Bolívares (VES)</span>
+                    <span className="font-mono font-black text-2xl sm:text-3xl text-indigo-700 tracking-tight block mt-1">
+                      {((parseFloat(noteTotalUsdInput) || 0) * noteExchangeRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.
+                    </span>
+                    <span className="font-mono text-xs font-bold text-slate-500 block mt-0.5">
+                      Tasa de Cambio: {noteExchangeRate.toFixed(2)} Bs/$
+                    </span>
                   </div>
-                  {noteAdjustStock && (
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Origen de la Mercadería WMS</label>
-                      <select
-                        value={noteLocationId}
-                        onChange={(e) => setNoteLocationId(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                      >
-                        {locations.map((loc) => (
-                          <option key={loc.id} value={loc.id}>
-                            {'\u00A0'.repeat(loc.depth * 3)}
-                            {loc.name} ({loc.type})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Reactive Totals display */}
-              <div className="border-t border-slate-100 pt-3 flex justify-between items-center text-xs font-mono bg-slate-50/50 p-3 rounded-xl">
-                <div>
-                  <span className="text-[10px] text-slate-400 block">Tasa de Cambio</span>
-                  <input
-                    type="number"
-                    value={noteExchangeRate}
-                    onChange={(e) => setNoteExchangeRate(parseFloat(e.target.value) || 1.0)}
-                    className="w-20 px-2 py-0.5 bg-white border border-slate-200 rounded text-center text-xs font-bold"
-                  />
-                </div>
-                <div className="text-right">
-                  <span className="font-bold text-slate-900 block text-sm">Total USD: ${selectedTotalUsd.toFixed(2)}</span>
-                  <span className="font-bold text-slate-500 block">Total VES: {selectedTotalVes.toLocaleString('es-VE')} Bs.</span>
                 </div>
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50">
-              <button 
-                type="button" 
+            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50 shrink-0">
+              <button
+                type="button"
                 onClick={handleCloseRegisterNoteForm}
-                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition-all cursor-pointer text-sm"
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold rounded-xl transition-all text-sm cursor-pointer"
               >
                 Cancelar
               </button>
-              <button 
+              <button
                 type="submit"
-                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-medium rounded-xl transition-all cursor-pointer text-sm"
+                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:from-indigo-700 active:to-violet-700 text-white font-semibold rounded-xl transition-all shadow-md shadow-indigo-200 text-sm cursor-pointer active:scale-98 disabled:opacity-50"
               >
                 Registrar Nota
               </button>
@@ -959,8 +914,8 @@ export default function PurchasesPage() {
           <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50">
               <h3 className="text-base font-bold text-slate-900">Nota de Ajuste de Proveedor</h3>
-              <button 
-                onClick={() => { setSelectedNoteId(null); setNoteDetail(null); }} 
+              <button
+                onClick={() => { setSelectedNoteId(null); setNoteDetail(null); }}
                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="h-5 w-5" />
@@ -1034,9 +989,9 @@ export default function PurchasesPage() {
 
                 {/* QR and Fiscal Message */}
                 <div className="flex flex-col items-center justify-center space-y-3 pt-4 border-t border-dashed border-slate-200">
-                  <img 
-                    src={getQrUrl(noteDetail)} 
-                    alt="QR Fiscal SENIAT" 
+                  <img
+                    src={getQrUrl(noteDetail)}
+                    alt="QR Fiscal SENIAT"
                     className="w-32 h-32 border border-slate-200 p-2 rounded-xl"
                   />
                   <div className="text-center space-y-1">
@@ -1067,75 +1022,6 @@ export default function PurchasesPage() {
         </div>
       )}
 
-      {/* Purchase Invoice Selector Modal */}
-      {isSelectingInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-              <h3 className="text-base font-bold text-slate-900">Seleccionar Factura de Compra</h3>
-              <button 
-                onClick={() => setIsSelectingInvoice(false)} 
-                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <p className="text-xs text-slate-500">Toda nota de crédito o débito de proveedor debe modificar un registro de compra existente. Por favor busque y seleccione la factura original a ajustar:</p>
-              
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input 
-                  type="text"
-                  placeholder="Buscar por Nro Factura o Proveedor..."
-                  value={invoiceSearch}
-                  onChange={(e) => setInvoiceSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                />
-              </div>
-
-              <div className="border border-slate-100 rounded-xl overflow-hidden max-h-60 overflow-y-auto divide-y divide-slate-100">
-                {selectorFilteredPurchases.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-slate-400 italic">No se encontraron registros de compra</div>
-                ) : (
-                  selectorFilteredPurchases.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => {
-                        setIsSelectingInvoice(false);
-                        setSelectedPurchaseId(p.id);
-                        fetchPurchaseDetails(p.id, true);
-                      }}
-                      className="w-full text-left p-3 hover:bg-slate-50 transition-colors flex justify-between items-center text-xs cursor-pointer"
-                    >
-                      <div>
-                        <span className="font-mono font-bold text-slate-700 block">{p.invoice_number}</span>
-                        <span className="text-slate-500">Proveedor: {p.supplier_name}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-bold text-slate-900 block">${Number(p.total_amount_usd).toFixed(2)} USD</span>
-                        <span className="text-[10px] text-slate-400">{new Date(p.created_at).toLocaleDateString()}</span>
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsSelectingInvoice(false)}
-                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl text-xs transition-all cursor-pointer"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Global feedback message */}
       {feedbackMessage && (

@@ -37,13 +37,18 @@ function LoginContent() {
         password,
       });
 
-      const { user, access_token } = response.data;
-      login(user, access_token);
+      const { user, access_token, refresh_token } = response.data;
+      login(user, access_token, refresh_token);
     } catch (err: any) {
-      if (err.response?.status === 401) {
-        setError('Credenciales inválidas. Por favor intenta de nuevo.');
+      const serverMessage = err.response?.data?.message;
+      if (serverMessage) {
+        setError(serverMessage);
+      } else if (err.response?.status === 401) {
+        setError('Correo electrónico o contraseña incorrectos. Por favor verifica tus datos.');
+      } else if (err.response?.status === 429) {
+        setError('Demasiados intentos de conexión. Por favor espera unos minutos antes de intentar de nuevo.');
       } else {
-        setError('Ocurrió un error al intentar iniciar sesión. Verifica tu conexión.');
+        setError('Ocurrió un error al intentar iniciar sesión. Verifica tu conexión con el servidor.');
       }
       setIsSubmitting(false);
     }
@@ -51,84 +56,95 @@ function LoginContent() {
 
   return (
     <div className="space-y-6">
+      {/* Header del Formulario */}
       <div>
-        <h3 className="text-xl font-semibold text-slate-900 tracking-tight">Iniciar Sesión</h3>
-        <p className="text-sm text-slate-500 mt-1">Ingresa tus datos para acceder al panel</p>
+        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+          Bienvenido de nuevo
+        </h2>
+        <p className="text-sm text-slate-500 mt-1.5 font-medium">
+          Ingresa tus credenciales para entrar a tu espacio de trabajo.
+        </p>
       </div>
-      
+
       {isRegistered && !error && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-100 flex items-start gap-3 text-emerald-800 text-sm animate-in fade-in slide-in-from-top-1 duration-200">
-          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
-          <span>¡Empresa registrada con éxito! Inicia sesión para comenzar tu periodo de prueba.</span>
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200/80 flex items-start gap-3 text-emerald-800 text-xs font-semibold animate-in fade-in slide-in-from-top-1 duration-200">
+          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
+          <span>¡Empresa registrada con éxito! Inicia sesión para comenzar a gestionar tu negocio.</span>
         </div>
       )}
 
       {isReset && !error && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-100 flex items-start gap-3 text-emerald-800 text-sm animate-in fade-in slide-in-from-top-1 duration-200">
-          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
-          <span>¡Contraseña restablecida con éxito! Ya puedes iniciar sesión con tu nueva contraseña.</span>
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200/80 flex items-start gap-3 text-emerald-800 text-xs font-semibold animate-in fade-in slide-in-from-top-1 duration-200">
+          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
+          <span>¡Contraseña restablecida con éxito! Inicia sesión con tu nueva clave.</span>
         </div>
       )}
 
       {error && (
-        <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-3 text-rose-700 text-sm animate-in fade-in slide-in-from-top-1 duration-200">
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200/80 flex items-start gap-3 text-rose-700 text-xs font-semibold animate-in fade-in slide-in-from-top-1 duration-200">
           <AlertCircle className="h-5 w-5 shrink-0 text-rose-500" />
           <span>{error}</span>
         </div>
       )}
 
-      <form className="space-y-4" onSubmit={handleSubmit}>
+      <form className="space-y-5" onSubmit={handleSubmit}>
+        {/* Email Field */}
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Correo electrónico</label>
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+            Email
+          </label>
           <div className="relative">
-            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-            <input 
-              type="email" 
+            <input
+              type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm placeholder-slate-400 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200"
-              placeholder="juan@empresa.com"
+              className="block w-full px-4 py-3 border border-slate-200 rounded-2xl text-sm placeholder-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all duration-200 text-slate-900 font-medium shadow-2xs"
+              placeholder="tu@empresa.com"
             />
           </div>
         </div>
 
+        {/* Password Field */}
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Contraseña</label>
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+            Contraseña
+          </label>
           <div className="relative">
-            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-            <input 
-              type={showPassword ? 'text' : 'password'} 
+            <input
+              type={showPassword ? 'text' : 'password'}
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="block w-full pl-11 pr-11 py-2.5 border border-slate-200 rounded-xl text-sm placeholder-slate-400 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200"
+              className="block w-full pl-4 pr-11 py-3 border border-slate-200 rounded-2xl text-sm placeholder-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all duration-200 text-slate-900 font-medium shadow-2xs"
               placeholder="••••••••"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors p-1"
             >
               {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
             </button>
           </div>
         </div>
 
+        {/* Links & Checkbox */}
         <div className="flex items-center justify-between pt-1">
-          <div className="flex items-center">
-            <input type="checkbox" className="h-4 w-4 text-primary-600 focus:ring-primary-500/20 border-slate-300 rounded-lg" />
-            <label className="ml-2 block text-xs font-medium text-slate-600">Recordarme</label>
-          </div>
-          <Link href="/forgot-password" className="text-xs font-semibold text-primary-600 hover:text-primary-700 transition-colors">
+          <label className="flex items-center cursor-pointer">
+            <input type="checkbox" className="h-4 w-4 text-indigo-600 focus:ring-indigo-500/20 border-slate-300 rounded-md" />
+            <span className="ml-2 text-xs font-semibold text-slate-600">Recordarme</span>
+          </label>
+          <Link href="/forgot-password" className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors">
             ¿Olvidaste tu contraseña?
           </Link>
         </div>
 
-        <button 
+        {/* Submit Button */}
+        <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full flex items-center justify-center py-3 px-4 rounded-xl bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg shadow-primary-600/10 hover:shadow-primary-600/20 mt-2"
+          className="w-full flex items-center justify-center py-3.5 px-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-bold hover:from-indigo-500 hover:to-violet-500 active:scale-[0.99] disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200 shadow-md shadow-indigo-200 cursor-pointer"
         >
           {isSubmitting ? (
             <>
@@ -137,19 +153,20 @@ function LoginContent() {
             </>
           ) : (
             <>
-              Entrar al Sistema
+              Iniciar sesión
               <ArrowRight className="ml-2 h-4.5 w-4.5" />
             </>
           )}
         </button>
-      </form>
 
-      <div className="text-center pt-2">
-        <span className="text-sm text-slate-500">¿No tienes cuenta? </span>
-        <Link href="/register" className="text-sm font-semibold text-primary-600 hover:text-primary-700 transition-colors">
-          Regístrate ahora
-        </Link>
-      </div>
+        {/* Link a Registro */}
+        <p className="text-center text-xs font-medium text-slate-500 pt-2">
+          ¿No tienes cuenta?{' '}
+          <Link href="/register" className="font-bold text-indigo-600 hover:text-indigo-700 hover:underline">
+            Registra tu empresa aquí
+          </Link>
+        </p>
+      </form>
     </div>
   );
 }
@@ -157,8 +174,8 @@ function LoginContent() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="flex items-center justify-center p-12">
-        <Loader2 className="h-6 w-6 animate-spin text-primary-600" />
+      <div className="flex justify-center p-8">
+        <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
       </div>
     }>
       <LoginContent />

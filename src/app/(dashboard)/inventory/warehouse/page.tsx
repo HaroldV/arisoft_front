@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Warehouse, Info, Plus, Trash2, FolderPlus, HelpCircle, Loader2, AlertCircle, CheckCircle, ChevronRight, ChevronDown } from 'lucide-react';
+import { Warehouse, Info, Plus, Trash2, FolderPlus, HelpCircle, Loader2, AlertCircle, CheckCircle, ChevronRight, ChevronDown, Layers } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import { Modal } from '@/components/Modal';
 
@@ -191,14 +191,14 @@ export default function WarehousePage() {
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={() => handleSelectParent(node.id, node.type)}
-              className="p-1 text-indigo-600 hover:bg-indigo-50 rounded cursor-pointer"
+              className="p-1.5 text-indigo-600 hover:bg-indigo-50/80 rounded-lg transition-all duration-200 cursor-pointer"
               title="Añadir sub-ubicación"
             >
               <FolderPlus className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => handleDelete(node.id, node.name)}
-              className="p-1 text-rose-600 hover:bg-rose-50 rounded cursor-pointer"
+              className="p-1.5 text-rose-500 hover:bg-rose-50/80 rounded-lg transition-all duration-200 cursor-pointer"
               title="Eliminar ubicación"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -261,99 +261,117 @@ export default function WarehousePage() {
           )}
         </div>
 
-        {/* Right Form View (1/3 width) */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
-          <div className="border-b border-slate-100 pb-3">
-            <h3 className="font-bold text-slate-800 text-sm">Registrar Nueva Ubicación</h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">Agrega bodegas raíz o anida pasillos y estanterías.</p>
+        {/* Right Form View (Sally Enterprise UX Standard) */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+          <div className="flex items-center gap-3.5 px-6 py-4.5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-indigo-50/30">
+            <div className="bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-xl p-2.5 shadow-md shadow-indigo-100 flex items-center justify-center">
+              <Layers className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm tracking-tight">Registrar Nueva Ubicación</h3>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">Estructura Física y Jerarquía de Almacén</p>
+            </div>
           </div>
 
-          {formSuccess && (
-            <div className="p-3 bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-xl flex items-center gap-2 text-xs">
-              <CheckCircle className="h-4.5 w-4.5 text-emerald-500 shrink-0" />
-              <span>¡Ubicación registrada exitosamente!</span>
-            </div>
-          )}
+          <div className="p-6 space-y-4">
+            {formSuccess && (
+              <div className="p-3.5 bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-xl flex items-center gap-2.5 text-xs font-semibold">
+                <CheckCircle className="h-4.5 w-4.5 text-emerald-500 shrink-0" />
+                <span>¡Ubicación registrada exitosamente!</span>
+              </div>
+            )}
 
-          {formError && (
-            <div className="p-3 bg-rose-50 border border-rose-100 text-rose-800 rounded-xl flex items-center gap-2 text-xs">
-              <AlertCircle className="h-4.5 w-4.5 text-rose-500 shrink-0" />
-              <span>{formError}</span>
-            </div>
-          )}
+            {formError && (
+              <div className="p-3.5 bg-rose-50 border border-rose-100 text-rose-800 rounded-xl flex items-center gap-2.5 text-xs font-semibold">
+                <AlertCircle className="h-4.5 w-4.5 text-rose-500 shrink-0" />
+                <span>{formError}</span>
+              </div>
+            )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nombre de Ubicación *</label>
-              <input
-                type="text"
-                required
-                placeholder="Ej. Almacén Central, Pasillo 3"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm"
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              />
-            </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                  Nombre de Ubicación *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Almacén Central, Pasillo 3, Gaveta B"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                />
+              </div>
 
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tipo de Nivel *</label>
-              <select
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm appearance-none bg-white"
-                value={formData.type}
-                onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
-              >
-                <option value="WAREHOUSE">Bodega / Almacén Principal (WAREHOUSE)</option>
-                <option value="AISLE">Pasillo (AISLE)</option>
-                <option value="SHELF">Estantería / Estante (SHELF)</option>
-                <option value="BIN">Gaveta / Compartimiento (BIN)</option>
-              </select>
-            </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                  Tipo de Nivel *
+                </label>
+                <select
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium appearance-none"
+                  value={formData.type}
+                  onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
+                >
+                  <option value="WAREHOUSE">Bodega / Almacén Principal (WAREHOUSE)</option>
+                  <option value="AISLE">Pasillo (AISLE)</option>
+                  <option value="SHELF">Estantería / Estante (SHELF)</option>
+                  <option value="BIN">Gaveta / Compartimiento (BIN)</option>
+                </select>
+              </div>
 
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Ubicación Padre (Anidar)</label>
-              <select
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm appearance-none bg-white"
-                value={formData.parent_id}
-                onChange={(e) => setFormData(prev => ({ ...prev, parent_id: e.target.value }))}
-              >
-                <option value="">Ninguna (Es una Bodega Raíz)</option>
-                {flatLocations.map(loc => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.name} ({loc.type})
-                  </option>
-                ))}
-              </select>
-            </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                  Ubicación Padre (Jerarquía)
+                </label>
+                <select
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium appearance-none"
+                  value={formData.parent_id}
+                  onChange={(e) => setFormData(prev => ({ ...prev, parent_id: e.target.value }))}
+                >
+                  <option value="">Ninguna (Es una Bodega Raíz)</option>
+                  {flatLocations.map(loc => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name} ({loc.type})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Límite de Capacidad (Items)</label>
-              <input
-                type="number"
-                min="0"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm"
-                value={formData.capacity_limit || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, capacity_limit: Number(e.target.value) || 0 }))}
-              />
-            </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                  Límite de Capacidad (Items)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="0 = Ilimitado"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-mono font-bold"
+                  value={formData.capacity_limit || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, capacity_limit: Number(e.target.value) || 0 }))}
+                />
+              </div>
 
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-medium rounded-xl transition-all cursor-pointer text-sm disabled:opacity-50"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4" />
-                  Guardar Ubicación
-                </>
-              )}
-            </button>
-          </form>
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:from-indigo-700 active:to-violet-700 text-white font-semibold rounded-xl transition-all cursor-pointer text-sm shadow-md shadow-indigo-200 active:scale-98 disabled:opacity-50"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4" />
+                      Guardar Ubicación
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
 

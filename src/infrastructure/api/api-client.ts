@@ -1,12 +1,16 @@
 import axios from 'axios';
+import { APP_CONFIG } from '@/constants/domain-constants';
 
 // Create a configured axios instance for the API calls
 const apiClient = axios.create({
-  baseURL: 'http://localhost:4000',
+  baseURL: APP_CONFIG.API_URL,
   withCredentials: true, // Send cookies cross-origin
 });
 
-// Request interceptor to attach access token and tenant ID
+let cachedToken: string | null = null;
+let cachedTenantId: string | null = null;
+
+// Request interceptor to attach access token and tenant ID dynamically
 apiClient.interceptors.request.use(
   (config) => {
     if (typeof window !== 'undefined') {
@@ -14,12 +18,14 @@ apiClient.interceptors.request.use(
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
+
       const userStr = localStorage.getItem('ari_user');
       if (userStr) {
         try {
           const user = JSON.parse(userStr);
-          if (user?.tenant_id) {
-            config.headers['x-tenant-id'] = user.tenant_id;
+          const tenantId = user?.tenant_id || user?.tenantId || user?.tenant?.id;
+          if (tenantId) {
+            config.headers['x-tenant-id'] = tenantId;
           }
         } catch (e) {
           console.error('Error parsing user from localStorage for tenant header:', e);
@@ -53,8 +59,12 @@ apiClient.interceptors.response.use(
 
     // Check if error is 401 (Unauthorized) and has not been retried yet
     if (error.response?.status === 401 && !originalRequest._retry) {
-      // Avoid looping if the failed request itself was the refresh call
-      if (originalRequest.url?.includes('/auth/refresh')) {
+      // Avoid looping or attempting refresh for auth endpoints (login, register, refresh)
+      if (
+        originalRequest.url?.includes('/auth/login') ||
+        originalRequest.url?.includes('/auth/register') ||
+        originalRequest.url?.includes('/auth/refresh')
+      ) {
         return Promise.reject(error);
       }
 
@@ -73,17 +83,22 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
+        const storedRefreshToken = typeof window !== 'undefined' ? localStorage.getItem('ari_refresh_token') : null;
         // Use a clean axios instance to refresh to avoid triggering interceptors
         const refreshResponse = await axios.post(
-          'http://localhost:4000/auth/refresh',
-          {},
+          `${APP_CONFIG.API_URL}/auth/refresh`,
+          { refresh_token: storedRefreshToken },
           { withCredentials: true }
         );
 
-        const { access_token } = refreshResponse.data;
+        const { access_token, refresh_token: newRefreshToken } = refreshResponse.data;
 
+        cachedToken = access_token;
         if (typeof window !== 'undefined') {
           localStorage.setItem('ari_token', access_token);
+          if (newRefreshToken) {
+            localStorage.setItem('ari_refresh_token', newRefreshToken);
+          }
         }
 
         originalRequest.headers.Authorization = `Bearer ${access_token}`;
@@ -95,6 +110,8 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         isRefreshing = false;
+        cachedToken = null;
+        cachedTenantId = null;
 
         // Session is completely dead, clean up local storage and redirect
         if (typeof window !== 'undefined') {

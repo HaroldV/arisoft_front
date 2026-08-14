@@ -21,6 +21,9 @@ import {
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import { VENEZUELAN_STATES, TAXPAYER_TYPES } from '@/constants/venezuela';
+import { ActionTooltip } from '@/components/ActionTooltip';
+import { SearchableSelect } from '@/components/SearchableSelect';
+import { RifInput } from '@/components/RifInput';
 
 interface Client {
   id: string;
@@ -116,14 +119,15 @@ export default function ClientsPage() {
     }, 400);
     return () => clearTimeout(delayDebounceFn);
   }, [search]);
+  const [errorFields, setErrorFields] = useState<{ [key: string]: boolean }>({});
 
   const handleOpenAdd = () => {
-    setTaxPrefix('V');
-    setTaxNumber('');
     setEditingClient(null);
+    setTaxPrefix('J');
+    setTaxNumber('');
     setFormData({
       name: '',
-      tax_id: '',
+      tax_id: 'J-',
       email: '',
       phone: '',
       address: '',
@@ -133,6 +137,7 @@ export default function ClientsPage() {
     });
     setModalError(null);
     setModalSuccess(false);
+    setErrorFields({});
     setIsOpen(true);
   };
 
@@ -153,11 +158,28 @@ export default function ClientsPage() {
     });
     setModalError(null);
     setModalSuccess(false);
+    setErrorFields({});
     setIsOpen(true);
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    const errs: { [key: string]: boolean } = {};
+
+    if (!formData.name.trim()) {
+      errs['name'] = true;
+    }
+    if (!taxNumber.trim()) {
+      errs['taxNumber'] = true;
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setErrorFields(errs);
+      setModalError('Por favor completa todos los campos requeridos marcados en rojo.');
+      return;
+    }
+
+    setErrorFields({});
     setIsSaving(true);
     setModalError(null);
     setModalSuccess(false);
@@ -317,21 +339,23 @@ export default function ClientsPage() {
                       <div className="text-[10px] font-mono text-slate-400">{c.phone || ''}</div>
                     </td>
                     <td className="py-4 px-6 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleOpenEdit(c)}
-                          className="p-1.5 text-slate-500 hover:text-primary-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                          title="Editar"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => setDeletingId(c.id)}
-                          className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                          title="Desactivar"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <ActionTooltip content="Editar cliente">
+                          <button
+                            onClick={() => handleOpenEdit(c)}
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/80 rounded-lg transition-all duration-200 cursor-pointer"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                        </ActionTooltip>
+                        <ActionTooltip content="Desactivar cliente">
+                          <button
+                            onClick={() => setDeletingId(c.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50/80 rounded-lg transition-all duration-200 cursor-pointer"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </ActionTooltip>
                       </div>
                     </td>
                   </tr>
@@ -371,98 +395,74 @@ export default function ClientsPage() {
               )}
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Nombre / Razón Social</label>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Nombre / Razón Social <span className="text-rose-500">*</span>
+                </label>
                 <div className="relative">
                   <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
                   <input
                     type="text"
                     required
                     placeholder="Ej. Juan Pérez"
-                    className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200"
+                    className={`block w-full pl-11 pr-3.5 py-2.5 rounded-xl text-sm outline-none transition-all duration-200 ${
+                      errorFields['name']
+                        ? 'border-2 border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/30'
+                        : 'border border-slate-200 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500'
+                    }`}
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, name: e.target.value });
+                      if (errorFields['name']) setErrorFields({ ...errorFields, name: false });
+                    }}
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Cédula o RIF</label>
-                <div className="flex gap-2">
-                  <div className="relative shrink-0 w-24">
-                    <select
-                      className="block w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none bg-white focus:ring-2 focus:ring-primary-500/20 font-semibold text-slate-700"
-                      value={taxPrefix}
-                      onChange={(e) => {
-                        const pref = e.target.value as 'V' | 'J' | 'G';
-                        setTaxPrefix(pref);
-                        setFormData(prev => ({ ...prev, tax_id: getFormattedTaxId(pref, taxNumber) }));
-                      }}
-                    >
-                      <option value="V">V-</option>
-                      <option value="J">J-</option>
-                      <option value="G">G-</option>
-                    </select>
-                  </div>
-                  <div className="relative flex-1">
-                    <FileText className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                    <input
-                      type="text"
-                      required
-                      placeholder={taxPrefix === 'V' ? 'Ej. 12345678' : 'Ej. 123456789'}
-                      className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200 font-mono"
-                      value={taxNumber}
-                      onChange={(e) => {
-                        const num = e.target.value.replace(/\D/g, '');
-                        if (num.length <= 9) {
-                          setTaxNumber(num);
-                          setFormData(prev => ({ ...prev, tax_id: getFormattedTaxId(taxPrefix, num) }));
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-                {taxNumber && (
-                  <p className="text-xs text-slate-500 mt-1.5 flex items-center gap-2">
-                    <span>Identificador final:</span>
-                    <span className="font-mono text-sm font-bold bg-indigo-50 border border-indigo-100 text-indigo-700 px-2.5 py-0.5 rounded-lg">
-                      {getFormattedTaxId(taxPrefix, taxNumber)}
-                    </span>
-                  </p>
+                {errorFields['name'] && (
+                  <span className="text-[11px] font-semibold text-rose-500 mt-1 block animate-in fade-in duration-150">
+                    ⚠️ El Nombre o Razón Social es obligatorio.
+                  </span>
                 )}
               </div>
+
+              <RifInput
+                value={formData.tax_id}
+                required
+                label="Cédula / RIF del Cliente"
+                onChange={(formattedRif) => {
+                  setFormData(prev => ({ ...prev, tax_id: formattedRif }));
+                  if (errorFields['taxNumber']) setErrorFields({ ...errorFields, taxNumber: false });
+                }}
+              />
 
               {/* Zone and Taxpayer Selects */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Zona / Estado</label>
-                  <div className="relative">
-                    <Map className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                    <select
-                      className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none bg-white focus:ring-2 focus:ring-primary-500/20"
-                      value={formData.zone_code}
-                      onChange={(e) => setFormData({ ...formData, zone_code: e.target.value })}
-                    >
-                      {VENEZUELAN_STATES.map(s => (
-                        <option key={s.code} value={s.code}>{s.name} ({s.code})</option>
-                      ))}
-                    </select>
-                  </div>
+                  <SearchableSelect
+                    icon={Map}
+                    value={formData.zone_code}
+                    onChange={(val) => setFormData(prev => ({ ...prev, zone_code: val }))}
+                    options={VENEZUELAN_STATES.map(s => ({
+                      value: s.code,
+                      label: s.name,
+                      sublabel: `Código: ${s.code}`
+                    }))}
+                    placeholder="Buscar estado..."
+                  />
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Tipo de Contribuyente</label>
-                  <div className="relative">
-                    <ShieldAlert className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                    <select
-                      className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none bg-white focus:ring-2 focus:ring-primary-500/20"
-                      value={formData.taxpayer_type}
-                      onChange={(e) => setFormData({ ...formData, taxpayer_type: e.target.value })}
-                    >
-                      {TAXPAYER_TYPES.map(t => (
-                        <option key={t.code} value={t.code}>{t.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <SearchableSelect
+                    icon={ShieldAlert}
+                    value={formData.taxpayer_type}
+                    onChange={(val) => setFormData(prev => ({ ...prev, taxpayer_type: val }))}
+                    options={TAXPAYER_TYPES.map(t => ({
+                      value: t.code,
+                      label: t.name,
+                      sublabel: `Código fiscal: ${t.code}`
+                    }))}
+                    placeholder="Seleccionar contribuyente..."
+                  />
                 </div>
               </div>
 

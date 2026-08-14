@@ -10,14 +10,17 @@ interface User {
   full_name: string;
   role: string;
   tenant_id: string;
+  tenant_status?: string;
+  plan_is_active?: boolean;
   enabled_modules: string[];
+  permissions?: string[];
   trial_days_left: number;
 }
 
 interface AuthContextType {
   user: User | null;
   accessToken: string | null;
-  login: (user: User, accessToken: string) => void;
+  login: (user: User, accessToken: string, refreshToken?: string) => void;
   logout: () => Promise<void>;
   isLoading: boolean;
 }
@@ -42,12 +45,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = (userData: User, token: string) => {
+  const login = (userData: User, token: string, refreshToken?: string) => {
     setUser(userData);
     setAccessToken(token);
     localStorage.setItem('ari_user', JSON.stringify(userData));
     localStorage.setItem('ari_token', token);
-    router.push('/');
+    if (refreshToken) {
+      localStorage.setItem('ari_refresh_token', refreshToken);
+    }
+    if (userData.role === 'SUPER_ADMIN') {
+      router.push('/admin');
+    } else {
+      router.push('/');
+    }
   };
 
   const logout = async () => {
@@ -60,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAccessToken(null);
       localStorage.removeItem('ari_user');
       localStorage.removeItem('ari_token');
+      localStorage.removeItem('ari_refresh_token');
       router.push('/login');
     }
   };

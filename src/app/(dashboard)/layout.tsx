@@ -5,7 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import Sidebar from "@/components/Sidebar";
 import SandboxBanner from "@/components/SandboxBanner";
+import { SubscriptionBlockedModal } from "@/components/modals/SubscriptionBlockedModal";
 import { Bell, Search, Wifi, WifiOff } from 'lucide-react';
+import apiClient from '@/infrastructure/api/api-client';
+import Link from 'next/link';
 
 export default function DashboardLayout({
   children,
@@ -15,6 +18,38 @@ export default function DashboardLayout({
   const { user, isLoading } = useAuth();
   const router = useRouter();
   const [isOnline, setIsOnline] = useState(true);
+  const [rate, setRate] = useState<number>(36.50);
+
+  useEffect(() => {
+    const fetchRate = async () => {
+      try {
+        const res = await apiClient.get('/tenant/profile');
+        const settings = res.data?.settings || {};
+        const activeRate = settings.exchangeRate || Number(settings.manualRate) || 36.50;
+        setRate(activeRate);
+      } catch (err) {
+        console.error('Error fetching exchange rate for layout:', err);
+      }
+    };
+    if (user) {
+      fetchRate();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const handleRateUpdate = (e: Event) => {
+        const customEvent = e as CustomEvent;
+        if (customEvent.detail && typeof customEvent.detail.rate === 'number') {
+          setRate(customEvent.detail.rate);
+        }
+      };
+      window.addEventListener('exchange-rate-updated', handleRateUpdate);
+      return () => {
+        window.removeEventListener('exchange-rate-updated', handleRateUpdate);
+      };
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -36,6 +71,8 @@ export default function DashboardLayout({
   useEffect(() => {
     if (!isLoading && !user) {
       router.push('/login');
+    } else if (!isLoading && user?.role === 'SUPER_ADMIN' && typeof window !== 'undefined' && window.location.pathname === '/') {
+      router.replace('/admin');
     }
   }, [user, isLoading, router]);
 
@@ -76,24 +113,24 @@ export default function DashboardLayout({
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            {/* Connection Status Badge */}
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold select-none transition-all ${
+            {/* Connection Status Badge with BCV Rate */}
+            <Link href="/settings/company" className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold select-none transition-all cursor-pointer hover:bg-indigo-100/30 ${
               isOnline 
-                ? 'bg-emerald-50/50 border-emerald-100 text-emerald-700' 
-                : 'bg-rose-50 border-rose-100 text-rose-700 animate-pulse'
-            }`}>
+                ? 'bg-indigo-50/50 border-indigo-100 text-indigo-700 hover:border-indigo-200' 
+                : 'bg-rose-50 border-rose-100 text-rose-700 animate-pulse hover:border-rose-200'
+            }`} title="Ir a Configuración de Soberanía Económica">
               {isOnline ? (
                 <>
-                  <Wifi className="h-3.5 w-3.5" />
-                  <span>Sincronizado</span>
+                  <Wifi className="h-3.5 w-3.5 text-indigo-600 animate-pulse" />
+                  <span>Tasa BCV: Bs. {rate.toFixed(2)}</span>
                 </>
               ) : (
                 <>
-                  <WifiOff className="h-3.5 w-3.5" />
-                  <span>Modo Offline</span>
+                  <WifiOff className="h-3.5 w-3.5 text-rose-500" />
+                  <span>Modo Offline (Bs. {rate.toFixed(2)})</span>
                 </>
               )}
-            </div>
+            </Link>
 
             <button className="p-2 text-slate-400 hover:text-primary-600 hover:bg-slate-100 rounded-full transition-all relative">
               <Bell className="h-5 w-5" />
@@ -113,7 +150,7 @@ export default function DashboardLayout({
 
         {/* Main Content Area */}
         <main className="flex-1 p-8">
-          <div className="max-w-7xl mx-auto">
+          <div className="max-w-[1600px] mx-auto">
             {children}
           </div>
         </main>

@@ -22,9 +22,13 @@ import {
   Shield,
   Plus,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Upload,
+  User,
+  Clock
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
+import { ActionTooltip } from '@/components/ActionTooltip';
 
 interface Product {
   id: string;
@@ -40,6 +44,12 @@ interface Product {
   unit_of_measure?: string;
   category?: string;
   category_id?: string | null;
+  image_url?: string;
+  imageUrl?: string;
+  created_by_user_name?: string;
+  updated_by_user_name?: string;
+  created_at?: string;
+  updated_at?: string;
   variations?: any[];
   advanced_fields?: any;
 }
@@ -61,6 +71,7 @@ export default function StockPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editForm, setEditForm] = useState({
     name: '',
+    imageUrl: '',
     costUsd: 0,
     priceUsd: 0,
     taxRate: 16.00,
@@ -68,6 +79,70 @@ export default function StockPage() {
     categoryId: '',
     unitOfMeasure: 'unidades',
   });
+
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+
+  const compressAndGetBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxWidth = 800;
+
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
+          } else {
+            resolve(e.target?.result as string);
+          }
+        };
+        img.onerror = () => resolve(e.target?.result as string);
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (!file) return;
+    const MAX_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB (Estándar óptimo para catálogo ERP/Web)
+    if (file.size > MAX_SIZE_BYTES) {
+      setImageError(`⚠️ El archivo seleccionado (${(file.size / (1024 * 1024)).toFixed(1)} MB) supera el tamaño óptimo permitido de 2 MB.`);
+      return;
+    }
+
+    setImageError(null);
+    setIsUploadingImage(true);
+    try {
+      const base64 = await compressAndGetBase64(file);
+      const res = await apiClient.post('/inventory/products/upload-image', {
+        image_base64: base64,
+        filename: file.name,
+        category_name: editForm.category || 'General',
+      });
+      if (res.data?.url) {
+        setEditForm((prev) => ({ ...prev, imageUrl: res.data.url }));
+      }
+    } catch (err: any) {
+      setImageError('Error al procesar la imagen.');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
 
   // Categories list and selection
   const [categories, setCategories] = useState<{ id: string; name: string; tenant_id: string | null; code: string | null }[]>([]);
@@ -78,7 +153,7 @@ export default function StockPage() {
   const fetchCategoriesList = async () => {
     try {
       const response = await apiClient.get('/inventory/categories');
-      setCategories(response.data);
+      setCategories(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       console.error('Error fetching categories:', err);
     }
@@ -151,9 +226,11 @@ export default function StockPage() {
       const response = await apiClient.get('/inventory/products', {
         params: query ? { name: query } : {}
       });
-      setProducts(response.data);
+      const productList: Product[] = Array.isArray(response.data) ? response.data : (response.data?.items || []);
+      setProducts(productList);
     } catch (err: any) {
-      setError('Error al cargar la lista de stock. Por favor reintenta.');
+      console.error('Error fetching stock products:', err);
+      setError(err.response?.data?.message || 'Error al cargar la lista de stock. Por favor reintenta.');
     } finally {
       setIsLoading(false);
     }
@@ -171,6 +248,7 @@ export default function StockPage() {
     setEditingProduct(product);
     setEditForm({
       name: product.name,
+      imageUrl: product.image_url || product.imageUrl || '',
       costUsd: product.costUsd || 0,
       priceUsd: product.priceUsd || 0,
       taxRate: product.taxRate || 16.00,
@@ -226,6 +304,7 @@ export default function StockPage() {
 
       await apiClient.patch(`/inventory/products/${editingProduct.id}`, {
         name: editForm.name.trim(),
+        imageUrl: editForm.imageUrl.trim() || undefined,
         costUsd: Number(editForm.costUsd),
         priceUsd: Number(editForm.priceUsd),
         taxRate: Number(editForm.taxRate),
@@ -377,10 +456,41 @@ export default function StockPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-                {products.map((product) => (
-                  <tr key={product.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="py-4 px-6 font-mono text-xs font-semibold text-slate-600">{product.sku}</td>
-                    <td className="py-4 px-6 font-semibold text-slate-900">{product.name}</td>
+                {products.map((product) => {
+                  const rawUrl = product.image_url || product.imageUrl;
+                  const resolvedUrl = rawUrl
+                    ? (rawUrl.startsWith('http') || rawUrl.startsWith('data:') ? rawUrl : `http://localhost:4000${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`)
+                    : null;
+
+                  const n = (product.name || '').toLowerCase();
+                  const sampleImg = n.includes('papel') || n.includes('resma') ? 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=400&auto=format&fit=crop'
+                    : n.includes('tinta') || n.includes('cartucho') || n.includes('hp') ? 'https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?w=400&auto=format&fit=crop'
+                    : n.includes('boligrafo') || n.includes('marcador') || n.includes('solita') ? 'https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=400&auto=format&fit=crop'
+                    : n.includes('harina') || n.includes('pan') ? 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=400&auto=format&fit=crop'
+                    : n.includes('cafe') || n.includes('bebida') ? 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=400&auto=format&fit=crop'
+                    : n.includes('rif') || n.includes('documento') ? 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=400&auto=format&fit=crop'
+                    : 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=400&auto=format&fit=crop';
+
+                  const imgUrl = resolvedUrl || sampleImg;
+
+                  return (
+                    <tr key={product.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="py-4 px-6 font-mono text-xs font-semibold text-slate-600">{product.sku}</td>
+                      <td className="py-4 px-6 font-semibold text-slate-900 flex items-center gap-3">
+                        <img
+                          src={imgUrl}
+                          alt={product.name}
+                          className="w-10 h-10 rounded-xl object-cover border border-slate-200 shrink-0 bg-slate-100 shadow-xs"
+                        />
+                        <div>
+                          <p className="font-bold text-slate-900">{product.name}</p>
+                          {product.created_by_user_name && (
+                            <p className="text-[10px] text-slate-400 font-normal">
+                              Reg: {product.created_by_user_name}
+                            </p>
+                          )}
+                        </div>
+                      </td>
                     <td className="py-4 px-6 text-slate-500">{product.category || 'General'}</td>
                     <td className="py-4 px-6 text-slate-500 font-mono text-xs">{product.unit_of_measure || 'unidades'}</td>
                     <td className="py-4 px-6 font-medium">${Number(product.costUsd || 0).toFixed(2)}</td>
@@ -396,391 +506,437 @@ export default function StockPage() {
                     </td>
                     <td className="py-4 px-6">{getStockBadge(product.current_stock || 0)}</td>
                     <td className="py-4 px-6 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleEditClick(product)}
-                          className="p-1.5 text-slate-500 hover:text-primary-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                          title="Editar Metadatos"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteClick(product.id)}
-                          className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                          title="Desactivar Producto"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <ActionTooltip content="Editar producto">
+                          <button
+                            onClick={() => handleEditClick(product)}
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/80 rounded-lg transition-all duration-200 cursor-pointer"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                        </ActionTooltip>
+                        <ActionTooltip content="Desactivar producto">
+                          <button
+                            onClick={() => handleDeleteClick(product.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50/80 rounded-lg transition-all duration-200 cursor-pointer"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </ActionTooltip>
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
 
-      {/* Edit Modal */}
+      {/* Edit Modal (Sally Enterprise UX Standard) */}
       {editingProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-200 overflow-y-auto">
-          <div className="bg-white w-full max-w-5xl rounded-2xl shadow-xl border border-slate-100 my-8 animate-in scale-in duration-200 flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-              <h3 className="font-bold text-slate-900">Editar Producto ({editingProduct.sku})</h3>
-              <button onClick={() => setEditingProduct(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                <X className="h-5 w-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            {/* Header Fijo */}
+            <div className="flex justify-between items-center px-6 py-4.5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-indigo-50/30 shrink-0">
+              <div className="flex items-center gap-3.5">
+                <div className="bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-xl p-3 shadow-md shadow-indigo-100 flex items-center justify-center">
+                  <Package className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                      Ficha y Edición de Producto
+                    </h3>
+                    <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2.5 py-0.5 rounded-lg">
+                      {editingProduct.sku}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    Catálogo de Inventario • Parámetros de Precio, Costo y Variantes
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingProduct(null)}
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+                title="Cerrar modal"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleEditSubmit} className="p-6 space-y-5 overflow-y-auto flex-1">
-              {editSuccess && (
-                <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center gap-3 text-emerald-800 text-sm">
-                  <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0" />
-                  <span>¡Datos del producto actualizados!</span>
-                </div>
-              )}
-
-              {editError && (
-                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-3 text-rose-700 text-sm">
-                  <AlertCircle className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
-                  <span>{editError}</span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Nombre del Producto</label>
-                  <div className="relative">
-                    <Package className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                    <input
-                      type="text"
-                      required
-                      className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200"
-                      value={editForm.name}
-                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    />
+            <form onSubmit={handleEditSubmit} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
+                {editSuccess && (
+                  <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center gap-3 text-emerald-800 text-xs sm:text-sm font-semibold">
+                    <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0" />
+                    <span>¡Datos del producto actualizados exitosamente!</span>
                   </div>
-                </div>
+                )}
 
-                <div className="relative" ref={dropdownRef}>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Categoría</label>
-                  <div className="relative">
-                    <Layers className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                    <input
-                      type="text"
-                      className="block w-full pl-11 pr-10 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200"
-                      value={editForm.category}
-                      onChange={(e) => handleCategoryChange(e.target.value)}
-                      onFocus={() => {
-                        setFilteredCategories(editForm.category.trim() ? categories.filter(c => c.name.toLowerCase().includes(editForm.category.toLowerCase())) : categories);
-                        setShowDropdown(true);
-                      }}
-                    />
-                    {editForm.categoryId && (
-                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] bg-indigo-50 border border-indigo-100 text-indigo-600 px-2 py-0.5 rounded font-medium">
-                        Vínculo
-                      </span>
+                {editError && (
+                  <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-3 text-rose-700 text-xs sm:text-sm font-semibold">
+                    <AlertCircle className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
+                    <span>{editError}</span>
+                  </div>
+                )}
+
+                {/* Primary Data Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4.5">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                      Nombre Comercial del Producto <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Package className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
+                      <input
+                        type="text"
+                        required
+                        className="block w-full pl-11 pr-3.5 py-2.5 bg-slate-50 focus:bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        value={editForm.name}
+                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="relative" ref={dropdownRef}>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                      Categoría Asignada
+                    </label>
+                    <div className="relative">
+                      <Layers className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
+                      <input
+                        type="text"
+                        className="block w-full pl-11 pr-10 py-2.5 bg-slate-50 focus:bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        value={editForm.category}
+                        onChange={(e) => handleCategoryChange(e.target.value)}
+                        onFocus={() => {
+                          setFilteredCategories(editForm.category.trim() ? categories.filter(c => c.name.toLowerCase().includes(editForm.category.toLowerCase())) : categories);
+                          setShowDropdown(true);
+                        }}
+                      />
+                      {editForm.categoryId && (
+                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] bg-indigo-50 border border-indigo-200/80 text-indigo-700 px-2 py-0.5 rounded-md font-bold">
+                          Vinculada
+                        </span>
+                      )}
+                    </div>
+                    {showDropdown && (
+                      <div className="absolute z-50 left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar p-1.5">
+                        {filteredCategories.length > 0 ? (
+                          filteredCategories.map((c) => (
+                            <button
+                              type="button"
+                              key={c.id}
+                              className="w-full text-left px-3.5 py-2 hover:bg-indigo-50 rounded-xl text-xs font-semibold text-slate-800 transition-all flex items-center justify-between"
+                              onClick={() => {
+                                setEditForm({ ...editForm, category: c.name, categoryId: c.id });
+                                setShowDropdown(false);
+                              }}
+                            >
+                              <span>{c.name}</span>
+                              <span className="text-[10px] text-slate-400 font-mono">{c.code || 'CAEV'}</span>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="p-3 text-xs text-slate-400 text-center">No hay categorías que coincidan</div>
+                        )}
+                      </div>
                     )}
                   </div>
-                  {showDropdown && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100">
-                      {filteredCategories.length === 0 ? (
-                        <div 
-                          className="px-4 py-3 text-xs text-slate-500 cursor-pointer hover:bg-slate-50"
-                          onClick={() => setShowDropdown(false)}
-                        >
-                          No se encontraron coincidencias. Se creará <span className="font-semibold text-slate-700">"{editForm.category}"</span> al guardar.
+
+                  {/* Image Uploader & Preview */}
+                  <div className="md:col-span-2 bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                        Imagen y Miniatura del Producto
+                      </label>
+                      <span className="text-[11px] text-slate-400 font-medium">JPG, PNG, WebP (Máx 2 MB)</span>
+                    </div>
+
+                    {imageError && (
+                      <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-between text-rose-700 text-xs animate-in fade-in duration-200">
+                        <span>{imageError}</span>
+                        <button type="button" onClick={() => setImageError(null)} className="text-rose-400 hover:text-rose-600 font-bold">
+                          ✕
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="flex gap-3 items-center">
+                      <label className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-indigo-200 text-indigo-700 rounded-xl text-xs font-bold cursor-pointer transition-all shrink-0 shadow-2xs hover:shadow-xs">
+                        <Upload className="w-4 h-4 text-indigo-600" />
+                        <span>{isUploadingImage ? 'Subiendo...' : 'Subir desde PC'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          disabled={isUploadingImage}
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleFileUpload(file);
+                          }}
+                        />
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="O pega URL de imagen (https://...)"
+                        className="block w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs bg-white text-slate-700 font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                        value={editForm.imageUrl}
+                        onChange={(e) => setEditForm({ ...editForm, imageUrl: e.target.value })}
+                      />
+                      {editForm.imageUrl && (
+                        <div className="w-11 h-11 rounded-xl border border-slate-200 overflow-hidden shrink-0 bg-white flex items-center justify-center shadow-2xs">
+                          <img
+                            src={editForm.imageUrl}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                            onError={(e: any) => { e.target.style.display = 'none'; }}
+                          />
                         </div>
-                      ) : (
-                        filteredCategories.map((c) => (
-                          <div
-                            key={c.id}
-                            onClick={() => handleSelectCategory(c)}
-                            className="flex justify-between items-center px-4 py-2.5 hover:bg-slate-50 cursor-pointer text-sm text-slate-700 transition-colors"
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Financial Values Grid (Cost and Price) */}
+                  <div className="p-4 bg-gradient-to-br from-indigo-50/70 via-slate-50 to-blue-50/50 border border-indigo-100/80 rounded-2xl shadow-2xs space-y-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                      Costo Unitario ($)
+                    </label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required
+                        className="block w-full pl-11 pr-3.5 py-2.5 bg-white border border-slate-200 rounded-xl font-mono text-sm sm:text-base font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        value={editForm.costUsd}
+                        onChange={(e) => setEditForm({ ...editForm, costUsd: Number(e.target.value) })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-gradient-to-br from-emerald-50/70 via-slate-50 to-teal-50/50 border border-emerald-100/80 rounded-2xl shadow-2xs space-y-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-emerald-800">
+                      Precio de Venta Sugerido ($)
+                    </label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-emerald-600" />
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required
+                        className="block w-full pl-11 pr-3.5 py-2.5 bg-white border border-emerald-200 rounded-xl font-mono text-sm sm:text-base font-black text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                        value={editForm.priceUsd}
+                        onChange={(e) => setEditForm({ ...editForm, priceUsd: Number(e.target.value) })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Collapsible Variations Subform */}
+                <div className="border-t border-slate-100 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowVariations(!showVariations)}
+                    className="flex items-center justify-between w-full py-2.5 text-xs font-bold text-slate-700 uppercase tracking-wider hover:text-slate-900 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span>Variaciones de Producto (Opcional)</span>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        editVariations.length > 0
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-slate-100 text-slate-500 border border-slate-200'
+                      }`}>
+                        {editVariations.length === 1 ? '1 variación' : `${editVariations.length} variaciones`}
+                      </span>
+                    </div>
+                    {showVariations ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
+
+                  {showVariations && (
+                    <div className="space-y-3 mt-2 p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl shadow-2xs">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-2 bg-white p-3 rounded-xl border border-slate-200">
+                        <div className="md:col-span-2">
+                          <input
+                            type="text"
+                            placeholder="Nombre de la variación (ej. Talla L / Color Azul)"
+                            className="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 font-medium"
+                            value={varForm.name}
+                            onChange={(e) => setVarForm({ ...varForm, name: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <input
+                            type="number"
+                            placeholder="Stock"
+                            className="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 font-mono font-bold text-right"
+                            value={varForm.quantity || ''}
+                            onChange={(e) => setVarForm({ ...varForm, quantity: Number(e.target.value) })}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="Costo $"
+                            className="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 font-mono font-bold text-right"
+                            value={varForm.unit_cost || ''}
+                            onChange={(e) => setVarForm({ ...varForm, unit_cost: Number(e.target.value) })}
+                          />
+                        </div>
+                        <div className="md:col-span-4 flex items-center justify-between gap-2 pt-1">
+                          <input
+                            type="text"
+                            placeholder="SKU específico de la variante (opcional)"
+                            className="flex-1 p-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 font-mono font-semibold"
+                            value={varForm.sku}
+                            onChange={(e) => setVarForm({ ...varForm, sku: e.target.value.toUpperCase() })}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddVariation}
+                            disabled={!varForm.name.trim()}
+                            className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl text-xs font-bold cursor-pointer disabled:opacity-50 shadow-xs"
                           >
-                            <div className="flex flex-col">
-                              <span className="font-medium text-slate-800">{c.name}</span>
-                              {c.code && (
-                                <span className="text-[10px] font-mono text-slate-400">CAEV: {c.code}</span>
-                              )}
+                            Agregar Variante
+                          </button>
+                        </div>
+                      </div>
+
+                      {editVariations.length > 0 && (
+                        <div className="space-y-2 pt-2">
+                          {editVariations.map((v, i) => (
+                            <div key={i} className="flex items-center justify-between p-3 bg-white border border-slate-200/80 rounded-xl text-xs shadow-2xs">
+                              <div className="flex items-center gap-3">
+                                <span className="font-bold text-slate-900">{v.name}</span>
+                                <span className="font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded text-[10px]">{v.sku || 'SKU Auto'}</span>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <span className="font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-lg text-xs">
+                                  {v.quantity} unids
+                                </span>
+                                <span className="font-mono font-bold text-slate-800">${Number(v.unit_cost).toFixed(2)}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveVariation(i)}
+                                  className="p-1 text-slate-400 hover:text-rose-600 rounded-lg"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
                             </div>
-                            {c.tenant_id === null ? (
-                              <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-medium">
-                                Global
-                              </span>
-                            ) : (
-                              <span className="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-medium">
-                                Propia
-                              </span>
-                            )}
-                          </div>
-                        ))
+                          ))}
+                        </div>
                       )}
                     </div>
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Unidad de Medida</label>
-                  <div className="relative">
-                    <Scale className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                    <select
-                      className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200 appearance-none bg-white"
-                      value={editForm.unitOfMeasure}
-                      onChange={(e) => setEditForm({ ...editForm, unitOfMeasure: e.target.value })}
-                    >
-                      <option value="unidades">Unidades (unidad)</option>
-                      <option value="kg">Kilogramos (kg)</option>
-                      <option value="gramos">Gramos (g)</option>
-                      <option value="litros">Litros (l)</option>
-                      <option value="ml">Mililitros (ml)</option>
-                      <option value="paquetes">Paquetes</option>
-                    </select>
-                  </div>
-                </div>
+                {/* Collapsible Advanced Info */}
+                <div className="border-t border-slate-100 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="flex items-center justify-between w-full py-2 text-xs font-bold text-slate-700 uppercase tracking-wider hover:text-slate-900 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span>Información Avanzada / Lote (Opcional)</span>
+                      {Object.values(advancedFields).some(v => v !== '' && v !== 0) && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          Configurado
+                        </span>
+                      )}
+                    </div>
+                    {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
 
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Tasa IVA (%)</label>
-                  <div className="relative">
-                    <Percent className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                    <select
-                      className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200 appearance-none bg-white"
-                      value={editForm.taxRate}
-                      onChange={(e) => setEditForm({ ...editForm, taxRate: Number(e.target.value) })}
-                    >
-                      <option value={16.00}>16% (General)</option>
-                      <option value={8.00}>8% (Reducido)</option>
-                      <option value={0.00}>0% (Exento)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Costo Base (USD)</label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                    <input
-                      type="number"
-                      step="0.01"
-                      required
-                      min="0"
-                      className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200"
-                      value={editForm.costUsd}
-                      onChange={(e) => setEditForm({ ...editForm, costUsd: Number(e.target.value) })}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Precio de Venta (USD)</label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                    <input
-                      type="number"
-                      step="0.01"
-                      required
-                      min="0"
-                      className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200"
-                      value={editForm.priceUsd}
-                      onChange={(e) => setEditForm({ ...editForm, priceUsd: Number(e.target.value) })}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Collapsible Variations Subform */}
-              <div className="border-t border-slate-100 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowVariations(!showVariations)}
-                  className="flex items-center justify-between w-full py-2.5 text-xs font-bold text-slate-700 uppercase tracking-wider hover:text-slate-900 cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    <span>Variaciones de Producto (Opcional)</span>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
-                      editVariations.length > 0
-                        ? 'bg-primary-50 text-primary-700 border border-primary-100'
-                        : 'bg-slate-50 text-slate-500 border border-slate-100'
-                    }`}>
-                      {editVariations.length === 1 ? '1 variación' : `${editVariations.length} variaciones`}
-                    </span>
-                  </div>
-                  {showVariations ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </button>
-
-                {showVariations && (
-                  <div className="space-y-3 mt-2 p-4 bg-slate-50/50 border border-slate-100 rounded-xl">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-2 bg-white p-3 rounded-xl border border-slate-200">
-                      <div className="md:col-span-2">
-                        <input
-                          type="text"
-                          placeholder="Variación"
-                          className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-white"
-                          value={varForm.name}
-                          onChange={(e) => setVarForm({ ...varForm, name: e.target.value })}
-                        />
-                      </div>
+                  {showAdvanced && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl animate-in fade-in duration-200 shadow-2xs">
                       <div>
-                        <input
-                          type="number"
-                          placeholder="Stock"
-                          className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-white text-right"
-                          value={varForm.quantity || ''}
-                          onChange={(e) => setVarForm({ ...varForm, quantity: Number(e.target.value) })}
-                        />
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Fecha de Expiración</label>
+                        <div className="relative">
+                          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                          <input
+                            type="date"
+                            className="block w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium"
+                            value={advancedFields.expiration_date ? advancedFields.expiration_date.substring(0, 10) : ''}
+                            onChange={(e) => setAdvancedFields({ ...advancedFields, expiration_date: e.target.value })}
+                          />
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <input
-                          type="number"
-                          step="0.01"
-                          placeholder="Costo"
-                          className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-white text-right"
-                          value={varForm.unit_cost || ''}
-                          onChange={(e) => setVarForm({ ...varForm, unit_cost: Number(e.target.value) })}
-                        />
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Ubicación física en Almacén</label>
+                        <div className="relative">
+                          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                          <input
+                            type="text"
+                            placeholder="Ej. Pasillo 3, Estante B"
+                            className="block w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium"
+                            value={advancedFields.location}
+                            onChange={(e) => setAdvancedFields({ ...advancedFields, location: e.target.value })}
+                          />
+                        </div>
                       </div>
-                      <div className="md:col-span-4 flex items-center justify-between gap-2">
-                        <input
-                          type="text"
-                          placeholder="SKU específico (opcional)"
-                          className="flex-1 p-2 border border-slate-200 rounded-lg text-xs bg-white"
-                          value={varForm.sku}
-                          onChange={(e) => setVarForm({ ...varForm, sku: e.target.value.toUpperCase() })}
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Stock de Seguridad Mínimo</label>
+                        <div className="relative">
+                          <Shield className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                          <input
+                            type="number"
+                            min="0"
+                            className="block w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-right"
+                            value={advancedFields.security_stock || ''}
+                            onChange={(e) => setAdvancedFields({ ...advancedFields, security_stock: Number(e.target.value) })}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Notas del Producto</label>
+                        <textarea
+                          rows={2}
+                          className="block w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs resize-none font-medium"
+                          value={advancedFields.description}
+                          onChange={(e) => setAdvancedFields({ ...advancedFields, description: e.target.value })}
                         />
-                        <button
-                          type="button"
-                          onClick={handleAddVariation}
-                          disabled={!varForm.name.trim()}
-                          className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-[11px] font-semibold cursor-pointer disabled:opacity-50"
-                        >
-                          Añadir
-                        </button>
                       </div>
                     </div>
+                  )}
+                </div>
 
-                    {editVariations.length > 0 && (
-                      <div className="border border-slate-200 bg-white rounded-xl overflow-hidden text-xs max-h-36 overflow-y-auto">
-                        <table className="w-full text-left">
-                          <thead className="bg-slate-50 font-bold text-slate-500 uppercase">
-                            <tr>
-                              <th className="py-2 px-3">Variación</th>
-                              <th className="py-2 px-3">SKU</th>
-                              <th className="py-2 px-3 text-right">Stock</th>
-                              <th className="py-2 px-3 text-right">Costo</th>
-                              <th className="py-2 px-3 text-right"></th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 text-slate-700">
-                            {editVariations.map((v, idx) => (
-                              <tr key={idx} className="hover:bg-slate-50/50">
-                                <td className="py-2 px-3 font-bold">{v.name}</td>
-                                <td className="py-2 px-3 font-mono text-slate-500">{v.sku || '-'}</td>
-                                <td className="py-2 px-3 text-right">{v.quantity}</td>
-                                <td className="py-2 px-3 text-right">{v.unit_cost ? `$${Number(v.unit_cost).toFixed(2)}` : '-'}</td>
-                                <td className="py-2 px-3 text-right">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveVariation(idx)}
-                                    className="text-rose-500 hover:bg-rose-50 p-1 rounded transition-colors cursor-pointer"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
+                {/* Audit Trail Info Banner */}
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-50 via-white to-indigo-50/20 border border-slate-200/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs text-slate-600 shadow-2xs">
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <span><strong>Registrado por:</strong> {editingProduct.created_by_user_name || 'Sistema / Carga Masiva'}</span>
                   </div>
-                )}
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span><strong>Última modificación por:</strong> {editingProduct.updated_by_user_name || 'Sin modificaciones'}</span>
+                  </div>
+                </div>
               </div>
 
-              {/* Collapsible Advanced Info */}
-              <div className="border-t border-slate-100 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setShowAdvanced(!showAdvanced)}
-                  className="flex items-center justify-between w-full py-2 text-xs font-bold text-slate-700 uppercase tracking-wider hover:text-slate-900 cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    <span>Información Avanzada / Lote (Opcional)</span>
-                    {Object.values(advancedFields).some(v => v !== '' && v !== 0) && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                        Configurado
-                      </span>
-                    )}
-                  </div>
-                  {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </button>
-
-                {showAdvanced && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 p-4 bg-slate-50 border border-slate-100 rounded-xl animate-in fade-in duration-200">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Fecha de Expiración</label>
-                      <div className="relative">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-                        <input
-                          type="date"
-                          className="block w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-xs bg-white"
-                          value={advancedFields.expiration_date ? advancedFields.expiration_date.substring(0, 10) : ''}
-                          onChange={(e) => setAdvancedFields({ ...advancedFields, expiration_date: e.target.value })}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Ubicación física</label>
-                      <div className="relative">
-                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-                        <input
-                          type="text"
-                          className="block w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-xs bg-white"
-                          value={advancedFields.location}
-                          onChange={(e) => setAdvancedFields({ ...advancedFields, location: e.target.value })}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Stock de Seguridad</label>
-                      <div className="relative">
-                        <Shield className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-                        <input
-                          type="number"
-                          min="0"
-                          className="block w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-xs bg-white text-right"
-                          value={advancedFields.security_stock || ''}
-                          onChange={(e) => setAdvancedFields({ ...advancedFields, security_stock: Number(e.target.value) })}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Notas del Producto</label>
-                      <textarea
-                        rows={2}
-                        className="block w-full p-2.5 border border-slate-200 rounded-lg text-xs bg-white resize-none"
-                        value={advancedFields.description}
-                        onChange={(e) => setAdvancedFields({ ...advancedFields, description: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 shrink-0">
+              {/* Footer Fijo */}
+              <div className="flex justify-between items-center px-6 py-4 border-t border-slate-100 bg-slate-50/80 shrink-0">
                 <button
                   type="button"
                   onClick={() => setEditingProduct(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold rounded-xl transition-all text-sm cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:opacity-75 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all cursor-pointer"
+                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:from-indigo-700 active:to-violet-700 text-white font-semibold rounded-xl transition-all shadow-md shadow-indigo-200 text-sm cursor-pointer active:scale-98 disabled:opacity-50"
                 >
                   {isSaving && <Loader2 className="animate-spin h-4 w-4" />}
                   Guardar Cambios
@@ -791,34 +947,46 @@ export default function StockPage() {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal (Sally Enterprise UX Standard) */}
       {deletingId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 overflow-hidden p-6 space-y-4 animate-in scale-in duration-200">
-            <div className="flex items-start gap-3">
-              <div className="p-2.5 bg-rose-50 rounded-xl text-rose-600 mt-0.5 shrink-0">
-                <Trash2 className="h-5 w-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center px-6 py-4.5 border-b border-slate-100 bg-rose-50/50 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-rose-100 text-rose-600 rounded-xl">
+                  <Trash2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900">¿Desactivar producto?</h3>
+                  <p className="text-xs text-slate-500 font-medium">Borrado lógico y exclusión de catálogo POS</p>
+                </div>
               </div>
-              <div className="space-y-1">
-                <h3 className="font-bold text-slate-900">¿Desactivar producto?</h3>
-                <p className="text-xs text-slate-500">
-                  Esta acción realizará un borrado lógico (soft delete). El producto no estará disponible para ventas en el POS. Solo se permite si el producto no tiene historial de movimientos activos.
-                </p>
-              </div>
+              <button
+                onClick={() => setDeletingId(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="p-6">
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Esta acción realizará un borrado lógico (soft delete). El producto no estará disponible para ventas en el POS ni para pedidos de compra. Solo se permite si el producto no tiene historial de movimientos activos pendientes.
+              </p>
+            </div>
+
+            <div className="flex justify-between items-center px-6 py-4 border-t border-slate-100 bg-slate-50/80 shrink-0">
               <button
                 type="button"
                 onClick={() => setDeletingId(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleDeleteConfirm}
                 disabled={isDeleting}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-xl transition-all shadow-md shadow-rose-200 cursor-pointer disabled:opacity-50"
               >
                 {isDeleting && <Loader2 className="animate-spin h-4 w-4" />}
                 Confirmar Desactivación

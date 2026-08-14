@@ -1,0 +1,822 @@
+'use client';
+
+import { useState, useEffect, useMemo } from 'react';
+import apiClient from '@/infrastructure/api/api-client';
+import { useAuth } from '@/context/AuthContext';
+import { TenantCompany, SaasPlan } from '../SuperAdminBackoffice';
+
+const MOCK_TENANTS: TenantCompany[] = [
+  {
+    id: 't-1',
+    name: 'Unidad Educativa Privada Nuestro Samán',
+    tax_id: 'J-31456982-1',
+    subdomain: 'unidad-educativa-privada-nuestro-saman',
+    plan_name: 'CORPORATIVO',
+    status: 'ACTIVE',
+    user_count: 8,
+    max_users: 25,
+    product_count: 1420,
+    max_products: 10000,
+    monthly_fee_usd: 75.00,
+    subscription_expires_at: '2026-12-31',
+    created_at: '28/7/2026',
+    enabled_modules: ['POS', 'SALES', 'INVENTORY', 'BANKS', 'REPORTS', 'PAYROLL'],
+    owner_email: 'direccion@nuestrosaman.edu.ve',
+    owner_name: 'Lic. Nelson Parra',
+    logo_color: 'bg-emerald-600'
+  },
+  {
+    id: 't-2',
+    name: 'IKAIUAD',
+    tax_id: 'J-40897654-3',
+    subdomain: 'ikaiuad',
+    plan_name: 'COMERCIAL_PRO',
+    status: 'ACTIVE',
+    user_count: 4,
+    max_users: 10,
+    product_count: 680,
+    max_products: 2500,
+    monthly_fee_usd: 35.00,
+    subscription_expires_at: '2026-09-15',
+    created_at: '23/5/2026',
+    enabled_modules: ['POS', 'SALES', 'INVENTORY', 'BANKS', 'REPORTS'],
+    owner_email: 'contacto@ikaiuad.com',
+    owner_name: 'Ing. Javier Soto',
+    logo_color: 'bg-blue-600'
+  },
+  {
+    id: 't-3',
+    name: 'Porto Minimarket & Delicateses',
+    tax_id: 'J-50119283-4',
+    subdomain: 'porto',
+    plan_name: 'COMERCIAL_PRO',
+    status: 'ACTIVE',
+    user_count: 5,
+    max_users: 10,
+    product_count: 1850,
+    max_products: 2500,
+    monthly_fee_usd: 35.00,
+    subscription_expires_at: '2026-10-10',
+    created_at: '23/5/2026',
+    enabled_modules: ['POS', 'SALES', 'INVENTORY', 'BANKS', 'REPORTS'],
+    owner_email: 'gerencia@portovenezuela.com',
+    owner_name: 'Antonio Da Silva',
+    logo_color: 'bg-blue-600'
+  },
+  {
+    id: 't-4',
+    name: 'Cecual Suministros Industriales',
+    tax_id: 'J-29837465-0',
+    subdomain: 'cecual',
+    plan_name: 'EMPRENDEDOR',
+    status: 'ACTIVE',
+    user_count: 2,
+    max_users: 3,
+    product_count: 340,
+    max_products: 500,
+    monthly_fee_usd: 15.00,
+    subscription_expires_at: '2026-08-30',
+    created_at: '8/5/2026',
+    enabled_modules: ['POS', 'SALES', 'INVENTORY'],
+    owner_email: 'ventas@cecual.com',
+    owner_name: 'Cecilia Alvarado',
+    logo_color: 'bg-blue-600'
+  },
+  {
+    id: 't-5',
+    name: 'Loca Academia de Policía',
+    tax_id: 'G-20098172-8',
+    subdomain: 'loca-academia-de-policia',
+    plan_name: 'COMERCIAL_PRO',
+    status: 'ACTIVE',
+    user_count: 3,
+    max_users: 10,
+    product_count: 520,
+    max_products: 2500,
+    monthly_fee_usd: 35.00,
+    subscription_expires_at: '2026-11-20',
+    created_at: '8/5/2026',
+    enabled_modules: ['POS', 'SALES', 'INVENTORY', 'BANKS', 'REPORTS'],
+    owner_email: 'seguridad@academia.org',
+    owner_name: 'Capitán Mahoney',
+    logo_color: 'bg-blue-600'
+  },
+  {
+    id: 't-6',
+    name: 'HaroldV Global Solutions',
+    tax_id: 'V-18992019-1',
+    subdomain: 'haroldv',
+    plan_name: 'CORPORATIVO',
+    status: 'ACTIVE',
+    user_count: 12,
+    max_users: 25,
+    product_count: 4200,
+    max_products: 10000,
+    monthly_fee_usd: 75.00,
+    subscription_expires_at: '2026-12-31',
+    created_at: '8/5/2026',
+    enabled_modules: ['POS', 'SALES', 'INVENTORY', 'BANKS', 'REPORTS', 'PAYROLL'],
+    owner_email: 'harold@haroldv.com',
+    owner_name: 'Harold Villalobos',
+    logo_color: 'bg-blue-600'
+  }
+];
+
+export const ALL_MODULE_GROUPS = [
+  {
+    key: 'POS', label: 'Ventas (Punto de Venta & Operaciones)', icon: 'Store',
+    color: 'indigo',
+    submodules: [
+      { key: 'pos:create', label: 'Punto de Venta', desc: 'Acceso al módulo POS de caja y facturación rápida' },
+      { key: 'sales:invoicing', label: 'Facturación de Venta', desc: 'Módulo de emisión y consulta de facturas de venta' },
+      { key: 'sales:quotations', label: 'Cotizaciones', desc: 'Emisión y seguimiento de cotizaciones a clientes' },
+      { key: 'sales:orders', label: 'Notas de Pedido', desc: 'Gestión de pedidos de venta y pedidos pendientes' },
+      { key: 'sales:deliveries', label: 'Notas de Entrega', desc: 'Despachos y guías de entrega de productos' },
+      { key: 'clients:manage', label: 'Clientes', desc: 'Directorio y gestión del catálogo de clientes' },
+      { key: 'pos:shifts', label: 'Turnos y Arqueos', desc: 'Apertura, cierre y arqueos de turnos de caja' },
+    ]
+  },
+  {
+    key: 'INVENTORY_PURCHASES', label: 'Compras (Órdenes, Recepciones & Facturas)', icon: 'Building2',
+    color: 'emerald',
+    submodules: [
+      { key: 'purchases:orders', label: 'Órdenes de Compra', desc: 'Gestión y aprobación de órdenes de compra a proveedores' },
+      { key: 'purchases:receptions', label: 'Notas de Recepción', desc: 'Recepciones y verificación de mercancía recibida' },
+      { key: 'purchases:new', label: 'Registrar Compra', desc: 'Formulario de registro directo de compras' },
+      { key: 'purchases:invoices', label: 'Facturación de Compra', desc: 'Registro y control de facturas de proveedores' },
+      { key: 'providers:manage', label: 'Proveedores', desc: 'Directorio y gestión del catálogo de proveedores' },
+    ]
+  },
+  {
+    key: 'INVENTORY', label: 'Control de Inventario (Catálogo & Stock)', icon: 'Package',
+    color: 'teal',
+    submodules: [
+      { key: 'inventory:create', label: 'Crear Productos', desc: 'Alta de nuevos productos en el catálogo' },
+      { key: 'inventory:stock', label: 'Listado de Productos', desc: 'Consulta de stock, catálogo y precios' },
+      { key: 'inventory:bulk_prices', label: 'Actualizar Precios Masivo', desc: 'Herramienta de actualización masiva de precios' },
+      { key: 'inventory:valuation', label: 'Valuación de Inventario', desc: 'Reportes de auditoría y valorización de stock' },
+      { key: 'inventory:warehouse', label: 'Almacenes', desc: 'Gestión de depósitos y sucursales' },
+      { key: 'inventory:categories', label: 'Categorías', desc: 'Clasificación y rubros de productos' },
+      { key: 'inventory:moves', label: 'Movimientos', desc: 'Ajustes, mermas y transferencias entre almacenes' },
+    ]
+  },
+  {
+    key: 'BANKS', label: 'Cuentas (Bancos, CxC, CxP & Historial)', icon: 'Landmark',
+    color: 'blue',
+    submodules: [
+      { key: 'banks:accounts', label: 'Cuentas Bancarias', desc: 'Administración de cuentas bancarias y saldos' },
+      { key: 'accounts:receivables', label: 'Cuentas por Cobrar (CxC)', desc: 'Control de créditos y cobros pendientes' },
+      { key: 'accounts:payables', label: 'Cuentas por Pagar (CxP)', desc: 'Control de compromisos y pagos a proveedores' },
+      { key: 'accounts:history', label: 'Historial', desc: 'Auditoría e historial financiero general' },
+    ]
+  },
+  {
+    key: 'REPORTS', label: 'Reportes y Analítica', icon: 'BarChart3',
+    color: 'purple',
+    submodules: [
+      { key: 'reports:view', label: 'Reportes y Analítica', desc: 'Centro de reportes BI y métricas clave del negocio' },
+    ]
+  },
+  {
+    key: 'SETTINGS', label: 'Configuración de Empresa', icon: 'Settings',
+    color: 'amber',
+    submodules: [
+      { key: 'company:manage', label: 'Perfil de Empresa', desc: 'Configuración de datos de la empresa y logo' },
+      { key: 'fiscal:manage', label: 'Configuración Fiscal', desc: 'Timbres fiscales, retenciones e imprenta digital' },
+      { key: 'users:manage', label: 'Usuarios y Roles', desc: 'Administración de usuarios, cajeros y roles internos' },
+    ]
+  },
+];
+
+export function useSuperAdminData() {
+  const [activeTab, setActiveTab] = useState<'TENANTS' | 'PAYMENTS' | 'PLANS' | 'BILLING' | 'MARKET_BI'>('TENANTS');
+  const [subscriptionPayments, setSubscriptionPayments] = useState<any[]>([]);
+  const [isApprovingPayment, setIsApprovingPayment] = useState(false);
+  const [viewMode, setViewMode] = useState<'CARDS' | 'TABLE'>('TABLE');
+  const [tenants, setTenants] = useState<TenantCompany[]>([]);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'SUSPENDED'>('ALL');
+  const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const [masterBcvRate, setMasterBcvRate] = useState<number>(36.50);
+  const [isSyncingBcv, setIsSyncingBcv] = useState(false);
+  const [bcvLastUpdated, setBcvLastUpdated] = useState<string>('Hoy, 08:30 AM (Automático)');
+  const [syncSuccess, setSyncSuccess] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTenant, setEditingTenant] = useState<TenantCompany | null>(null);
+  const [formName, setFormName] = useState('');
+  const [formTaxId, setFormTaxId] = useState('');
+  const [formSubdomain, setFormSubdomain] = useState('');
+
+  const [saasPlans, setSaasPlans] = useState<SaasPlan[]>([]);
+  const [billingCycle, setBillingCycle] = useState<'MONTHLY' | 'ANNUAL'>('MONTHLY');
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<SaasPlan | null>(null);
+
+  const [planFormName, setPlanFormName] = useState('');
+  const [planFormCode, setPlanFormCode] = useState('');
+  const [planFormDesc, setPlanFormDesc] = useState('');
+  const [planFormMonthly, setPlanFormMonthly] = useState<number>(29);
+  const [planFormAnnual, setPlanFormAnnual] = useState<number>(290);
+  const [planFormUsers, setPlanFormUsers] = useState<number>(5);
+  const [planFormProducts, setPlanFormProducts] = useState<number>(1000);
+  const [planFormWarehouses, setPlanFormWarehouses] = useState<number>(1);
+  const [planFormFiscalPrinting, setPlanFormFiscalPrinting] = useState<boolean>(false);
+  const [planFormBadge, setPlanFormBadge] = useState('');
+  const [planFormFeatured, setPlanFormFeatured] = useState<boolean>(false);
+  const [planFormActive, setPlanFormActive] = useState<boolean>(true);
+  const [planFormModules, setPlanFormModules] = useState<string[]>(['POS', 'INVENTORY']);
+  const [planFormPermissions, setPlanFormPermissions] = useState<string[]>(['pos:create', 'sales:invoicing', 'inventory:stock']);
+  const [planFormFeaturesText, setPlanFormFeaturesText] = useState('');
+  const [isSavingPlan, setIsSavingPlan] = useState(false);
+  const [planModalError, setPlanModalError] = useState<string | null>(null);
+
+  const [formPlan, setFormPlan] = useState<string>('COMERCIAL_PRO');
+  const [formStatus, setFormStatus] = useState<'ACTIVE' | 'SUSPENDED'>('ACTIVE');
+  const [formMaxUsers, setFormMaxUsers] = useState<number>(10);
+  const [formMaxProducts, setFormMaxProducts] = useState<number>(2500);
+  const [formMonthlyFee, setFormMonthlyFee] = useState<number>(35);
+  const [formOwnerEmail, setFormOwnerEmail] = useState('');
+  const [formOwnerName, setFormOwnerName] = useState('');
+  const [formModules, setFormModules] = useState<string[]>(['POS', 'SALES', 'INVENTORY', 'BANKS', 'REPORTS']);
+  const [formPermissions, setFormPermissions] = useState<string[]>([
+    'pos:create', 'pos:refund', 'clients:manage',
+    'sales:view', 'sales:write',
+    'inventory:view', 'inventory:write', 'purchases:register', 'providers:manage',
+    'banks:view'
+  ]);
+  const [expandedModuleGroups, setExpandedModuleGroups] = useState<string[]>(['POS', 'INVENTORY', 'BANKS']);
+  const [isSaving, setIsSaving] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+
+  const [tenantToToggle, setTenantToToggle] = useState<TenantCompany | null>(null);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+
+  const [impersonatingTenant, setImpersonatingTenant] = useState<TenantCompany | null>(null);
+  const [isImpersonatingId, setIsImpersonatingId] = useState<string | null>(null);
+  const [newTenantPassword, setNewTenantPassword] = useState<string | null>(null);
+  const [passwordCopied, setPasswordCopied] = useState(false);
+
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user?.role === 'SUPER_ADMIN') {
+      fetchTenants();
+      fetchPlans();
+      fetchSubscriptionPayments();
+    }
+  }, [user?.role]);
+
+  const fetchSubscriptionPayments = async () => {
+    if (user?.role !== 'SUPER_ADMIN') return;
+    try {
+      const res = await apiClient.get('/admin/subscription/payments');
+      if (res.data && Array.isArray(res.data)) {
+        setSubscriptionPayments(res.data);
+      }
+    } catch (err) {
+      console.error('Error fetching subscription payments:', err);
+    }
+  };
+
+  const handleApproveSubscriptionPayment = async (paymentId: string) => {
+    setIsApprovingPayment(true);
+    setSyncSuccess(null);
+    setSyncError(null);
+    try {
+      const res = await apiClient.post(`/admin/subscription/payments/${paymentId}/approve`);
+      setSyncSuccess(res.data?.message || '¡Pago aprobado y empresa activada con éxito!');
+      await fetchSubscriptionPayments();
+      await fetchTenants();
+    } catch (err: any) {
+      setSyncError(err.response?.data?.message || 'Error al aprobar el pago.');
+    } finally {
+      setIsApprovingPayment(false);
+    }
+  };
+
+  const fetchPlans = async () => {
+    try {
+      const res = await apiClient.get('/admin/plans');
+      if (res.data && Array.isArray(res.data)) {
+        setSaasPlans(res.data);
+      }
+    } catch (err) {
+      console.error('Error fetching SaaS plans:', err);
+    }
+  };
+
+  const fetchTenants = async () => {
+    setIsLoading(true);
+    setFetchError(null);
+    try {
+      const res = await apiClient.get('/admin/tenants');
+      if (res.data && Array.isArray(res.data)) {
+        setTenants(res.data);
+      } else {
+        setTenants(MOCK_TENANTS);
+      }
+    } catch (err: any) {
+      console.error('Error fetching tenants:', err);
+      setTenants(MOCK_TENANTS);
+      setFetchError('No se pudo conectar con el backend. Mostrando datos de demostración.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSelectPlanInForm = (planCode: string) => {
+    setFormPlan(planCode);
+    const selected = saasPlans.find(p => p.code === planCode);
+    if (selected) {
+      setFormMaxUsers(selected.max_users);
+      setFormMaxProducts(selected.max_products);
+      setFormMonthlyFee(selected.monthly_fee_usd);
+      if (selected.enabled_modules && selected.enabled_modules.length > 0) {
+        setFormModules(selected.enabled_modules);
+      }
+      if (selected.enabled_permissions && selected.enabled_permissions.length > 0) {
+        setFormPermissions(selected.enabled_permissions);
+      }
+    }
+  };
+
+  const handleOpenPlanModal = (plan?: SaasPlan) => {
+    setPlanModalError(null);
+    if (plan) {
+      setEditingPlan(plan);
+      setPlanFormName(plan.name);
+      setPlanFormCode(plan.code);
+      setPlanFormDesc(plan.description || '');
+      setPlanFormMonthly(plan.monthly_fee_usd);
+      setPlanFormAnnual(plan.annual_fee_usd || plan.monthly_fee_usd * 10);
+      setPlanFormUsers(plan.max_users);
+      setPlanFormProducts(plan.max_products);
+      setPlanFormWarehouses(plan.max_warehouses || 1);
+      setPlanFormFiscalPrinting(Boolean(plan.has_fiscal_printing));
+      setPlanFormBadge(plan.badge_text || '');
+      setPlanFormFeatured(Boolean(plan.is_featured));
+      setPlanFormActive(Boolean(plan.is_active));
+      setPlanFormModules(plan.enabled_modules || ['POS', 'INVENTORY']);
+      setPlanFormPermissions(plan.enabled_permissions || []);
+      setPlanFormFeaturesText((plan.features_list || []).join('\n'));
+    } else {
+      setEditingPlan(null);
+      setPlanFormName('');
+      setPlanFormCode('');
+      setPlanFormDesc('');
+      setPlanFormMonthly(25);
+      setPlanFormAnnual(250);
+      setPlanFormUsers(5);
+      setPlanFormProducts(1000);
+      setPlanFormWarehouses(1);
+      setPlanFormFiscalPrinting(false);
+      setPlanFormBadge('');
+      setPlanFormFeatured(false);
+      setPlanFormActive(true);
+      setPlanFormModules(['POS', 'INVENTORY']);
+      setPlanFormPermissions(['pos:create', 'sales:invoicing', 'inventory:stock']);
+      setPlanFormFeaturesText('');
+    }
+    setIsPlanModalOpen(true);
+  };
+
+  const handleSavePlan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPlanModalError(null);
+    if (!planFormName.trim() || (!editingPlan && !planFormCode.trim())) {
+      setPlanModalError('Por favor completa el Nombre y Código único del Plan');
+      return;
+    }
+    setIsSavingPlan(true);
+
+    const featuresArray = planFormFeaturesText
+      .split('\n')
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+
+    const payload = {
+      name: planFormName,
+      code: planFormCode.toUpperCase().trim(),
+      description: planFormDesc,
+      monthly_fee_usd: Number(planFormMonthly),
+      annual_fee_usd: Number(planFormAnnual),
+      max_users: Number(planFormUsers),
+      max_products: Number(planFormProducts),
+      max_warehouses: Number(planFormWarehouses),
+      has_fiscal_printing: planFormFiscalPrinting,
+      badge_text: planFormBadge,
+      is_featured: planFormFeatured,
+      is_active: planFormActive,
+      enabled_modules: planFormModules,
+      enabled_permissions: planFormPermissions,
+      features_list: featuresArray
+    };
+
+    try {
+      if (editingPlan) {
+        await apiClient.put(`/admin/plans/${editingPlan.id}`, payload);
+        setSyncSuccess(`¡Plan SaaS "${planFormName}" actualizado con éxito!`);
+      } else {
+        await apiClient.post('/admin/plans', payload);
+        setSyncSuccess(`¡Nuevo Plan SaaS "${planFormName}" registrado con éxito!`);
+      }
+      setIsPlanModalOpen(false);
+      fetchPlans();
+      setTimeout(() => setSyncSuccess(null), 4000);
+    } catch (err: any) {
+      console.error('Error saving plan:', err);
+      setPlanModalError(err.response?.data?.message || 'No se pudo guardar el plan SaaS');
+    } finally {
+      setIsSavingPlan(false);
+    }
+  };
+
+  const handleTogglePlanStatus = async (plan: SaasPlan) => {
+    try {
+      const newStatus = !plan.is_active;
+      await apiClient.put(`/admin/plans/${plan.id}/status`, { is_active: newStatus });
+      setSaasPlans(prev => prev.map(p => p.id === plan.id ? { ...p, is_active: newStatus } : p));
+      setSyncSuccess(`¡Plan "${plan.name}" ${newStatus ? 'activado' : 'desactivado'} con éxito!`);
+      setTimeout(() => setSyncSuccess(null), 4000);
+    } catch (err: any) {
+      console.error('Error toggling plan status:', err);
+      setSyncError('No se pudo cambiar el estado del plan');
+      setTimeout(() => setSyncError(null), 4000);
+    }
+  };
+
+  const handleTriggerBcvCron = async () => {
+    setIsSyncingBcv(true);
+    setSyncSuccess(null);
+    setSyncError(null);
+    try {
+      const res = await apiClient.post('/admin/bcv/sync');
+      const rate = res.data?.rate;
+      if (rate && typeof rate === 'number') {
+        setMasterBcvRate(rate);
+        const now = new Date();
+        setBcvLastUpdated(`Hoy, ${now.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })} (Sincronizado)`);
+        setSyncSuccess(`¡Tasa Maestra Global actualizada con éxito a Bs. ${rate.toFixed(2)} / USD para todos los tenants de la plataforma!`);
+        setTimeout(() => setSyncSuccess(null), 5000);
+      }
+    } catch (err: any) {
+      console.error('Error triggering BCV sync:', err);
+      setSyncError('No se pudo sincronizar la tasa BCV. Intenta de nuevo.');
+      setTimeout(() => setSyncError(null), 4000);
+    } finally {
+      setIsSyncingBcv(false);
+    }
+  };
+
+  const handleOpenModal = (tenant?: TenantCompany) => {
+    if (tenant) {
+      setEditingTenant(tenant);
+      setFormName(tenant.name);
+      setFormTaxId(tenant.tax_id);
+      setFormSubdomain(tenant.subdomain);
+      setFormPlan(tenant.plan_name);
+      setFormStatus(tenant.status);
+      setFormMaxUsers(tenant.max_users);
+      setFormMaxProducts(tenant.max_products);
+      setFormMonthlyFee(tenant.monthly_fee_usd);
+      setFormOwnerEmail(tenant.owner_email);
+      setFormOwnerName(tenant.owner_name);
+      setFormModules(tenant.enabled_modules || ['POS', 'SALES', 'INVENTORY', 'BANKS', 'REPORTS']);
+      setFormPermissions(tenant.enabled_permissions || [
+        'pos:create', 'sales:invoicing', 'sales:quotations', 'sales:orders', 'sales:deliveries', 'clients:manage', 'pos:shifts',
+        'purchases:orders', 'purchases:receptions', 'purchases:new', 'purchases:invoices', 'providers:manage',
+        'inventory:create', 'inventory:stock', 'inventory:bulk_prices', 'inventory:valuation', 'inventory:warehouse', 'inventory:categories', 'inventory:moves',
+        'banks:accounts', 'accounts:receivables', 'accounts:payables', 'accounts:history',
+        'reports:view',
+        'company:manage', 'fiscal:manage', 'users:manage'
+      ]);
+      setExpandedModuleGroups(tenant.enabled_modules || ['POS']);
+    } else {
+      setEditingTenant(null);
+      setFormName('');
+      setFormTaxId('');
+      setFormSubdomain('');
+      setFormPlan('COMERCIAL_PRO');
+      setFormStatus('ACTIVE');
+      setFormMaxUsers(10);
+      setFormMaxProducts(2500);
+      setFormMonthlyFee(35);
+      setFormOwnerEmail('');
+      setFormOwnerName('');
+      setFormModules(['POS', 'SALES', 'INVENTORY', 'BANKS', 'REPORTS']);
+      setFormPermissions([
+        'pos:create', 'sales:invoicing', 'sales:quotations', 'sales:orders', 'sales:deliveries', 'clients:manage', 'pos:shifts',
+        'purchases:orders', 'purchases:receptions', 'purchases:new', 'purchases:invoices', 'providers:manage',
+        'inventory:create', 'inventory:stock', 'inventory:bulk_prices', 'inventory:valuation', 'inventory:warehouse', 'inventory:categories', 'inventory:moves',
+        'banks:accounts', 'accounts:receivables', 'accounts:payables', 'accounts:history',
+        'reports:view',
+        'company:manage', 'fiscal:manage', 'users:manage'
+      ]);
+      setExpandedModuleGroups(['POS', 'INVENTORY', 'BANKS']);
+    }
+    setModalError(null);
+    setIsModalOpen(true);
+  };
+
+  const handleToggleModule = (modKey: string) => {
+    const group = ALL_MODULE_GROUPS.find(g => g.key === modKey);
+    const moduleEnabled = formModules.includes(modKey);
+    if (moduleEnabled) {
+      setFormModules(prev => prev.filter(m => m !== modKey));
+      const groupPerms = group?.submodules.map(s => s.key) || [];
+      setFormPermissions(prev => prev.filter(p => !groupPerms.includes(p)));
+    } else {
+      setFormModules(prev => [...prev, modKey]);
+      setExpandedModuleGroups(prev => prev.includes(modKey) ? prev : [...prev, modKey]);
+    }
+  };
+
+  const handleToggleSubmodule = (parentKey: string, permKey: string) => {
+    const permEnabled = formPermissions.includes(permKey);
+    if (permEnabled) {
+      const newPerms = formPermissions.filter(p => p !== permKey);
+      setFormPermissions(newPerms);
+      const group = ALL_MODULE_GROUPS.find(g => g.key === parentKey);
+      const groupPerms = group?.submodules.map(s => s.key) || [];
+      if (!groupPerms.some(p => newPerms.includes(p))) {
+        setFormModules(prev => prev.filter(m => m !== parentKey));
+      }
+    } else {
+      setFormPermissions(prev => [...prev, permKey]);
+      if (!formModules.includes(parentKey)) {
+        setFormModules(prev => [...prev, parentKey]);
+        setExpandedModuleGroups(prev => prev.includes(parentKey) ? prev : [...prev, parentKey]);
+      }
+    }
+  };
+
+  const handleToggleModuleGroup = (modKey: string) => {
+    setExpandedModuleGroups(prev =>
+      prev.includes(modKey) ? prev.filter(m => m !== modKey) : [...prev, modKey]
+    );
+  };
+
+  const handleSaveTenant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formName.trim() || !formTaxId.trim() || !formOwnerEmail.trim()) {
+      setModalError('Por favor completa todos los campos requeridos.');
+      return;
+    }
+
+    setIsSaving(true);
+    setModalError(null);
+
+    const payload = {
+      name: formName.trim(),
+      tax_id: formTaxId.trim().toUpperCase(),
+      subdomain: formSubdomain.trim().toLowerCase() || formName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+      plan_name: formPlan,
+      status: formStatus,
+      max_users: Number(formMaxUsers),
+      max_products: Number(formMaxProducts),
+      monthly_fee_usd: Number(formMonthlyFee),
+      owner_email: formOwnerEmail.trim(),
+      owner_name: formOwnerName.trim() || 'Gerente General',
+      enabled_modules: formModules,
+      enabled_permissions: formPermissions,
+    };
+
+    try {
+      if (editingTenant) {
+        await apiClient.put(`/admin/tenants/${editingTenant.id}`, payload);
+        setTenants(prev => prev.map(t =>
+          t.id === editingTenant.id
+            ? {
+              ...t,
+              name: payload.name,
+              tax_id: payload.tax_id,
+              subdomain: payload.subdomain,
+              plan_name: payload.plan_name,
+              status: payload.status,
+              max_users: payload.max_users,
+              max_products: payload.max_products,
+              monthly_fee_usd: payload.monthly_fee_usd,
+              owner_email: payload.owner_email,
+              owner_name: payload.owner_name,
+              enabled_modules: payload.enabled_modules,
+            }
+            : t
+        ));
+        setIsModalOpen(false);
+        setSyncSuccess('Empresa actualizada exitosamente.');
+        setTimeout(() => setSyncSuccess(null), 4000);
+      } else {
+        const res = await apiClient.post('/admin/tenants', payload);
+        const { defaultPassword } = res.data || {};
+        await fetchTenants();
+        setIsModalOpen(false);
+        if (defaultPassword) {
+          setNewTenantPassword(defaultPassword);
+        }
+      }
+    } catch (err: any) {
+      const backendMessage = err?.response?.data?.message;
+      const status = err?.response?.status;
+      if (status === 409) {
+        setModalError(backendMessage || 'El RIF o el email ya están registrados en la plataforma.');
+      } else if (status === 400) {
+        setModalError(backendMessage || 'Datos inválidos. Verifica los campos requeridos.');
+      } else {
+        setModalError('Error al guardar la empresa. Intenta de nuevo.');
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleToggleStatusRequest = (tenant: TenantCompany) => {
+    if (tenant.status === 'ACTIVE') {
+      setTenantToToggle(tenant);
+      setIsConfirmModalOpen(true);
+    } else {
+      executeToggleStatus(tenant);
+    }
+  };
+
+  const executeToggleStatus = async (tenant: TenantCompany) => {
+    const newStatus = tenant.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+    setTenants(prev => prev.map(t => t.id === tenant.id ? { ...t, status: newStatus, owner_is_active: newStatus !== 'SUSPENDED' } : t));
+    setIsConfirmModalOpen(false);
+    setTenantToToggle(null);
+    try {
+      await apiClient.put(`/admin/tenants/${tenant.id}`, { status: newStatus });
+      setSyncSuccess(`¡Empresa "${tenant.name}" ${newStatus === 'SUSPENDED' ? 'suspendida' : 'activada'} con éxito!`);
+      setTimeout(() => setSyncSuccess(null), 4000);
+      await fetchTenants();
+    } catch (err: any) {
+      console.error('Error toggling tenant status:', err);
+      setTenants(prev => prev.map(t => t.id === tenant.id ? { ...t, status: tenant.status } : t));
+      setSyncError(`No se pudo cambiar el estado de "${tenant.name}". Intenta de nuevo.`);
+      setTimeout(() => setSyncError(null), 4000);
+    }
+  };
+
+  const handleReactivateOwner = async (tenant: TenantCompany) => {
+    setTenants(prev => prev.map(t => t.id === tenant.id ? { ...t, owner_is_active: true, status: t.status === 'SUSPENDED' ? 'ACTIVE' : t.status } : t));
+    try {
+      await apiClient.post(`/admin/tenants/${tenant.id}/reactivate-owner`);
+      setSyncSuccess(`¡Cuenta de ${tenant.owner_name} (${tenant.owner_email}) reactivada con éxito! Acceso restablecido.`);
+      setTimeout(() => setSyncSuccess(null), 6000);
+      await fetchTenants();
+    } catch (err: any) {
+      console.error('Error reactivating owner:', err);
+      setTenants(prev => prev.map(t => t.id === tenant.id ? { ...t, owner_is_active: tenant.owner_is_active } : t));
+      setSyncError(`No se pudo reactivar la cuenta de ${tenant.owner_name}. Intenta de nuevo.`);
+      setTimeout(() => setSyncError(null), 4000);
+    }
+  };
+
+  const handleImpersonate = async (tenant: TenantCompany) => {
+    if (isImpersonatingId) return;
+    setIsImpersonatingId(tenant.id);
+    setImpersonatingTenant(tenant);
+    try {
+      const res = await apiClient.post(`/admin/tenants/${tenant.id}/impersonate`);
+      const { access_token, user } = res.data || {};
+
+      if (access_token && user) {
+        localStorage.setItem('ari_token', access_token);
+        localStorage.setItem('ari_user', JSON.stringify(user));
+        window.location.href = '/dashboard';
+      } else {
+        throw new Error('Respuesta inválida del servidor de impersonación');
+      }
+    } catch (err: any) {
+      console.error('Error impersonating tenant:', err);
+      setImpersonatingTenant(null);
+      setIsImpersonatingId(null);
+      setSyncError(`No se pudo iniciar sesión como "${tenant.name}". Verifica que el tenant tenga usuarios activos.`);
+      setTimeout(() => setSyncError(null), 5000);
+    }
+  };
+
+  const handleCopyPassword = () => {
+    if (newTenantPassword) {
+      navigator.clipboard.writeText(newTenantPassword).then(() => {
+        setPasswordCopied(true);
+        setTimeout(() => setPasswordCopied(false), 2000);
+      });
+    }
+  };
+
+  const totalMRR = useMemo(() => {
+    return tenants.filter(t => t.status === 'ACTIVE').reduce((acc, t) => acc + t.monthly_fee_usd, 0);
+  }, [tenants]);
+
+  const activeTenantsCount = useMemo(() => {
+    return tenants.filter(t => t.status === 'ACTIVE').length;
+  }, [tenants]);
+
+  const inactiveTenantsCount = useMemo(() => {
+    return tenants.filter(t => t.status === 'SUSPENDED').length;
+  }, [tenants]);
+
+  const filteredTenants = useMemo(() => {
+    return tenants.filter(t => {
+      const matchSearch = t.name.toLowerCase().includes(search.toLowerCase()) ||
+        t.tax_id.toLowerCase().includes(search.toLowerCase()) ||
+        t.subdomain.toLowerCase().includes(search.toLowerCase());
+      const matchStatus = statusFilter === 'ALL' || t.status === statusFilter;
+      return matchSearch && matchStatus;
+    });
+  }, [tenants, search, statusFilter]);
+
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
+
+  return {
+    activeTab, setActiveTab,
+    viewMode, setViewMode,
+    tenants,
+    search, setSearch,
+    statusFilter, setStatusFilter,
+    isLoading,
+    fetchError,
+    masterBcvRate,
+    isSyncingBcv,
+    bcvLastUpdated,
+    syncSuccess,
+    syncError,
+    isModalOpen, setIsModalOpen,
+    editingTenant,
+    subscriptionPayments,
+    isApprovingPayment,
+    handleApproveSubscriptionPayment,
+    formName, setFormName,
+    formTaxId, setFormTaxId,
+    formSubdomain, setFormSubdomain,
+    saasPlans,
+    billingCycle, setBillingCycle,
+    isPlanModalOpen, setIsPlanModalOpen,
+    editingPlan,
+    planFormName, setPlanFormName,
+    planFormCode, setPlanFormCode,
+    planFormDesc, setPlanFormDesc,
+    planFormMonthly, setPlanFormMonthly,
+    planFormAnnual, setPlanFormAnnual,
+    planFormUsers, setPlanFormUsers,
+    planFormProducts, setPlanFormProducts,
+    planFormWarehouses, setPlanFormWarehouses,
+    planFormFiscalPrinting, setPlanFormFiscalPrinting,
+    planFormBadge, setPlanFormBadge,
+    planFormFeatured, setPlanFormFeatured,
+    planFormActive, setPlanFormActive,
+    planFormModules, setPlanFormModules,
+    planFormPermissions, setPlanFormPermissions,
+    planFormFeaturesText, setPlanFormFeaturesText,
+    isSavingPlan,
+    planModalError,
+    formPlan, setFormPlan,
+    formStatus, setFormStatus,
+    formMaxUsers, setFormMaxUsers,
+    formMaxProducts, setFormMaxProducts,
+    formMonthlyFee, setFormMonthlyFee,
+    formOwnerEmail, setFormOwnerEmail,
+    formOwnerName, setFormOwnerName,
+    formModules, setFormModules,
+    formPermissions, setFormPermissions,
+    expandedModuleGroups, setExpandedModuleGroups,
+    isSaving,
+    modalError,
+    tenantToToggle,
+    isConfirmModalOpen, setIsConfirmModalOpen,
+    impersonatingTenant,
+    isImpersonatingId,
+    newTenantPassword, setNewTenantPassword,
+    passwordCopied,
+    handleSelectPlanInForm,
+    handleOpenPlanModal,
+    handleSavePlan,
+    handleTogglePlanStatus,
+    handleTriggerBcvCron,
+    handleOpenModal,
+    handleToggleModule,
+    handleToggleSubmodule,
+    handleToggleModuleGroup,
+    handleSaveTenant,
+    handleToggleStatusRequest,
+    executeToggleStatus,
+    handleReactivateOwner,
+    handleImpersonate,
+    handleCopyPassword,
+    totalMRR,
+    activeTenantsCount,
+    inactiveTenantsCount,
+    filteredTenants,
+    getInitials,
+  };
+}

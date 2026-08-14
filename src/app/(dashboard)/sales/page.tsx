@@ -14,9 +14,12 @@ import {
   AlertTriangle,
   ArrowRightLeft,
   Building,
-  Plus
+  Plus,
+  FileMinus,
+  FilePlus
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
+import { ActionTooltip } from '@/components/ActionTooltip';
 import { Modal } from '@/components/Modal';
 
 interface SaleSummary {
@@ -27,6 +30,9 @@ interface SaleSummary {
   created_at: string;
   invoice_number?: string;
   control_number?: string;
+  payment_method?: string;
+  credit_notes?: string;
+  debit_notes?: string;
   cashier: {
     id: string;
     full_name: string;
@@ -65,18 +71,6 @@ interface SaleDetail {
   items: SaleDetailItem[];
 }
 
-interface FiscalNoteSummary {
-  id: string;
-  document_number: string;
-  control_number: string;
-  type: 'CREDIT' | 'DEBIT';
-  date: string;
-  reason_code: string;
-  total_usd: number;
-  total_ves: number;
-  status: string;
-}
-
 interface LocationOption {
   id: string;
   name: string;
@@ -85,18 +79,11 @@ interface LocationOption {
 }
 
 export default function SalesHistoryPage() {
-  const [activeTab, setActiveTab] = useState<'sales' | 'notes'>('sales');
   const [sales, setSales] = useState<SaleSummary[]>([]);
-  const [notes, setNotes] = useState<FiscalNoteSummary[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Invoice Selector Modal State
-  const [isSelectingInvoice, setIsSelectingInvoice] = useState(false);
-  const [invoiceSearch, setInvoiceSearch] = useState('');
-
-  // Detail Modal State
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [saleDetail, setSaleDetail] = useState<SaleDetail | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
@@ -106,7 +93,6 @@ export default function SalesHistoryPage() {
   const [noteDetail, setNoteDetail] = useState<any | null>(null);
   const [isLoadingNoteDetail, setIsLoadingNoteDetail] = useState(false);
 
-  // Emit Note Form State
   const [isEmittingNote, setIsEmittingNote] = useState(false);
   const [noteType, setNoteType] = useState<'CREDIT' | 'DEBIT'>('CREDIT');
   const [noteReason, setNoteReason] = useState<'RETURN' | 'DISCOUNT' | 'PRICE_ERR' | 'TAX_ERR' | 'OTHER'>('RETURN');
@@ -124,30 +110,23 @@ export default function SalesHistoryPage() {
     selected: boolean;
   }[]>([]);
 
-  // Feedback Notification Modal
   const [feedbackMessage, setFeedbackMessage] = useState<{ title: string; message: string; type: 'success' | 'error' } | null>(null);
+  const [companyProfile, setCompanyProfile] = useState<any | null>(null);
 
   const fetchSales = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await apiClient.get('/sales');
+      const [response, profileRes] = await Promise.all([
+        apiClient.get('/sales'),
+        apiClient.get('/tenant/profile').catch(() => null)
+      ]);
       setSales(response.data);
+      if (profileRes) {
+        setCompanyProfile(profileRes.data);
+      }
     } catch (err: any) {
       setError('Error al cargar el historial de ventas.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchNotes = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await apiClient.get('/sales/notes');
-      setNotes(response.data);
-    } catch (err: any) {
-      setError('Error al cargar el historial de notas fiscales.');
     } finally {
       setIsLoading(false);
     }
@@ -185,7 +164,6 @@ export default function SalesHistoryPage() {
     try {
       const response = await apiClient.get(`/sales/${id}`);
       setSaleDetail(response.data);
-      // Initialize noteItems with original sale detail items
       const itemsPayload = response.data.items.map((item: SaleDetailItem) => ({
         productId: item.product_id,
         name: item.product_name,
@@ -208,6 +186,24 @@ export default function SalesHistoryPage() {
     }
   };
 
+  useEffect(() => {
+    fetchSales();
+  }, []);
+
+  const handleSaleClick = (id: string) => {
+    setSelectedSaleId(id);
+    fetchSaleDetail(id);
+  };
+
+  const handleCloseEmitNoteForm = () => {
+    setIsEmittingNote(false);
+    setNoteDescription('');
+    setNoteType('CREDIT');
+    setNoteReason('RETURN');
+    setSelectedSaleId(null);
+    setSaleDetail(null);
+  };
+
   const fetchNoteDetails = async (id: string) => {
     setIsLoadingNoteDetail(true);
     try {
@@ -220,29 +216,6 @@ export default function SalesHistoryPage() {
     }
   };
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const tab = params.get('tab');
-      if (tab === 'notes') {
-        setActiveTab('notes');
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === 'sales') {
-      fetchSales();
-    } else {
-      fetchNotes();
-    }
-  }, [activeTab]);
-
-  const handleSaleClick = (id: string) => {
-    setSelectedSaleId(id);
-    fetchSaleDetail(id);
-  };
-
   const handleNoteClick = (id: string) => {
     setSelectedNoteId(id);
     fetchNoteDetails(id);
@@ -251,13 +224,6 @@ export default function SalesHistoryPage() {
   const handleOpenEmitNoteForm = () => {
     fetchLocations();
     setIsEmittingNote(true);
-  };
-
-  const handleCloseEmitNoteForm = () => {
-    setIsEmittingNote(false);
-    setNoteDescription('');
-    setNoteType('CREDIT');
-    setNoteReason('RETURN');
   };
 
   const handleToggleItemSelect = (productId: string) => {
@@ -287,7 +253,7 @@ export default function SalesHistoryPage() {
       });
       return;
     }
-
+    
     const payload = {
       originalInvoiceId: selectedSaleId,
       type: noteType,
@@ -306,16 +272,16 @@ export default function SalesHistoryPage() {
     };
 
     try {
-      const res = await apiClient.post('/sales/notes', payload);
+      await apiClient.post('/sales/notes', payload);
       setFeedbackMessage({
         title: 'Nota Fiscal Emitida',
-        message: `La ${noteType === 'CREDIT' ? 'Nota de Crédito' : 'Nota de Débito'} ${res.data.documentNumber} se registró y publicó exitosamente.`,
+        message: `La ${noteType === 'CREDIT' ? 'Nota de Crédito' : 'Nota de Débito'} se registró exitosamente.`,
         type: 'success'
       });
       handleCloseEmitNoteForm();
       setSelectedSaleId(null);
       setSaleDetail(null);
-      fetchNotes();
+      fetchSales();
     } catch (err: any) {
       setFeedbackMessage({
         title: 'Error de emisión',
@@ -330,19 +296,6 @@ export default function SalesHistoryPage() {
     s.cashier.full_name.toLowerCase().includes(search.toLowerCase()) ||
     (s.invoice_number && s.invoice_number.toLowerCase().includes(search.toLowerCase())) ||
     (s.control_number && s.control_number.toLowerCase().includes(search.toLowerCase()))
-  );
-
-  const filteredNotes = notes.filter(n => 
-    n.document_number.toLowerCase().includes(search.toLowerCase()) ||
-    n.control_number.toLowerCase().includes(search.toLowerCase())
-  );
-
-  // Invoices filtered inside selector modal
-  const selectorFilteredSales = sales.filter(s => 
-    s.id.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
-    s.cashier.full_name.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
-    (s.invoice_number && s.invoice_number.toLowerCase().includes(invoiceSearch.toLowerCase())) ||
-    (s.control_number && s.control_number.toLowerCase().includes(invoiceSearch.toLowerCase()))
   );
 
   // Note Calculations
@@ -370,40 +323,13 @@ export default function SalesHistoryPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Header Container */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center gap-4">
-          <div className="bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl p-3">
-            <ShoppingCart className="h-6 w-6" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900">Facturas de Venta e Impuestos</h1>
-            <p className="text-xs text-slate-500">Consulta transacciones facturadas y emite Notas de Crédito y Débito.</p>
-          </div>
+      <div className="flex items-center gap-4">
+        <div className="bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl p-3">
+          <ShoppingCart className="h-6 w-6" />
         </div>
-
-        {/* Tabs for switching views */}
-        <div className="flex bg-slate-100 p-1 rounded-xl">
-          <button
-            onClick={() => setActiveTab('sales')}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              activeTab === 'sales' 
-                ? 'bg-white text-indigo-600 shadow-xs' 
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            Facturas de Ventas
-          </button>
-          <button
-            onClick={() => setActiveTab('notes')}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              activeTab === 'notes' 
-                ? 'bg-white text-indigo-600 shadow-xs' 
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            Notas de Crédito / Débito
-          </button>
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-slate-900">Historial de Ventas</h1>
+          <p className="text-xs text-slate-500">Consulta transacciones y gestiona notas de ajuste fiscal.</p>
         </div>
       </div>
 
@@ -417,224 +343,155 @@ export default function SalesHistoryPage() {
         </div>
       )}
 
-      {/* Filter and search */}
       <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="relative w-full max-w-md">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
           <input
             type="text"
-            placeholder={activeTab === 'sales' ? "Buscar por Ticket ID o Nombre de Cajero..." : "Buscar por Nro Nota o Nro Control..."}
+            placeholder="Buscar por Ticket ID o Nombre de Cajero..."
             className="w-full pl-11 pr-4 py-2 bg-slate-100 border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none text-slate-800 placeholder-slate-400"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        {activeTab === 'notes' && (
-          <button
-            onClick={() => { setIsSelectingInvoice(true); setInvoiceSearch(''); }}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition-all shadow-md shadow-indigo-600/10 hover:shadow-lg cursor-pointer shrink-0"
-          >
-            <Plus className="h-4.5 w-4.5" />
-            Emitir Nota Fiscal
-          </button>
-        )}
       </div>
 
-      {/* Data Table */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         {isLoading ? (
           <div className="py-20 flex flex-col items-center justify-center space-y-3">
             <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
             <span className="text-sm font-semibold text-slate-500">Cargando registros...</span>
           </div>
-        ) : activeTab === 'sales' ? (
-          filteredSales.length === 0 ? (
-            <div className="py-20 text-center space-y-2">
-              <ShoppingCart className="h-10 w-10 text-slate-300 mx-auto" />
-              <p className="text-sm font-bold text-slate-600">No se encontraron ventas registradas</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/50 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    <th className="py-4 px-6">Ticket ID</th>
-                    <th className="py-4 px-6">Factura / Control</th>
-                    <th className="py-4 px-6">Cajero</th>
-                    <th className="py-4 px-6">Total USD</th>
-                    <th className="py-4 px-6">Total VES</th>
-                    <th className="py-4 px-6">Fecha / Hora</th>
-                    <th className="py-4 px-6 text-right">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-                  {filteredSales.map((s) => (
-                    <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-4 px-6 font-mono text-xs font-semibold text-slate-500">#{s.id.substring(0, 8).toUpperCase()}</td>
-                      <td className="py-4 px-6 font-mono text-xs text-slate-800">
-                        {s.invoice_number ? (
-                          <div className="flex flex-col">
-                            <span className="font-bold text-slate-950">{s.invoice_number}</span>
-                            <span className="text-[10px] text-slate-400">Ctrl: {s.control_number}</span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 italic">No fiscal (Pre-registro)</span>
-                        )}
-                      </td>
-                      <td className="py-4 px-6 font-bold text-slate-900">{s.cashier.full_name}</td>
-                      <td className="py-4 px-6 font-semibold">${Number(s.total_amount_usd).toFixed(2)}</td>
-                      <td className="py-4 px-6 font-medium text-slate-500">{(s.total_amount_usd * s.exchange_rate_applied).toLocaleString('es-VE')} Bs.</td>
-                      <td className="py-4 px-6 text-slate-400 text-xs">
-                        {new Date(s.created_at).toLocaleString()}
-                      </td>
-                      <td className="py-4 px-6 text-right">
-                        <button
-                          onClick={() => handleSaleClick(s.id)}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:underline cursor-pointer"
-                        >
-                          Ver Detalle
-                          <ChevronRight className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )
+        ) : filteredSales.length === 0 ? (
+          <div className="py-20 text-center space-y-2">
+            <ShoppingCart className="h-10 w-10 text-slate-300 mx-auto" />
+            <p className="text-sm font-bold text-slate-600">No se encontraron ventas registradas</p>
+          </div>
         ) : (
-          filteredNotes.length === 0 ? (
-            <div className="py-20 text-center space-y-2">
-              <FileText className="h-10 w-10 text-slate-300 mx-auto" />
-              <p className="text-sm font-bold text-slate-600">No se encontraron notas fiscales registradas</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/50 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    <th className="py-4 px-6">Nro Documento</th>
-                    <th className="py-4 px-6">Nro Control</th>
-                    <th className="py-4 px-6">Tipo</th>
-                    <th className="py-4 px-6">Motivo</th>
-                    <th className="py-4 px-6">Total USD</th>
-                    <th className="py-4 px-6">Total VES</th>
-                    <th className="py-4 px-6 text-right">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-                  {filteredNotes.map((n) => (
-                    <tr key={n.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-4 px-6 font-mono text-xs font-bold text-slate-900">{n.document_number}</td>
-                      <td className="py-4 px-6 font-mono text-xs text-slate-600">{n.control_number}</td>
-                      <td className="py-4 px-6">
-                        <span className={`px-2 py-0.5 text-xs font-semibold rounded ${
-                          n.type === 'CREDIT' 
-                            ? 'bg-blue-50 text-blue-700 border border-blue-100' 
-                            : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  <th className="py-4 px-6">Ticket ID</th>
+                  <th className="py-4 px-6">Factura / Control</th>
+                  <th className="py-4 px-6">Cajero</th>
+                  <th className="py-4 px-6 text-center">Estado / Notas</th>
+                  <th className="py-4 px-6">Total USD</th>
+                  <th className="py-4 px-6">Total VES</th>
+                  <th className="py-4 px-6">Fecha / Hora</th>
+                  <th className="py-4 px-6 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
+                {filteredSales.map((s) => (
+                  <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="py-4 px-6 font-mono text-xs font-semibold text-slate-500">#{s.id.substring(0, 8).toUpperCase()}</td>
+                    <td className="py-4 px-6 font-mono text-xs text-slate-800">
+                      {s.invoice_number ? (
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-950">{s.invoice_number}</span>
+                          <span className="text-[10px] text-slate-400">Ctrl: {s.control_number}</span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 italic">No fiscal (Pre-registro)</span>
+                      )}
+                    </td>
+                    <td className="py-4 px-6 font-bold text-slate-900">{s.cashier.full_name}</td>
+                    <td className="py-4 px-6 text-center">
+                      <div className="flex flex-col items-center justify-center gap-1">
+                        <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full border inline-flex items-center gap-1 ${
+                          s.status === 'ANULADA'
+                            ? 'bg-slate-100 text-slate-500 border-slate-200'
+                            : s.status === 'AJUSTADA'
+                            ? 'bg-amber-50 text-amber-700 border-amber-100'
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-100'
                         }`}>
-                          {n.type === 'CREDIT' ? 'CRÉDITO' : 'DÉBITO'}
+                          {s.status === 'ANULADA' ? 'Anulada' : s.status === 'AJUSTADA' ? 'Ajustada' : 'Pagada'}
                         </span>
-                      </td>
-                      <td className="py-4 px-6 text-slate-600 text-xs uppercase font-medium">{n.reason_code}</td>
-                      <td className="py-4 px-6 font-semibold">${Number(n.total_usd).toFixed(2)}</td>
-                      <td className="py-4 px-6 font-medium text-slate-500">{Number(n.total_ves).toLocaleString('es-VE')} Bs.</td>
-                      <td className="py-4 px-6 text-right">
-                        <button
-                          onClick={() => handleNoteClick(n.id)}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:underline cursor-pointer"
-                        >
-                          Ver Detalle
-                          <ChevronRight className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )
+                        {s.credit_notes && (
+                          <div className="flex flex-wrap gap-1 justify-center max-w-[150px]">
+                            {s.credit_notes.split(',').map((noteStr) => {
+                              const [docNum, noteId] = noteStr.split(':');
+                              return (
+                                <button
+                                  key={noteId}
+                                  onClick={() => handleNoteClick(noteId)}
+                                  className="font-mono text-[9px] text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-100 px-1.5 py-0.5 rounded font-bold cursor-pointer transition-colors animate-in fade-in"
+                                  title="Ver detalle de Nota de Crédito"
+                                >
+                                  NC: {docNum}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {s.debit_notes && (
+                          <div className="flex flex-wrap gap-1 justify-center max-w-[150px]">
+                            {s.debit_notes.split(',').map((noteStr) => {
+                              const [docNum, noteId] = noteStr.split(':');
+                              return (
+                                <button
+                                  key={noteId}
+                                  onClick={() => handleNoteClick(noteId)}
+                                  className="font-mono text-[9px] text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 px-1.5 py-0.5 rounded font-bold cursor-pointer transition-colors animate-in fade-in"
+                                  title="Ver detalle de Nota de Débito"
+                                >
+                                  ND: {docNum}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-4 px-6 font-semibold">${Number(s.total_amount_usd).toFixed(2)}</td>
+                    <td className="py-4 px-6 font-medium text-slate-500">{(s.total_amount_usd * s.exchange_rate_applied).toLocaleString('es-VE')} Bs.</td>
+                    <td className="py-4 px-6 text-slate-400 text-xs">
+                      {new Date(s.created_at).toLocaleString()}
+                    </td>
+                    <td className="py-4 px-6 text-right">
+                      <div className="flex justify-end gap-1">
+                        <ActionTooltip content="Ver detalle de venta">
+                          <button
+                            onClick={() => handleSaleClick(s.id)}
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/80 rounded-lg transition-all duration-200 cursor-pointer inline-flex items-center"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                        </ActionTooltip>
+
+                        {s.invoice_number && (
+                          <ActionTooltip content={s.status === 'ANULADA' ? "Factura anulada" : "Emitir Nota de Ajuste (Crédito/Débito)"}>
+                            <button
+                              onClick={() => {
+                                if (s.status === 'ANULADA') return;
+                                setNoteType('CREDIT');
+                                setSelectedSaleId(s.id);
+                                fetchSaleDetail(s.id, true);
+                              }}
+                              disabled={s.status === 'ANULADA'}
+                              className={`p-1.5 rounded-lg transition-all duration-200 inline-flex items-center ${
+                                s.status === 'ANULADA'
+                                  ? 'text-slate-200 cursor-not-allowed'
+                                  : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 cursor-pointer'
+                              }`}
+                            >
+                              <ArrowRightLeft className="h-4 w-4" />
+                            </button>
+                          </ActionTooltip>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
-      {/* Invoice Selector Modal */}
-      {isSelectingInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-              <h3 className="text-base font-bold text-slate-900">Seleccionar Factura de Venta</h3>
-              <button 
-                onClick={() => setIsSelectingInvoice(false)} 
-                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <p className="text-xs text-slate-500">Toda nota de crédito o débito debe modificar un documento fiscal registrado. Por favor busque y seleccione la factura original a continuación:</p>
-              
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input 
-                  type="text"
-                  placeholder="Buscar por Ticket ID o Cajero..."
-                  value={invoiceSearch}
-                  onChange={(e) => setInvoiceSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                />
-              </div>
-
-              <div className="border border-slate-100 rounded-xl overflow-hidden max-h-60 overflow-y-auto divide-y divide-slate-100">
-                {selectorFilteredSales.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-slate-400 italic">No se encontraron facturas coincidentes</div>
-                ) : (
-                  selectorFilteredSales.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => {
-                        setIsSelectingInvoice(false);
-                        setSelectedSaleId(s.id);
-                        fetchSaleDetail(s.id, true);
-                      }}
-                      className="w-full text-left p-3 hover:bg-slate-50 transition-colors flex justify-between items-center text-xs cursor-pointer"
-                    >
-                      <div>
-                        {s.invoice_number ? (
-                          <span className="font-mono font-bold text-slate-800 block">
-                            {s.invoice_number} <span className="text-[10px] text-slate-400 font-normal">(Ctrl: {s.control_number})</span>
-                          </span>
-                        ) : (
-                          <span className="font-mono font-bold text-slate-700 block">#{s.id.substring(0, 8).toUpperCase()}</span>
-                        )}
-                        <span className="text-slate-500">Cajero: {s.cashier.full_name}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-bold text-slate-900 block">${Number(s.total_amount_usd).toFixed(2)} USD</span>
-                        <span className="text-[10px] text-slate-400">{new Date(s.created_at).toLocaleDateString()}</span>
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsSelectingInvoice(false)}
-                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl text-xs transition-all cursor-pointer"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Sale Detail Receipt Drawer Modal */}
-      {selectedSaleId && (
+      {selectedSaleId && !isEmittingNote && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50">
@@ -654,6 +511,28 @@ export default function SalesHistoryPage() {
               </div>
             ) : (
               <div className="p-6 space-y-5 overflow-y-auto max-h-[80vh]">
+                {companyProfile && (
+                  <div className="text-center border-b border-dashed border-slate-200 pb-3 space-y-0.5 text-xs font-mono text-slate-700">
+                    {companyProfile.logo_url && (
+                      <img src={companyProfile.logo_url} alt="Logo" className="h-8 object-contain mx-auto mb-1" />
+                    )}
+                    <p className="font-bold text-slate-900 uppercase">{companyProfile.commercial_name || companyProfile.company_name}</p>
+                    <p className="text-[10px] text-slate-500 font-bold">RIF: {companyProfile.tax_id}</p>
+                    {companyProfile.fiscal_address && (
+                      <p className="text-[9px] text-slate-400 max-w-[250px] mx-auto leading-normal">{companyProfile.fiscal_address}</p>
+                    )}
+                    {companyProfile.phone && (
+                      <p className="text-[9px] text-slate-400">Tlf: {companyProfile.phone}</p>
+                    )}
+                    <p className="text-[9px] font-bold text-indigo-600 uppercase tracking-wider mt-1">
+                      {companyProfile.taxpayer_type === 'SPECIAL' ? 'Contribuyente Especial' : companyProfile.taxpayer_type === 'FORMAL' ? 'Contribuyente Formal' : 'Contribuyente Ordinario'}
+                    </p>
+                    {companyProfile.taxpayer_type === 'SPECIAL' && companyProfile.is_withholding_agent && (
+                      <p className="text-[8px] text-indigo-700 font-black tracking-tight mt-0.5">AGENTE DE RETENCIÓN DE IVA</p>
+                    )}
+                  </div>
+                )}
+
                 {/* Header info */}
                 <div className="text-xs font-mono border-b border-dashed border-slate-200 pb-3 space-y-1.5 text-slate-600">
                   {saleDetail.invoice_number && (
@@ -730,6 +609,12 @@ export default function SalesHistoryPage() {
                   </div>
                 </div>
 
+                {companyProfile && companyProfile.receipt_footer && (
+                  <div className="border-t border-dashed border-slate-200 pt-3 text-center text-[10px] text-slate-400 leading-relaxed font-sans whitespace-pre-line">
+                    {companyProfile.receipt_footer}
+                  </div>
+                )}
+
                 {/* Action buttons */}
                 <div className="flex flex-col gap-2 pt-2">
                   <button
@@ -765,8 +650,11 @@ export default function SalesHistoryPage() {
       {isEmittingNote && saleDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
           <form onSubmit={handleSubmitNote} className="bg-white w-full max-w-lg rounded-2xl shadow-xl border border-slate-100 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-              <h3 className="text-base font-bold text-slate-900">Emitir Nota Fiscal de Ajuste</h3>
+            <div className="flex justify-between items-start px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">Emitir Nota Fiscal de Ajuste</h3>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">Generación de Nota de Crédito o Débito para la factura seleccionada</p>
+              </div>
               <button 
                 type="button"
                 onClick={handleCloseEmitNoteForm} 
@@ -776,31 +664,30 @@ export default function SalesHistoryPage() {
               </button>
             </div>
 
-            <div className="p-6 space-y-4 overflow-y-auto max-h-[75vh]">
+            <div className="p-6 space-y-5 overflow-y-auto max-h-[75vh]">
               {/* Associated invoice details */}
-              <div className="bg-indigo-50 border border-indigo-100 p-3.5 rounded-xl text-xs space-y-1.5">
-                <div className="flex justify-between">
-                  <span className="text-slate-500 font-medium">Factura original a ajustar:</span>
-                  <span className="font-mono font-bold text-indigo-950">
+              <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl text-xs space-y-2 shadow-2xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Factura original a ajustar</span>
+                  <span className="font-mono font-semibold text-xs text-slate-700 bg-slate-100/90 px-2 py-0.5 rounded-md">
                     {saleDetail.invoice_number || `#${saleDetail.id.substring(0, 8).toUpperCase()}`}
                   </span>
                 </div>
                 {saleDetail.control_number && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 font-medium">Número de Control:</span>
-                    <span className="font-mono font-bold text-indigo-950">{saleDetail.control_number}</span>
+                  <div className="flex justify-between items-center border-t border-indigo-100/50 pt-2">
+                    <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Número de Control</span>
+                    <span className="font-mono font-semibold text-xs text-slate-700 bg-slate-100/90 px-2 py-0.5 rounded-md">{saleDetail.control_number}</span>
                   </div>
                 )}
               </div>
 
-              {/* Form Metadata */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Tipo de Documento</label>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Tipo de Documento</label>
                   <select 
                     value={noteType} 
                     onChange={(e) => setNoteType(e.target.value as any)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm"
                   >
                     <option value="CREDIT">Nota de Crédito</option>
                     <option value="DEBIT">Nota de Débito</option>
@@ -808,11 +695,11 @@ export default function SalesHistoryPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Motivo Fiscal</label>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Motivo Fiscal</label>
                   <select 
                     value={noteReason} 
                     onChange={(e) => setNoteReason(e.target.value as any)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm"
                   >
                     <option value="RETURN">Devolución de mercancía</option>
                     <option value="DISCOUNT">Descuento comercial</option>
@@ -824,41 +711,41 @@ export default function SalesHistoryPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Descripción / Justificación</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Descripción / Justificación</label>
                 <input 
                   type="text" 
                   required
                   placeholder="Detalles sobre el ajuste del documento..."
                   value={noteDescription}
                   onChange={(e) => setNoteDescription(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition-all shadow-2xs"
                 />
               </div>
 
               {/* Items Table for notes */}
               <div className="space-y-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Seleccionar artículos a ajustar</span>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Artículos a ajustar</span>
                 <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
                   {noteItems.map((item) => (
-                    <div key={item.productId} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200/60 bg-slate-50/20">
+                    <div key={item.productId} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200/65 bg-white shadow-2xs hover:border-indigo-150 transition-colors">
                       <input 
                         type="checkbox" 
                         checked={item.selected}
                         onChange={() => handleToggleItemSelect(item.productId)}
-                        className="w-4 h-4 rounded text-indigo-600 bg-slate-50 border-slate-200 focus:ring-indigo-500"
+                        className="w-4 h-4 rounded text-indigo-600 bg-slate-50 border-slate-200 focus:ring-indigo-500 cursor-pointer"
                       />
                       <div className="flex-1 min-w-0">
                         <span className="text-xs font-bold text-slate-900 block truncate">{item.name}</span>
-                        <span className="text-[10px] text-slate-500">Max original: {item.originalQty}</span>
+                        <span className="text-[10px] text-slate-400 font-medium">Max original: {item.originalQty}</span>
                       </div>
                       {item.selected && (
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-slate-500">Cant:</span>
+                          <span className="text-xs text-slate-500 font-bold">Cant:</span>
                           <input 
                             type="number"
                             value={item.quantity}
                             onChange={(e) => handleQtyChange(item.productId, parseInt(e.target.value) || 1)}
-                            className="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-center text-xs"
+                            className="w-16 px-2.5 py-1 bg-slate-50 border border-slate-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 rounded-lg text-center text-xs font-bold text-slate-955"
                           />
                         </div>
                       )}
@@ -869,25 +756,25 @@ export default function SalesHistoryPage() {
 
               {/* WMS location selector for re-entry */}
               {noteType === 'CREDIT' && noteReason === 'RETURN' && (
-                <div className="p-4 rounded-2xl bg-indigo-50/40 border border-indigo-100/50 space-y-3">
-                  <div className="flex items-center gap-2 text-indigo-950 text-xs font-bold">
+                <div className="p-4 rounded-2xl bg-indigo-50/40 border border-indigo-100/50 space-y-3 shadow-2xs">
+                  <div className="flex items-center gap-2 text-indigo-950 text-xs font-bold uppercase tracking-wider">
                     <Building className="h-4 w-4 text-indigo-600" />
-                    <span>Control de Inventario WMS (Devolución Física)</span>
+                    <span>Control de Inventario WMS</span>
                   </div>
                   <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2 text-xs text-slate-700">
+                    <label className="flex items-center gap-2 text-xs text-slate-700 font-semibold cursor-pointer">
                       <input 
                         type="checkbox" 
                         checked={noteReenterStock}
                         onChange={(e) => setNoteReenterStock(e.target.checked)}
-                        className="w-4 h-4 rounded text-indigo-600 bg-slate-50 border-slate-200 focus:ring-indigo-500"
+                        className="w-4 h-4 rounded text-indigo-600 bg-slate-50 border-slate-200 focus:ring-indigo-500 cursor-pointer"
                       />
                       <span>¿Reingresar mercadería al inventario?</span>
                     </label>
                   </div>
                   {noteReenterStock && (
                     <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Destino de Reingreso WMS</label>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Destino de Reingreso WMS</label>
                       <select
                         value={noteLocationId}
                         onChange={(e) => setNoteLocationId(e.target.value)}
@@ -905,30 +792,37 @@ export default function SalesHistoryPage() {
                 </div>
               )}
 
-              {/* Reactive Totals display */}
-              <div className="border-t border-slate-100 pt-3 flex justify-between items-center text-xs font-mono bg-slate-50/50 p-3 rounded-xl">
-                <div>
-                  <span className="text-[10px] text-slate-400 block">Tasa BCV</span>
-                  <span className="font-bold text-slate-700">{noteExchangeRate.toFixed(2)} Bs.</span>
-                </div>
-                <div className="text-right">
-                  <span className="font-bold text-slate-900 block text-sm">Total USD: ${selectedTotalUsd.toFixed(2)}</span>
-                  <span className="font-bold text-slate-500 block">Total VES: {selectedTotalVes.toLocaleString('es-VE')} Bs.</span>
+              {/* Reactive Totals display (Luminous Executive Theme) */}
+              <div className="bg-gradient-to-br from-indigo-50/90 via-slate-50 to-blue-50/60 border border-indigo-100/90 rounded-2xl p-5 shadow-xs space-y-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Tasa de Cambio (BCV)</span>
+                    <span className="font-mono font-bold text-slate-700 mt-0.5 block">{noteExchangeRate.toFixed(2)} Bs.</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Total a Ajustar</span>
+                    <span className="font-mono font-black text-xl sm:text-2xl text-slate-900 tracking-tight block">
+                      ${selectedTotalUsd.toFixed(2)}
+                    </span>
+                    <span className="font-mono text-xs font-bold text-slate-500 block">
+                      {selectedTotalVes.toLocaleString('es-VE')} Bs.
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50">
+            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50 shrink-0">
               <button 
                 type="button" 
                 onClick={handleCloseEmitNoteForm}
-                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition-all cursor-pointer text-sm"
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold rounded-xl transition-all text-sm cursor-pointer"
               >
                 Cancelar
               </button>
               <button 
                 type="submit"
-                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-medium rounded-xl transition-all cursor-pointer text-sm"
+                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:from-indigo-700 active:to-violet-700 text-white font-semibold rounded-xl transition-all shadow-md shadow-indigo-200 text-sm cursor-pointer active:scale-98 disabled:opacity-50"
               >
                 Emitir Nota Fiscal
               </button>
@@ -960,9 +854,24 @@ export default function SalesHistoryPage() {
               <div className="p-6 space-y-5 overflow-y-auto max-h-[80vh] print-container">
                 {/* Print Invoice Style header */}
                 <div className="text-center space-y-1">
-                  <h4 className="text-sm font-bold text-slate-900 uppercase">ARI Soft ERP C.A.</h4>
-                  <p className="text-[10px] text-slate-500">RIF: J-12345678-9</p>
-                  <p className="text-[10px] text-slate-500">Dirección Fiscal: Caracas, Venezuela</p>
+                  {companyProfile ? (
+                    <>
+                      {companyProfile.logo_url && (
+                        <img src={companyProfile.logo_url} alt="Logo" className="h-8 object-contain mx-auto mb-1" />
+                      )}
+                      <h4 className="text-sm font-bold text-slate-900 uppercase">{companyProfile.commercial_name || companyProfile.company_name}</h4>
+                      <p className="text-[10px] text-slate-500 font-bold">RIF: {companyProfile.tax_id}</p>
+                      {companyProfile.fiscal_address && (
+                        <p className="text-[9px] text-slate-400 max-w-[250px] mx-auto leading-normal">{companyProfile.fiscal_address}</p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <h4 className="text-sm font-bold text-slate-900 uppercase">ARI Soft ERP C.A.</h4>
+                      <p className="text-[10px] text-slate-500">RIF: J-12345678-9</p>
+                      <p className="text-[10px] text-slate-500">Dirección Fiscal: Caracas, Venezuela</p>
+                    </>
+                  )}
                 </div>
 
                 <div className="border-t border-b border-dashed border-slate-200 py-3 text-xs font-mono space-y-1 text-slate-700">
