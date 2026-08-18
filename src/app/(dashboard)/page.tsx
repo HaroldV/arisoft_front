@@ -3,10 +3,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { 
-  TrendingUp, 
-  Users, 
-  Package, 
+import {
+  TrendingUp,
+  Users,
+  Package,
   AlertCircle,
   ArrowUpRight,
   Clock,
@@ -34,7 +34,7 @@ import apiClient from '@/infrastructure/api/api-client';
 export default function WelcomeDashboard() {
   const { user } = useAuth();
   const router = useRouter();
-  
+
   const [currentDate, setCurrentDate] = useState('');
   const [exchangeRate, setExchangeRate] = useState<number>(36.50);
   const [calcUsd, setCalcUsd] = useState<string>('10');
@@ -48,11 +48,11 @@ export default function WelcomeDashboard() {
   const [purchases, setPurchases] = useState<any[]>([]);
 
   useEffect(() => {
-    const options: Intl.DateTimeFormatOptions = { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    const options: Intl.DateTimeFormatOptions = {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     };
     const formatted = new Date().toLocaleDateString('es-ES', options);
     setCurrentDate(formatted.charAt(0).toUpperCase() + formatted.slice(1));
@@ -174,21 +174,6 @@ export default function WelcomeDashboard() {
 
         {/* Live BCV Exchange Rate Card & Date */}
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-start lg:justify-end">
-          <div className="bg-gradient-to-br from-emerald-50 via-slate-50 to-teal-50/60 border border-emerald-100/90 rounded-2xl p-3 shadow-2xs flex items-center gap-3">
-            <div className="p-2 bg-emerald-500 text-white rounded-xl shadow-xs">
-              <DollarSign className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block">
-                Tasa Oficial BCV
-              </span>
-              <div className="flex items-center gap-1.5 font-mono font-black text-sm text-slate-900">
-                <span>Bs. {exchangeRate.toFixed(2)}</span>
-                <span className="text-[10px] font-medium text-slate-400 font-sans">/ USD</span>
-              </div>
-            </div>
-          </div>
-
           <div className="flex items-center space-x-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-200/70 text-xs font-semibold text-slate-700">
             <Clock className="h-4 w-4 text-indigo-600 shrink-0" />
             <span>{currentDate || 'Cargando fecha...'}</span>

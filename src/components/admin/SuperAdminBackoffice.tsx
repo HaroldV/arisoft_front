@@ -32,6 +32,7 @@ import { MarketBiTab } from './subcomponents/MarketBiTab';
 import { PendingPaymentsTab } from './subcomponents/PendingPaymentsTab';
 import { TenantModal } from './subcomponents/TenantModal';
 import { TenantConfirmModal } from './subcomponents/TenantConfirmModal';
+import { ManualBcvModal } from './subcomponents/ManualBcvModal';
 import { useSuperAdminData, ALL_MODULE_GROUPS } from './hooks/useSuperAdminData';
 
 export interface SaasPlan {
@@ -87,8 +88,12 @@ export default function SuperAdminBackoffice() {
     isLoading,
     fetchError,
     masterBcvRate,
+    masterEurRate,
     isSyncingBcv,
     bcvLastUpdated,
+    isManualBcvModalOpen,
+    setIsManualBcvModalOpen,
+    handleSaveManualBcvRate,
     syncSuccess,
     syncError,
     isModalOpen, setIsModalOpen,
@@ -192,20 +197,40 @@ export default function SuperAdminBackoffice() {
                 </span>
                 <span className="text-[10px] text-slate-400 font-medium">{bcvLastUpdated}</span>
               </div>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="font-mono font-black text-base text-slate-900">
-                  Bs. {masterBcvRate.toFixed(2)}
-                </span>
-                <span className="text-xs text-slate-400 font-medium">/ USD</span>
-                <button
-                  onClick={handleTriggerBcvCron}
-                  disabled={isSyncingBcv}
-                  className="ml-2 flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-50 active:bg-slate-100 border border-indigo-200 rounded-lg text-indigo-700 font-bold text-[11px] transition-all shadow-2xs cursor-pointer disabled:opacity-50"
-                  title="Sincronizar tasa oficial para toda la plataforma"
-                >
-                  <RefreshCw className={`w-3 h-3 ${isSyncingBcv ? 'animate-spin text-indigo-600' : ''}`} />
-                  <span>{isSyncingBcv ? 'Sincronizando...' : 'Ejecutar Cronjob'}</span>
-                </button>
+              <div className="flex flex-wrap items-center gap-2.5 mt-0.5">
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-bold text-slate-500">USD:</span>
+                  <span className="font-mono font-black text-sm text-slate-900">
+                    Bs. {masterBcvRate.toFixed(2)}
+                  </span>
+                </div>
+                <div className="h-3 w-px bg-slate-200"></div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-bold text-slate-500">EUR:</span>
+                  <span className="font-mono font-black text-sm text-slate-900">
+                    Bs. {masterEurRate.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 ml-2">
+                  <button
+                    onClick={handleTriggerBcvCron}
+                    disabled={isSyncingBcv}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-50 active:bg-slate-100 border border-indigo-200 rounded-lg text-indigo-700 font-bold text-[11px] transition-all shadow-2xs cursor-pointer disabled:opacity-50"
+                    title="Sincronizar tasas oficiales en vivo (USD y EUR) desde www.bcv.org.ve"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isSyncingBcv ? 'animate-spin text-indigo-600' : ''}`} />
+                    <span>{isSyncingBcv ? 'Sincronizando...' : 'Ejecutar Cronjob'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsManualBcvModalOpen(true)}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 border border-indigo-200/80 rounded-lg text-indigo-800 font-bold text-[11px] transition-all shadow-2xs cursor-pointer"
+                    title="Registrar o corregir tasas manualmente"
+                  >
+                    <Edit2 className="w-3 h-3 text-indigo-600" />
+                    <span>Ajustar Manual</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -678,6 +703,18 @@ export default function SuperAdminBackoffice() {
         setFeatured={setPlanFormFeatured}
         featuresText={planFormFeaturesText}
         setFeaturesText={setPlanFormFeaturesText}
+      />
+
+      {/* MODAL 4: REGISTRO / AJUSTE MANUAL DE TASAS MAESTRAS GLOBALES BCV */}
+      <ManualBcvModal
+        isOpen={isManualBcvModalOpen}
+        onClose={() => setIsManualBcvModalOpen(false)}
+        currentUsdRate={masterBcvRate}
+        currentEurRate={masterEurRate}
+        lastUpdated={bcvLastUpdated}
+        onSaveManualRates={handleSaveManualBcvRate}
+        onTriggerScrape={handleTriggerBcvCron}
+        isSyncing={isSyncingBcv}
       />
     </div>
   );

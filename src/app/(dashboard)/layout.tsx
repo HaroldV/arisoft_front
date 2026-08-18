@@ -18,15 +18,24 @@ export default function DashboardLayout({
   const { user, isLoading } = useAuth();
   const router = useRouter();
   const [isOnline, setIsOnline] = useState(true);
-  const [rate, setRate] = useState<number>(36.50);
+  const [rate, setRate] = useState<number>(772.54);
+  const [rateLabel, setRateLabel] = useState<string>('Tasa USD');
 
   useEffect(() => {
     const fetchRate = async () => {
       try {
         const res = await apiClient.get('/tenant/profile');
         const settings = res.data?.settings || {};
-        const activeRate = settings.exchangeRate || Number(settings.manualRate) || 36.50;
+        const activeRate = settings.exchangeRate || Number(settings.manualRate) || 772.54;
         setRate(activeRate);
+
+        if (settings.currencyMode === 'MANUAL') {
+          setRateLabel('Tasa Propia');
+        } else if (settings.officialCurrency === 'EUR') {
+          setRateLabel('Tasa BCV EUR');
+        } else {
+          setRateLabel('Tasa BCV USD');
+        }
       } catch (err) {
         console.error('Error fetching exchange rate for layout:', err);
       }
@@ -42,6 +51,13 @@ export default function DashboardLayout({
         const customEvent = e as CustomEvent;
         if (customEvent.detail && typeof customEvent.detail.rate === 'number') {
           setRate(customEvent.detail.rate);
+          if (customEvent.detail.mode === 'MANUAL') {
+            setRateLabel('Tasa Propia');
+          } else if (customEvent.detail.officialCurrency === 'EUR') {
+            setRateLabel('Tasa BCV EUR');
+          } else {
+            setRateLabel('Tasa BCV USD');
+          }
         }
       };
       window.addEventListener('exchange-rate-updated', handleRateUpdate);
@@ -113,16 +129,16 @@ export default function DashboardLayout({
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            {/* Connection Status Badge with BCV Rate */}
+            {/* Connection Status Badge with BCV / Custom Rate */}
             <Link href="/settings/company" className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold select-none transition-all cursor-pointer hover:bg-indigo-100/30 ${
               isOnline 
                 ? 'bg-indigo-50/50 border-indigo-100 text-indigo-700 hover:border-indigo-200' 
                 : 'bg-rose-50 border-rose-100 text-rose-700 animate-pulse hover:border-rose-200'
-            }`} title="Ir a Configuración de Soberanía Económica">
+            }`} title="Ir a Configuración de Moneda y Tasa">
               {isOnline ? (
                 <>
                   <Wifi className="h-3.5 w-3.5 text-indigo-600 animate-pulse" />
-                  <span>Tasa BCV: Bs. {rate.toFixed(2)}</span>
+                  <span>{rateLabel}: Bs. {rate.toFixed(2)}</span>
                 </>
               ) : (
                 <>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   BarChart3,
   TrendingUp,
@@ -37,7 +38,15 @@ type TimeRange = 'WEEK' | 'MONTH' | 'YEAR' | 'ALL' | 'CUSTOM';
 type ActiveTab = 'OVERVIEW' | 'SALES' | 'PURCHASES' | 'SUPPLIERS' | 'PRODUCTS';
 
 export default function ReportsDashboard() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('OVERVIEW');
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab')?.toUpperCase() as ActiveTab;
+  const [activeTab, setActiveTab] = useState<ActiveTab>(tabParam && ['OVERVIEW', 'SALES', 'PURCHASES', 'SUPPLIERS', 'PRODUCTS'].includes(tabParam) ? tabParam : 'OVERVIEW');
+
+  useEffect(() => {
+    if (tabParam && ['OVERVIEW', 'SALES', 'PURCHASES', 'SUPPLIERS', 'PRODUCTS'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
   const [timeRange, setTimeRange] = useState<TimeRange>('MONTH');
   const [selectedCashier, setSelectedCashier] = useState<string>('ALL');
   const [startDate, setStartDate] = useState<string>('');

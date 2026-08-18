@@ -199,9 +199,11 @@ export function useSuperAdminData() {
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const [masterBcvRate, setMasterBcvRate] = useState<number>(36.50);
+  const [masterBcvRate, setMasterBcvRate] = useState<number>(772.54);
+  const [masterEurRate, setMasterEurRate] = useState<number>(894.49);
   const [isSyncingBcv, setIsSyncingBcv] = useState(false);
-  const [bcvLastUpdated, setBcvLastUpdated] = useState<string>('Hoy, 08:30 AM (Automático)');
+  const [bcvLastUpdated, setBcvLastUpdated] = useState<string>('Cargando...');
+  const [isManualBcvModalOpen, setIsManualBcvModalOpen] = useState<boolean>(false);
   const [syncSuccess, setSyncSuccess] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
 
@@ -267,8 +269,28 @@ export function useSuperAdminData() {
       fetchTenants();
       fetchPlans();
       fetchSubscriptionPayments();
+      fetchMasterBcvRate();
     }
   }, [user?.role]);
+
+  const fetchMasterBcvRate = async () => {
+    try {
+      const res = await apiClient.get('/admin/bcv/rate');
+      if (res.data) {
+        if (res.data.USD?.rate) setMasterBcvRate(Number(res.data.USD.rate));
+        else if (res.data.rate) setMasterBcvRate(Number(res.data.rate));
+
+        if (res.data.EUR?.rate) setMasterEurRate(Number(res.data.EUR.rate));
+
+        const dt = res.data.updated_at ? new Date(res.data.updated_at) : new Date();
+        const sourceLabel = res.data.source === 'MANUAL' ? 'Manual' : res.data.source === 'AUTO_SCRAPING' ? 'BCV Oficial' : 'Guardado';
+        const slotLabel = res.data.execution_slot === 'EVENING' ? 'Cierre' : 'Apertura';
+        setBcvLastUpdated(`Hoy, ${dt.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })} (${sourceLabel} - ${slotLabel})`);
+      }
+    } catch (err) {
+      console.warn('Could not fetch master BCV rate:', err);
+    }
+  };
 
   const fetchSubscriptionPayments = async () => {
     if (user?.role !== 'SUPER_ADMIN') return;
@@ -455,18 +477,52 @@ export function useSuperAdminData() {
     setSyncError(null);
     try {
       const res = await apiClient.post('/admin/bcv/sync');
-      const rate = res.data?.rate;
-      if (rate && typeof rate === 'number') {
-        setMasterBcvRate(rate);
+      const usdRate = res.data?.USD?.rate || res.data?.rate;
+      const eurRate = res.data?.EUR?.rate;
+      if (usdRate && typeof usdRate === 'number') {
+        setMasterBcvRate(usdRate);
+        if (eurRate) setMasterEurRate(eurRate);
         const now = new Date();
-        setBcvLastUpdated(`Hoy, ${now.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })} (Sincronizado)`);
-        setSyncSuccess(`¡Tasa Maestra Global actualizada con éxito a Bs. ${rate.toFixed(2)} / USD para todos los tenants de la plataforma!`);
+        const valueDate = res.data?.value_date ? ` (Fecha Valor: ${res.data.value_date})` : '';
+        const eurText = eurRate ? ` | EUR: Bs. ${eurRate.toFixed(2)}` : '';
+        setBcvLastUpdated(`Hoy, ${now.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })} (BCV Oficial)`);
+        setSyncSuccess(`¡Tasas Oficiales BCV sincronizadas: USD Bs. ${usdRate.toFixed(2)}${eurText}${valueDate}!`);
         setTimeout(() => setSyncSuccess(null), 5000);
       }
     } catch (err: any) {
       console.error('Error triggering BCV sync:', err);
-      setSyncError('No se pudo sincronizar la tasa BCV. Intenta de nuevo.');
-      setTimeout(() => setSyncError(null), 4000);
+      setSyncError('No se pudo conectar con el portal www.bcv.org.ve. Puedes registrar las tasas manualmente con el botón "Ajustar Manual".');
+      setTimeout(() => setSyncError(null), 6000);
+    } finally {
+      setIsSyncingBcv(false);
+    }
+  };
+
+  const handleSaveManualBcvRate = async (rates: { usdRate?: number; eurRate?: number }, valueDate?: string, note?: string) => {
+    setIsSyncingBcv(true);
+    setSyncSuccess(null);
+    setSyncError(null);
+    try {
+      const res = await apiClient.post('/admin/bcv/manual', {
+        usd_rate: rates.usdRate,
+        eur_rate: rates.eurRate,
+        value_date: valueDate,
+        note,
+      });
+      const usdRate = res.data?.USD?.rate || res.data?.rate;
+      const eurRate = res.data?.EUR?.rate;
+      if (usdRate && typeof usdRate === 'number') {
+        setMasterBcvRate(usdRate);
+        if (eurRate) setMasterEurRate(eurRate);
+        const now = new Date();
+        setBcvLastUpdated(`Hoy, ${now.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })} (Manual)`);
+        setSyncSuccess(`¡Tasas Maestras Globales actualizadas manualmente (USD: Bs. ${usdRate.toFixed(2)} | EUR: Bs. ${eurRate?.toFixed(2) || '---'})!`);
+        setTimeout(() => setSyncSuccess(null), 5000);
+      }
+    } catch (err: any) {
+      console.error('Error saving manual BCV rate:', err);
+      setSyncError(err.response?.data?.message || 'Error al guardar las tasas manuales.');
+      throw err;
     } finally {
       setIsSyncingBcv(false);
     }
@@ -747,8 +803,12 @@ export function useSuperAdminData() {
     isLoading,
     fetchError,
     masterBcvRate,
+    masterEurRate,
     isSyncingBcv,
     bcvLastUpdated,
+    isManualBcvModalOpen,
+    setIsManualBcvModalOpen,
+    handleSaveManualBcvRate,
     syncSuccess,
     syncError,
     isModalOpen, setIsModalOpen,

@@ -51,14 +51,6 @@ const menuConfig = [
     items: [
       { label: 'Inicio', icon: LayoutDashboard, href: '/', tenantOnly: true },
       {
-        label: 'Reportes y Analítica',
-        icon: BarChart3,
-        href: '/reports',
-        module: 'REPORTS',
-        permission: 'reports:view',
-        tenantOnly: true,
-      },
-      {
         label: 'Ventas',
         icon: ShoppingCart,
         module: 'POS',
@@ -128,6 +120,19 @@ const menuConfig = [
           { label: 'Configuración Fiscal', icon: Receipt, href: '/settings/fiscal', roles: ['OWNER', 'MANAGER'], permission: 'fiscal:manage' },
           { label: 'Usuarios y Roles', icon: Users, href: '/settings/users', roles: ['OWNER', 'MANAGER'], permission: 'users:manage' },
           { label: 'Seguridad', icon: UserCircle, href: '/settings/security', roles: ['OWNER', 'MANAGER', 'CASHIER', 'WAREHOUSE_KEEPER'] },
+        ]
+      },
+      {
+        label: 'Reportes & Analítica',
+        icon: BarChart3,
+        module: 'REPORTS',
+        tenantOnly: true,
+        children: [
+          { label: 'Tablero General', icon: LayoutDashboard, href: '/reports?tab=OVERVIEW', permission: 'reports:view' },
+          { label: 'Reporte de Ventas', icon: Receipt, href: '/reports?tab=SALES', permission: 'reports:view' },
+          { label: 'Reporte de Compras', icon: ShoppingBag, href: '/reports?tab=PURCHASES', permission: 'reports:view' },
+          { label: 'Reporte de Proveedores', icon: Building2, href: '/reports?tab=SUPPLIERS', permission: 'reports:view' },
+          { label: 'Reporte de Productos', icon: Package, href: '/reports?tab=PRODUCTS', permission: 'reports:view' },
         ]
       },
       {
