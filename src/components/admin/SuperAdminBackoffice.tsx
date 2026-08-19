@@ -23,13 +23,11 @@ import {
   Unlock,
   LogIn,
   Copy,
-  CreditCard
 } from 'lucide-react';
 import { PlanModal } from './subcomponents/PlanModal';
 import { TenantsTable } from './subcomponents/TenantsTable';
 import { BillingTab } from './subcomponents/BillingTab';
 import { MarketBiTab } from './subcomponents/MarketBiTab';
-import { PendingPaymentsTab } from './subcomponents/PendingPaymentsTab';
 import { TenantModal } from './subcomponents/TenantModal';
 import { TenantConfirmModal } from './subcomponents/TenantConfirmModal';
 import { ManualBcvModal } from './subcomponents/ManualBcvModal';
@@ -151,14 +149,12 @@ export default function SuperAdminBackoffice() {
     handleReactivateOwner,
     handleImpersonate,
     handleCopyPassword,
-    subscriptionPayments,
-    isApprovingPayment,
-    handleApproveSubscriptionPayment,
     totalMRR,
     activeTenantsCount,
     inactiveTenantsCount,
     filteredTenants,
     getInitials,
+    fetchTenants,
   } = useSuperAdminData();
 
   return (
@@ -392,7 +388,6 @@ export default function SuperAdminBackoffice() {
         <div className="flex items-center gap-2">
           {[
             { id: 'TENANTS', label: 'Empresas & Organizaciones', icon: Building2 },
-            { id: 'PAYMENTS', label: 'Pagos Pendientes', icon: CreditCard },
             { id: 'PLANS', label: 'Planes y Límites del SaaS', icon: Layers },
             { id: 'BILLING', label: 'Facturación & Suscripciones', icon: DollarSign },
             { id: 'MARKET_BI', label: 'Estudio de Mercado & Métricas', icon: BarChart3 },
@@ -454,15 +449,6 @@ export default function SuperAdminBackoffice() {
             getInitials={getInitials}
           />
         </div>
-      )}
-
-      {/* PESTAÑA: SOLICITUDES DE PAGO PENDIENTES */}
-      {activeTab === 'PAYMENTS' && (
-        <PendingPaymentsTab
-          payments={subscriptionPayments}
-          onApprove={handleApproveSubscriptionPayment}
-          isApproving={isApprovingPayment}
-        />
       )}
 
       {/* PESTAÑA 2: PLANES Y LÍMITES DEL SAAS DINÁMICOS */}
@@ -620,7 +606,13 @@ export default function SuperAdminBackoffice() {
       )}
 
       {/* PESTAÑA 3: FACTURACIÓN Y SUSCRIPCIONES (Desacoplado) */}
-      {activeTab === 'BILLING' && <BillingTab tenants={tenants} masterBcvRate={masterBcvRate} />}
+      {activeTab === 'BILLING' && (
+        <BillingTab
+          tenants={tenants}
+          masterBcvRate={masterBcvRate}
+          onRefreshTenants={fetchTenants}
+        />
+      )}
 
       {/* PESTAÑA 4: ESTUDIO DE MERCADO Y MÉTRICAS GLOBALES (Desacoplado) */}
       {activeTab === 'MARKET_BI' && <MarketBiTab />}

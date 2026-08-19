@@ -123,6 +123,16 @@ const menuConfig = [
         ]
       },
       {
+        label: 'Nómina & RRHH',
+        icon: Users,
+        module: 'PAYROLL',
+        tenantOnly: true,
+        children: [
+          { label: 'Procesamiento de Nómina', icon: FileSpreadsheet, href: '/payroll', permission: 'payroll:manage' },
+          { label: 'Fórmulas Legales', icon: FileText, href: '/payroll/formulas', permission: 'payroll:manage' },
+        ]
+      },
+      {
         label: 'Reportes & Analítica',
         icon: BarChart3,
         module: 'REPORTS',

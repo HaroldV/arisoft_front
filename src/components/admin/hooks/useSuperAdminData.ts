@@ -178,6 +178,13 @@ export const ALL_MODULE_GROUPS = [
     ]
   },
   {
+    key: 'PAYROLL', label: 'Nómina & Recursos Humanos', icon: 'Users',
+    color: 'emerald',
+    submodules: [
+      { key: 'payroll:manage', label: 'Procesamiento de Nómina', desc: 'Cálculo de asignaciones, deducciones y emisión de recibos' },
+    ]
+  },
+  {
     key: 'SETTINGS', label: 'Configuración de Empresa', icon: 'Settings',
     color: 'amber',
     submodules: [
@@ -189,9 +196,7 @@ export const ALL_MODULE_GROUPS = [
 ];
 
 export function useSuperAdminData() {
-  const [activeTab, setActiveTab] = useState<'TENANTS' | 'PAYMENTS' | 'PLANS' | 'BILLING' | 'MARKET_BI'>('TENANTS');
-  const [subscriptionPayments, setSubscriptionPayments] = useState<any[]>([]);
-  const [isApprovingPayment, setIsApprovingPayment] = useState(false);
+  const [activeTab, setActiveTab] = useState<'TENANTS' | 'PLANS' | 'BILLING' | 'MARKET_BI'>('TENANTS');
   const [viewMode, setViewMode] = useState<'CARDS' | 'TABLE'>('TABLE');
   const [tenants, setTenants] = useState<TenantCompany[]>([]);
   const [search, setSearch] = useState('');
@@ -268,7 +273,6 @@ export function useSuperAdminData() {
     if (user?.role === 'SUPER_ADMIN') {
       fetchTenants();
       fetchPlans();
-      fetchSubscriptionPayments();
       fetchMasterBcvRate();
     }
   }, [user?.role]);
@@ -283,40 +287,10 @@ export function useSuperAdminData() {
         if (res.data.EUR?.rate) setMasterEurRate(Number(res.data.EUR.rate));
 
         const dt = res.data.updated_at ? new Date(res.data.updated_at) : new Date();
-        const sourceLabel = res.data.source === 'MANUAL' ? 'Manual' : res.data.source === 'AUTO_SCRAPING' ? 'BCV Oficial' : 'Guardado';
-        const slotLabel = res.data.execution_slot === 'EVENING' ? 'Cierre' : 'Apertura';
-        setBcvLastUpdated(`Hoy, ${dt.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })} (${sourceLabel} - ${slotLabel})`);
+        setBcvLastUpdated(dt.toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' }));
       }
     } catch (err) {
       console.warn('Could not fetch master BCV rate:', err);
-    }
-  };
-
-  const fetchSubscriptionPayments = async () => {
-    if (user?.role !== 'SUPER_ADMIN') return;
-    try {
-      const res = await apiClient.get('/admin/subscription/payments');
-      if (res.data && Array.isArray(res.data)) {
-        setSubscriptionPayments(res.data);
-      }
-    } catch (err) {
-      console.error('Error fetching subscription payments:', err);
-    }
-  };
-
-  const handleApproveSubscriptionPayment = async (paymentId: string) => {
-    setIsApprovingPayment(true);
-    setSyncSuccess(null);
-    setSyncError(null);
-    try {
-      const res = await apiClient.post(`/admin/subscription/payments/${paymentId}/approve`);
-      setSyncSuccess(res.data?.message || '¡Pago aprobado y empresa activada con éxito!');
-      await fetchSubscriptionPayments();
-      await fetchTenants();
-    } catch (err: any) {
-      setSyncError(err.response?.data?.message || 'Error al aprobar el pago.');
-    } finally {
-      setIsApprovingPayment(false);
     }
   };
 
@@ -813,9 +787,6 @@ export function useSuperAdminData() {
     syncError,
     isModalOpen, setIsModalOpen,
     editingTenant,
-    subscriptionPayments,
-    isApprovingPayment,
-    handleApproveSubscriptionPayment,
     formName, setFormName,
     formTaxId, setFormTaxId,
     formSubdomain, setFormSubdomain,
@@ -878,5 +849,6 @@ export function useSuperAdminData() {
     inactiveTenantsCount,
     filteredTenants,
     getInitials,
+    fetchTenants,
   };
 }

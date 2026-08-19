@@ -117,6 +117,7 @@ apiClient.interceptors.response.use(
         if (typeof window !== 'undefined') {
           localStorage.removeItem('ari_user');
           localStorage.removeItem('ari_token');
+          localStorage.removeItem('ari_refresh_token');
           window.location.href = '/login';
         }
         return Promise.reject(refreshError);
