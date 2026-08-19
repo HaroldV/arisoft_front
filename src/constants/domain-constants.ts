@@ -175,8 +175,13 @@ export const PLAN_DEFAULT_PERMISSIONS: Record<SaasPlanCode, string[]> = {
   ],
 };
 
+const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').trim().replace(/\/+$/, '');
+const normalizedApiUrl = rawApiUrl.startsWith('http://') || rawApiUrl.startsWith('https://')
+  ? rawApiUrl
+  : `https://${rawApiUrl}`;
+
 export const APP_CONFIG = {
-  API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
+  API_URL: normalizedApiUrl,
   DEFAULT_BCV_RATE: Number(process.env.NEXT_PUBLIC_DEFAULT_BCV_RATE || 36.50),
   APP_NAME: process.env.NEXT_PUBLIC_APP_NAME || 'ARI ERP',
   SAAS_DOMAIN: process.env.NEXT_PUBLIC_SAAS_DOMAIN || 'erparisoft.com',
