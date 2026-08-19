@@ -34,13 +34,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    // Restore session from localStorage on mount
-    const storedUser = localStorage.getItem('ari_user');
-    const storedToken = localStorage.getItem('ari_token');
-    
-    if (storedUser && storedToken) {
-      setUser(JSON.parse(storedUser));
-      setAccessToken(storedToken);
+    // Restore session from localStorage on mount - SOLO en el navegador
+    if (typeof window !== 'undefined') {
+      const storedUser = localStorage.getItem('ari_user');
+      const storedToken = localStorage.getItem('ari_token');
+
+      if (storedUser && storedToken) {
+        setUser(JSON.parse(storedUser));
+        setAccessToken(storedToken);
+      }
     }
     setIsLoading(false);
   }, []);
@@ -48,10 +50,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = (userData: User, token: string, refreshToken?: string) => {
     setUser(userData);
     setAccessToken(token);
-    localStorage.setItem('ari_user', JSON.stringify(userData));
-    localStorage.setItem('ari_token', token);
-    if (refreshToken) {
-      localStorage.setItem('ari_refresh_token', refreshToken);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ari_user', JSON.stringify(userData));
+      localStorage.setItem('ari_token', token);
+      if (refreshToken) {
+        localStorage.setItem('ari_refresh_token', refreshToken);
+      }
     }
     if (userData.role === 'SUPER_ADMIN') {
       router.push('/admin');
@@ -68,9 +72,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setUser(null);
       setAccessToken(null);
-      localStorage.removeItem('ari_user');
-      localStorage.removeItem('ari_token');
-      localStorage.removeItem('ari_refresh_token');
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('ari_user');
+        localStorage.removeItem('ari_token');
+        localStorage.removeItem('ari_refresh_token');
+      }
       router.push('/login');
     }
   };
