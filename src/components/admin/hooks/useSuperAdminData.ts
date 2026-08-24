@@ -248,6 +248,8 @@ export function useSuperAdminData() {
   const [formMonthlyFee, setFormMonthlyFee] = useState<number>(35);
   const [formOwnerEmail, setFormOwnerEmail] = useState('');
   const [formOwnerName, setFormOwnerName] = useState('');
+  const [formOwnerPassword, setFormOwnerPassword] = useState('');
+  const [formOwnerPasswordConfirm, setFormOwnerPasswordConfirm] = useState('');
   const [formModules, setFormModules] = useState<string[]>(['POS', 'SALES', 'INVENTORY', 'BANKS', 'REPORTS']);
   const [formPermissions, setFormPermissions] = useState<string[]>([
     'pos:create', 'pos:refund', 'clients:manage',
@@ -503,6 +505,8 @@ export function useSuperAdminData() {
   };
 
   const handleOpenModal = (tenant?: TenantCompany) => {
+    setFormOwnerPassword('');
+    setFormOwnerPasswordConfirm('');
     if (tenant) {
       setEditingTenant(tenant);
       setFormName(tenant.name);
@@ -597,10 +601,32 @@ export function useSuperAdminData() {
       return;
     }
 
+    // Validation for new company registration password fields
+    if (!editingTenant) {
+      if (!formOwnerPassword || formOwnerPassword.length < 6) {
+        setModalError('La contraseña temporal de acceso debe tener al menos 6 caracteres.');
+        return;
+      }
+      if (formOwnerPassword !== formOwnerPasswordConfirm) {
+        setModalError('Las contraseñas ingresadas no coinciden. Por favor verifica los campos.');
+        return;
+      }
+    } else if (formOwnerPassword) {
+      // If editing and password field is filled
+      if (formOwnerPassword.length < 6) {
+        setModalError('La nueva contraseña debe tener al menos 6 caracteres.');
+        return;
+      }
+      if (formOwnerPassword !== formOwnerPasswordConfirm) {
+        setModalError('Las contraseñas ingresadas no coinciden. Por favor verifica los campos.');
+        return;
+      }
+    }
+
     setIsSaving(true);
     setModalError(null);
 
-    const payload = {
+    const payload: any = {
       name: formName.trim(),
       tax_id: formTaxId.trim().toUpperCase(),
       subdomain: formSubdomain.trim().toLowerCase() || formName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
@@ -614,6 +640,10 @@ export function useSuperAdminData() {
       enabled_modules: formModules,
       enabled_permissions: formPermissions,
     };
+
+    if (formOwnerPassword) {
+      payload.owner_password = formOwnerPassword;
+    }
 
     try {
       if (editingTenant) {
@@ -818,6 +848,8 @@ export function useSuperAdminData() {
     formMonthlyFee, setFormMonthlyFee,
     formOwnerEmail, setFormOwnerEmail,
     formOwnerName, setFormOwnerName,
+    formOwnerPassword, setFormOwnerPassword,
+    formOwnerPasswordConfirm, setFormOwnerPasswordConfirm,
     formModules, setFormModules,
     formPermissions, setFormPermissions,
     expandedModuleGroups, setExpandedModuleGroups,

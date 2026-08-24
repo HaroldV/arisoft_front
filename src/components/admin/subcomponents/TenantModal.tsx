@@ -45,6 +45,10 @@ interface TenantModalProps {
   setOwnerName: (v: string) => void;
   ownerEmail: string;
   setOwnerEmail: (v: string) => void;
+  ownerPassword?: string;
+  setOwnerPassword?: (v: string) => void;
+  ownerPasswordConfirm?: string;
+  setOwnerPasswordConfirm?: (v: string) => void;
   saasPlans: SaasPlan[];
   formModules: string[];
   formPermissions: string[];
@@ -82,6 +86,10 @@ export const TenantModal: React.FC<TenantModalProps> = ({
   setOwnerName,
   ownerEmail,
   setOwnerEmail,
+  ownerPassword = '',
+  setOwnerPassword,
+  ownerPasswordConfirm = '',
+  setOwnerPasswordConfirm,
   saasPlans,
   formModules,
   formPermissions,
@@ -276,11 +284,31 @@ export const TenantModal: React.FC<TenantModalProps> = ({
               </div>
             </div>
 
-            {/* Contact Information */}
+            {/* Contact Information & Initial Password */}
             <div className="space-y-3 pt-2 border-t border-slate-100">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-900">
-                3. Contacto del Propietario / Gerente
-              </h4>
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-900">
+                  3. Contacto & Credenciales de Acceso Inicial
+                </h4>
+                {setOwnerPassword && setOwnerPasswordConfirm && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$';
+                      let pass = '';
+                      for (let i = 0; i < 10; i++) {
+                        pass += chars.charAt(Math.floor(Math.random() * chars.length));
+                      }
+                      setOwnerPassword(pass);
+                      setOwnerPasswordConfirm(pass);
+                    }}
+                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    Generar Clave Temporal
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
@@ -308,6 +336,47 @@ export const TenantModal: React.FC<TenantModalProps> = ({
                   />
                 </div>
               </div>
+
+              {/* Password Fields */}
+              {setOwnerPassword && setOwnerPasswordConfirm && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                      {editingTenant ? 'Nueva Contraseña (Opcional)' : 'Contraseña Temporal de Acceso *'}
+                    </label>
+                    <input
+                      type="text"
+                      required={!editingTenant}
+                      placeholder={editingTenant ? 'Dejar en blanco para conservar actual' : 'Mínimo 6 caracteres (Ej. Admin123!)'}
+                      value={ownerPassword}
+                      onChange={(e) => setOwnerPassword(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-mono focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                      Confirmar Contraseña *
+                    </label>
+                    <input
+                      type="text"
+                      required={!editingTenant || Boolean(ownerPassword)}
+                      placeholder="Repita la contraseña"
+                      value={ownerPasswordConfirm}
+                      onChange={(e) => setOwnerPasswordConfirm(e.target.value)}
+                      className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-slate-800 text-sm font-mono focus:bg-white focus:ring-2 outline-none ${
+                        ownerPassword && ownerPasswordConfirm && ownerPassword !== ownerPasswordConfirm
+                          ? 'border-rose-300 focus:ring-rose-500/20 text-rose-700'
+                          : 'border-slate-200 focus:ring-indigo-500/20'
+                      }`}
+                    />
+                    {ownerPassword && ownerPasswordConfirm && ownerPassword !== ownerPasswordConfirm && (
+                      <span className="text-[10px] font-bold text-rose-600 mt-1 block">
+                        Las contraseñas no coinciden
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Enabled Modules Matrix */}
