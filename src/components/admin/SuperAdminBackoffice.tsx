@@ -124,6 +124,8 @@ export default function SuperAdminBackoffice() {
     formMonthlyFee, setFormMonthlyFee,
     formOwnerEmail, setFormOwnerEmail,
     formOwnerName, setFormOwnerName,
+    formOwnerPassword, setFormOwnerPassword,
+    formOwnerPasswordConfirm, setFormOwnerPasswordConfirm,
     formModules,
     formPermissions,
     expandedModuleGroups,
@@ -646,6 +648,10 @@ export default function SuperAdminBackoffice() {
         setOwnerName={setFormOwnerName}
         ownerEmail={formOwnerEmail}
         setOwnerEmail={setFormOwnerEmail}
+        ownerPassword={formOwnerPassword}
+        setOwnerPassword={setFormOwnerPassword}
+        ownerPasswordConfirm={formOwnerPasswordConfirm}
+        setOwnerPasswordConfirm={setFormOwnerPasswordConfirm}
         saasPlans={saasPlans}
         formModules={formModules}
         formPermissions={formPermissions}
