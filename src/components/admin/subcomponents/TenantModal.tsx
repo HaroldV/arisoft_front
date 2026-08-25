@@ -360,17 +360,17 @@ export const TenantModal: React.FC<TenantModalProps> = ({
                 </div>
               )}
 
-              {/* Custom Password Fields (Optional override) */}
-              {setOwnerPassword && setOwnerPasswordConfirm && (
+              {/* Custom Password Fields (Only when creating a new tenant) */}
+              {!editingTenant && setOwnerPassword && setOwnerPasswordConfirm && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                      {editingTenant ? 'Nueva Contraseña Personalizada (Opcional)' : 'Contraseña Temporal de Acceso *'}
+                      Contraseña Temporal de Acceso *
                     </label>
                     <input
                       type="text"
-                      required={!editingTenant}
-                      placeholder={editingTenant ? 'Dejar en blanco para conservar actual' : 'Mínimo 6 caracteres (Ej. Admin123!)'}
+                      required
+                      placeholder="Mínimo 6 caracteres (Ej. Admin123!)"
                       value={ownerPassword}
                       onChange={(e) => setOwnerPassword(e.target.value)}
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-mono focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
@@ -382,7 +382,7 @@ export const TenantModal: React.FC<TenantModalProps> = ({
                     </label>
                     <input
                       type="text"
-                      required={!editingTenant || Boolean(ownerPassword)}
+                      required
                       placeholder="Repita la contraseña"
                       value={ownerPasswordConfirm}
                       onChange={(e) => setOwnerPasswordConfirm(e.target.value)}
