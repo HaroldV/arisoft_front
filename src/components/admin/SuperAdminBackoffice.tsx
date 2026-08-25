@@ -133,6 +133,7 @@ export default function SuperAdminBackoffice() {
     isConfirmModalOpen, setIsConfirmModalOpen,
     impersonatingTenant,
     newTenantPassword, setNewTenantPassword,
+    formResetPassword, setFormResetPassword,
     passwordCopied,
     handleSelectPlanInForm,
     handleOpenPlanModal,
@@ -653,6 +654,8 @@ export default function SuperAdminBackoffice() {
         onToggleModule={handleToggleModule}
         onToggleModuleGroup={handleToggleModuleGroup}
         onToggleSubmodule={handleToggleSubmodule}
+        resetPassword={formResetPassword}
+        setResetPassword={setFormResetPassword}
       />
 
       {/* MODAL 2: ALERTA Y CONFIRMACIÓN DE SUSPENSIÓN (Desacoplado) */}

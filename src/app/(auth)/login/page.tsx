@@ -16,7 +16,13 @@ function LoginContent() {
 
   useEffect(() => {
     if (user) {
-      router.push('/');
+      if (user.must_change_password) {
+        router.push('/change-password');
+      } else if (user.role === 'SUPER_ADMIN') {
+        router.push('/admin');
+      } else {
+        router.push('/');
+      }
     }
   }, [user, router]);
 

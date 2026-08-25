@@ -87,6 +87,8 @@ export default function DashboardLayout({
   useEffect(() => {
     if (!isLoading && !user) {
       router.push('/login');
+    } else if (!isLoading && user?.must_change_password) {
+      router.replace('/change-password');
     } else if (!isLoading && user?.role === 'SUPER_ADMIN' && typeof window !== 'undefined' && window.location.pathname === '/') {
       router.replace('/admin');
     }
@@ -107,7 +109,7 @@ export default function DashboardLayout({
     );
   }
 
-  if (!user) {
+  if (!user || user.must_change_password) {
     return null;
   }
 

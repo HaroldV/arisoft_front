@@ -48,6 +48,11 @@ export default function WelcomeDashboard() {
   const [purchases, setPurchases] = useState<any[]>([]);
 
   useEffect(() => {
+    if (user?.must_change_password) {
+      router.replace('/change-password');
+      return;
+    }
+
     const options: Intl.DateTimeFormatOptions = {
       weekday: 'long',
       year: 'numeric',
@@ -58,7 +63,7 @@ export default function WelcomeDashboard() {
     setCurrentDate(formatted.charAt(0).toUpperCase() + formatted.slice(1));
 
     fetchLiveDashboardData();
-  }, []);
+  }, [user, router]);
 
   const fetchLiveDashboardData = async () => {
     setIsLoading(true);

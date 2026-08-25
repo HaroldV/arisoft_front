@@ -15,6 +15,7 @@ interface User {
   enabled_modules: string[];
   permissions?: string[];
   trial_days_left: number;
+  must_change_password?: boolean;
 }
 
 interface AuthContextType {
@@ -22,6 +23,7 @@ interface AuthContextType {
   accessToken: string | null;
   login: (user: User, accessToken: string, refreshToken?: string) => void;
   logout: () => Promise<void>;
+  updateUser: (updatedFields: Partial<User>) => void;
   isLoading: boolean;
 }
 
@@ -40,12 +42,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const storedToken = localStorage.getItem('ari_token');
 
       if (storedUser && storedToken) {
-        setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
         setAccessToken(storedToken);
+        if (parsedUser.must_change_password && window.location.pathname !== '/change-password') {
+          window.location.href = '/change-password';
+        }
       }
     }
     setIsLoading(false);
-  }, []);
+  }, [router]);
+
+  const updateUser = (updatedFields: Partial<User>) => {
+    setUser(prev => {
+      if (!prev) return null;
+      const newUser = { ...prev, ...updatedFields };
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('ari_user', JSON.stringify(newUser));
+      }
+      return newUser;
+    });
+  };
 
   const login = (userData: User, token: string, refreshToken?: string) => {
     setUser(userData);
@@ -57,7 +74,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('ari_refresh_token', refreshToken);
       }
     }
-    if (userData.role === 'SUPER_ADMIN') {
+
+    if (userData.must_change_password) {
+      if (typeof window !== 'undefined') {
+        window.location.href = '/change-password';
+      } else {
+        router.push('/change-password');
+      }
+    } else if (userData.role === 'SUPER_ADMIN') {
       router.push('/admin');
     } else {
       router.push('/');
@@ -82,7 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, accessToken, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, accessToken, login, logout, updateUser, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

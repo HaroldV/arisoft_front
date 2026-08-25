@@ -265,6 +265,7 @@ export function useSuperAdminData() {
   const [impersonatingTenant, setImpersonatingTenant] = useState<TenantCompany | null>(null);
   const [isImpersonatingId, setIsImpersonatingId] = useState<string | null>(null);
   const [newTenantPassword, setNewTenantPassword] = useState<string | null>(null);
+  const [formResetPassword, setFormResetPassword] = useState(false);
   const [passwordCopied, setPasswordCopied] = useState(false);
 
   const { user } = useAuth();
@@ -548,6 +549,7 @@ export function useSuperAdminData() {
       ]);
       setExpandedModuleGroups(['POS', 'INVENTORY', 'BANKS']);
     }
+    setFormResetPassword(false);
     setModalError(null);
     setIsModalOpen(true);
   };
@@ -613,11 +615,13 @@ export function useSuperAdminData() {
       owner_name: formOwnerName.trim() || 'Gerente General',
       enabled_modules: formModules,
       enabled_permissions: formPermissions,
+      reset_password: formResetPassword,
     };
 
     try {
       if (editingTenant) {
-        await apiClient.put(`/admin/tenants/${editingTenant.id}`, payload);
+        const res = await apiClient.put(`/admin/tenants/${editingTenant.id}`, payload);
+        const resetPassword = res.data?.defaultPassword;
         setTenants(prev => prev.map(t =>
           t.id === editingTenant.id
             ? {
@@ -637,16 +641,18 @@ export function useSuperAdminData() {
             : t
         ));
         setIsModalOpen(false);
-        setSyncSuccess('Empresa actualizada exitosamente.');
-        setTimeout(() => setSyncSuccess(null), 4000);
+        if (resetPassword) {
+          setNewTenantPassword(resetPassword);
+        } else {
+          setSyncSuccess('Empresa actualizada exitosamente.');
+          setTimeout(() => setSyncSuccess(null), 4000);
+        }
       } else {
         const res = await apiClient.post('/admin/tenants', payload);
-        const { defaultPassword } = res.data || {};
+        const createdPassword = res.data?.defaultPassword || 'ArivPassword123!';
         await fetchTenants();
         setIsModalOpen(false);
-        if (defaultPassword) {
-          setNewTenantPassword(defaultPassword);
-        }
+        setNewTenantPassword(createdPassword);
       }
     } catch (err: any) {
       const backendMessage = err?.response?.data?.message;
@@ -828,6 +834,7 @@ export function useSuperAdminData() {
     impersonatingTenant,
     isImpersonatingId,
     newTenantPassword, setNewTenantPassword,
+    formResetPassword, setFormResetPassword,
     passwordCopied,
     handleSelectPlanInForm,
     handleOpenPlanModal,

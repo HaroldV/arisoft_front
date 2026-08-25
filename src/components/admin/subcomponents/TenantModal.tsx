@@ -53,6 +53,8 @@ interface TenantModalProps {
   onToggleModule: (key: string) => void;
   onToggleModuleGroup: (key: string) => void;
   onToggleSubmodule: (groupKey: string, subKey: string) => void;
+  resetPassword?: boolean;
+  setResetPassword?: (v: boolean) => void;
 }
 
 export const TenantModal: React.FC<TenantModalProps> = ({
@@ -90,6 +92,8 @@ export const TenantModal: React.FC<TenantModalProps> = ({
   onToggleModule,
   onToggleModuleGroup,
   onToggleSubmodule,
+  resetPassword = false,
+  setResetPassword,
 }) => {
   if (!isOpen) return null;
 
@@ -104,7 +108,7 @@ export const TenantModal: React.FC<TenantModalProps> = ({
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                {editingTenant ? 'Editar Empresa & Límites SaaS' : 'Registrar Nueva Empresa (Onboarding)'}
+                {editingTenant ? 'Editar Empresa' : 'Registrar Nueva Empresa'}
               </h3>
               <p className="text-xs text-slate-500 font-medium mt-0.5">
                 Asignación de RIF, subdominio, plan de suscripción y límites operativos
@@ -155,11 +159,10 @@ export const TenantModal: React.FC<TenantModalProps> = ({
                       RIF Fiscal (J/V/G/E) *
                     </label>
                     {taxId && (
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                        RifValidator.validate(taxId).isValid 
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-rose-50 text-rose-700 border border-rose-200'
-                      }`}>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${RifValidator.validate(taxId).isValid
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-rose-50 text-rose-700 border border-rose-200'
+                        }`}>
                         {RifValidator.validate(taxId).isValid ? '✓ SENIAT Válido' : '✗ RIF Invalido'}
                       </span>
                     )}
@@ -308,6 +311,26 @@ export const TenantModal: React.FC<TenantModalProps> = ({
                   />
                 </div>
               </div>
+
+              {editingTenant && setResetPassword && (
+                <div className="mt-3 p-3.5 bg-amber-50/80 border border-amber-200/80 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <input
+                      type="checkbox"
+                      id="reset_password_checkbox"
+                      checked={resetPassword}
+                      onChange={(e) => setResetPassword(e.target.checked)}
+                      className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                    />
+                    <label htmlFor="reset_password_checkbox" className="text-xs font-bold text-slate-800 cursor-pointer">
+                      Regenerar Contraseña Temporal de Acceso
+                    </label>
+                  </div>
+                  <span className="text-[10px] font-semibold text-slate-500">
+                    Asigna <code className="font-mono text-indigo-700 font-bold bg-white px-1.5 py-0.5 rounded border border-indigo-100">ArivPassword123!</code> y exige cambio al iniciar sesión
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Enabled Modules Matrix */}
@@ -342,9 +365,8 @@ export const TenantModal: React.FC<TenantModalProps> = ({
                         <button
                           type="button"
                           onClick={() => onToggleModule(group.key)}
-                          className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all cursor-pointer ${
-                            moduleEnabled ? `${c.check} border-transparent` : 'border-slate-300 bg-white hover:border-slate-400'
-                          }`}
+                          className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all cursor-pointer ${moduleEnabled ? `${c.check} border-transparent` : 'border-slate-300 bg-white hover:border-slate-400'
+                            }`}
                         >
                           {moduleEnabled && <Check className="w-3 h-3 text-white" />}
                         </button>
@@ -376,13 +398,11 @@ export const TenantModal: React.FC<TenantModalProps> = ({
                                 key={sub.key}
                                 type="button"
                                 onClick={() => onToggleSubmodule(group.key, sub.key)}
-                                className={`w-full flex items-start gap-3 px-4 py-2.5 text-left transition-all cursor-pointer ${
-                                  si < group.submodules.length - 1 ? 'border-b border-slate-100' : ''
-                                } ${subEnabled ? c.subRow : 'hover:bg-slate-50'}`}
+                                className={`w-full flex items-start gap-3 px-4 py-2.5 text-left transition-all cursor-pointer ${si < group.submodules.length - 1 ? 'border-b border-slate-100' : ''
+                                  } ${subEnabled ? c.subRow : 'hover:bg-slate-50'}`}
                               >
-                                <span className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${
-                                  subEnabled ? `${c.check} border-transparent` : 'border-slate-300 bg-white'
-                                }`}>
+                                <span className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${subEnabled ? `${c.check} border-transparent` : 'border-slate-300 bg-white'
+                                  }`}>
                                   {subEnabled && <Check className="w-2.5 h-2.5 text-white" />}
                                 </span>
                                 <div className="flex-1 min-w-0">

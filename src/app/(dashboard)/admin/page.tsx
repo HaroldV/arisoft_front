@@ -11,7 +11,9 @@ export default function SuperAdminPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && user && user.role !== 'SUPER_ADMIN') {
+    if (!isLoading && user?.must_change_password) {
+      router.replace('/change-password');
+    } else if (!isLoading && user && user.role !== 'SUPER_ADMIN') {
       router.replace('/');
     }
   }, [user, isLoading, router]);
