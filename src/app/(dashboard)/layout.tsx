@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import Sidebar from "@/components/Sidebar";
 import SandboxBanner from "@/components/SandboxBanner";
 import { SubscriptionBlockedModal } from "@/components/modals/SubscriptionBlockedModal";
-import { Bell, Search, Wifi, WifiOff } from 'lucide-react';
+import { Bell, Wifi, WifiOff, ChevronRight, Home, DollarSign, Euro } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import Link from 'next/link';
 
@@ -17,31 +17,110 @@ export default function DashboardLayout({
 }) {
   const { user, isLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [isOnline, setIsOnline] = useState(true);
-  const [rate, setRate] = useState<number>(772.54);
-  const [rateLabel, setRateLabel] = useState<string>('Tasa USD');
+  const [bcvUsdRate, setBcvUsdRate] = useState<number>(772.54);
+  const [bcvEurRate, setBcvEurRate] = useState<number>(894.49);
+  const [currencyMode, setCurrencyMode] = useState<string>('BCV');
+  const [manualRate, setManualRate] = useState<number>(780.00);
+
+  // Mapeo amigable de rutas para el Breadcrumb
+  const getBreadcrumbItems = () => {
+    if (!pathname || pathname === '/') return [{ label: 'Inicio', href: '/' }];
+
+    const routeMap: Record<string, { label: string; parent?: { label: string; href: string } }> = {
+      '/pos': { label: 'Punto de Venta (POS)', parent: { label: 'Ventas', href: '/pos' } },
+      '/sales': { label: 'Facturación de Venta', parent: { label: 'Ventas', href: '/sales' } },
+      '/sales/quotations': { label: 'Cotizaciones', parent: { label: 'Ventas', href: '/sales' } },
+      '/sales/orders': { label: 'Notas de Pedido', parent: { label: 'Ventas', href: '/sales' } },
+      '/sales/deliveries': { label: 'Notas de Entrega', parent: { label: 'Ventas', href: '/sales' } },
+      '/sales/clients': { label: 'Directorio de Clientes', parent: { label: 'Ventas', href: '/sales' } },
+      '/admin/shifts': { label: 'Turnos y Arqueos de Caja', parent: { label: 'Ventas', href: '/pos' } },
+
+      '/inventory/purchases': { label: 'Facturas de Compra', parent: { label: 'Compras', href: '/inventory/purchases' } },
+      '/inventory/purchases/new': { label: 'Registro de Compra Directa', parent: { label: 'Compras', href: '/inventory/purchases' } },
+      '/inventory/purchases/orders': { label: 'Órdenes de Compra', parent: { label: 'Compras', href: '/inventory/purchases' } },
+      '/inventory/purchases/receptions': { label: 'Recepciones de Almacén', parent: { label: 'Compras', href: '/inventory/purchases' } },
+      '/inventory/providers': { label: 'Proveedores', parent: { label: 'Compras', href: '/inventory/purchases' } },
+
+      '/inventory/stock': { label: 'Existencias y Stock', parent: { label: 'Inventario', href: '/inventory/stock' } },
+      '/inventory/warehouse': { label: 'Almacenes y Sucursales', parent: { label: 'Inventario', href: '/inventory/stock' } },
+      '/inventory/categories': { label: 'Categorías', parent: { label: 'Inventario', href: '/inventory/stock' } },
+      '/inventory/moves': { label: 'Movimientos (Kardex)', parent: { label: 'Inventario', href: '/inventory/stock' } },
+      '/inventory/prices/bulk-update': { label: 'Ajuste Masivo de Precios', parent: { label: 'Inventario', href: '/inventory/stock' } },
+      '/inventory/audit-reports': { label: 'Reportes de Valuación', parent: { label: 'Inventario', href: '/inventory/stock' } },
+
+      '/accounts/banks': { label: 'Cuentas Bancarias', parent: { label: 'Finanzas', href: '/accounts/banks' } },
+      '/accounts/receivables': { label: 'Cuentas por Cobrar (CxC)', parent: { label: 'Finanzas', href: '/accounts/banks' } },
+      '/accounts/payables': { label: 'Cuentas por Pagar (CxP)', parent: { label: 'Finanzas', href: '/accounts/banks' } },
+      '/accounts/history': { label: 'Historial Financiero', parent: { label: 'Finanzas', href: '/accounts/banks' } },
+
+      '/payroll': { label: 'Procesamiento de Nómina', parent: { label: 'Nómina', href: '/payroll' } },
+      '/payroll/formulas': { label: 'Conceptos y Asignaciones', parent: { label: 'Nómina', href: '/payroll' } },
+
+      '/reports': { label: 'Métricas & Tableros BI', parent: { label: 'Reportes', href: '/reports' } },
+
+      '/settings/company': { label: 'Perfil de Empresa & Divisas', parent: { label: 'Configuración', href: '/settings/company' } },
+      '/settings/fiscal': { label: 'Parámetros Fiscales SENIAT', parent: { label: 'Configuración', href: '/settings/company' } },
+      '/settings/users': { label: 'Usuarios y Accesos', parent: { label: 'Configuración', href: '/settings/company' } },
+      '/settings/security': { label: 'Seguridad y Clave', parent: { label: 'Configuración', href: '/settings/company' } },
+      '/settings/subscription': { label: 'Planes y Suscripción SaaS', parent: { label: 'Configuración', href: '/settings/company' } },
+
+      '/admin': { label: 'SuperAdmin Backoffice', parent: { label: 'Plataforma', href: '/admin' } },
+    };
+
+    const current = routeMap[pathname];
+    if (current) {
+      const items = [{ label: 'Inicio', href: '/' }];
+      if (current.parent) items.push(current.parent);
+      items.push({ label: current.label, href: pathname });
+      return items;
+    }
+
+    return [{ label: 'Inicio', href: '/' }, { label: pathname.replace('/', ''), href: pathname }];
+  };
 
   useEffect(() => {
-    const fetchRate = async () => {
+    const fetchRates = async () => {
       try {
-        const res = await apiClient.get('/tenant/profile');
-        const settings = res.data?.settings || {};
-        const activeRate = settings.exchangeRate || Number(settings.manualRate) || 772.54;
-        setRate(activeRate);
+        // 1. Obtener tasas maestras del backend (actualizadas por cronjob BCV o superadmin)
+        const bcvRes = await apiClient.get('/admin/bcv/rate');
+        if (bcvRes.data) {
+          if (bcvRes.data.USD?.rate) setBcvUsdRate(Number(bcvRes.data.USD.rate));
+          else if (bcvRes.data.rate) setBcvUsdRate(Number(bcvRes.data.rate));
+          if (bcvRes.data.EUR?.rate) setBcvEurRate(Number(bcvRes.data.EUR.rate));
+        }
 
-        if (settings.currencyMode === 'MANUAL') {
-          setRateLabel('Tasa Propia');
-        } else if (settings.officialCurrency === 'EUR') {
-          setRateLabel('Tasa BCV EUR');
-        } else {
-          setRateLabel('Tasa BCV USD');
+        // 2. Obtener configuración de la empresa
+        const profileRes = await apiClient.get('/tenant/profile');
+        const settings = profileRes.data?.settings || {};
+        if (settings.currencyMode) {
+          setCurrencyMode(settings.currencyMode);
+        }
+        if (settings.manualRate) {
+          setManualRate(Number(settings.manualRate));
         }
       } catch (err) {
-        console.error('Error fetching exchange rate for layout:', err);
+        console.error('Error fetching exchange rates for layout:', err);
       }
     };
+
     if (user) {
-      fetchRate();
+      fetchRates();
+
+      // Re-sincronizar solo cuando el usuario cambia o enfoca la pestaña
+      const handleFocus = () => {
+        if (document.visibilityState === 'visible') {
+          fetchRates();
+        }
+      };
+      window.addEventListener('focus', handleFocus);
+      document.addEventListener('visibilitychange', handleFocus);
+
+      return () => {
+        window.removeEventListener('focus', handleFocus);
+        document.removeEventListener('visibilitychange', handleFocus);
+      };
     }
   }, [user]);
 
@@ -49,15 +128,17 @@ export default function DashboardLayout({
     if (typeof window !== 'undefined') {
       const handleRateUpdate = (e: Event) => {
         const customEvent = e as CustomEvent;
-        if (customEvent.detail && typeof customEvent.detail.rate === 'number') {
-          setRate(customEvent.detail.rate);
-          if (customEvent.detail.mode === 'MANUAL') {
-            setRateLabel('Tasa Propia');
-          } else if (customEvent.detail.officialCurrency === 'EUR') {
-            setRateLabel('Tasa BCV EUR');
-          } else {
-            setRateLabel('Tasa BCV USD');
+        if (customEvent.detail) {
+          if (typeof customEvent.detail.usdRate === 'number') setBcvUsdRate(customEvent.detail.usdRate);
+          if (typeof customEvent.detail.eurRate === 'number') setBcvEurRate(customEvent.detail.eurRate);
+          if (typeof customEvent.detail.rate === 'number' && !customEvent.detail.usdRate) {
+            if (customEvent.detail.officialCurrency === 'EUR') {
+              setBcvEurRate(customEvent.detail.rate);
+            } else {
+              setBcvUsdRate(customEvent.detail.rate);
+            }
           }
+          if (customEvent.detail.mode) setCurrencyMode(customEvent.detail.mode);
         }
       };
       window.addEventListener('exchange-rate-updated', handleRateUpdate);
@@ -91,6 +172,40 @@ export default function DashboardLayout({
       router.replace('/change-password');
     } else if (!isLoading && user?.role === 'SUPER_ADMIN' && typeof window !== 'undefined' && window.location.pathname === '/') {
       router.replace('/admin');
+    } else if (!isLoading && user && user.role !== 'SUPER_ADMIN' && typeof window !== 'undefined') {
+      const currentPath = window.location.pathname;
+      
+      // Mapeo de rutas a permisos requeridos
+      const routePermissions: Record<string, string> = {
+        '/sales/quotations': 'sales:quotations',
+        '/sales/orders': 'sales:orders',
+        '/sales/deliveries': 'sales:deliveries',
+        '/admin/shifts': 'pos:shifts',
+        '/inventory/purchases/orders': 'purchases:orders',
+        '/inventory/purchases/receptions': 'purchases:receptions',
+        '/inventory/purchases/new': 'purchases:new',
+        '/inventory/prices/bulk-update': 'inventory:bulk_prices',
+        '/inventory/audit-reports': 'inventory:valuation',
+        '/inventory/moves': 'inventory:moves',
+        '/accounts/receivables': 'accounts:receivables',
+        '/accounts/payables': 'accounts:payables',
+        '/accounts/history': 'accounts:history',
+        '/payroll': 'payroll:manage',
+        '/payroll/formulas': 'payroll:manage',
+        '/reports': 'reports:view',
+      };
+
+      const requiredPermission = routePermissions[currentPath];
+      if (requiredPermission && user.permissions && !user.permissions.includes(requiredPermission)) {
+        // Redirigir a ruta permitida por defecto
+        if (currentPath.startsWith('/accounts')) {
+          router.replace('/accounts/banks');
+        } else if (currentPath === '/inventory/purchases/new') {
+          router.replace('/inventory/purchases/orders');
+        } else {
+          router.replace('/');
+        }
+      }
     }
   }, [user, isLoading, router]);
 
@@ -113,53 +228,98 @@ export default function DashboardLayout({
     return null;
   }
 
+  const breadcrumbs = getBreadcrumbItems();
+
   return (
     <div className="bg-slate-50 min-h-screen">
       <Sidebar />
       <div className="sm:ml-64 flex flex-col min-h-screen">
         <SandboxBanner />
-        {/* Top Header */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-30">
-          <div className="flex items-center flex-1 max-w-md">
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input 
-                type="text" 
-                placeholder="Buscar en el sistema..." 
-                className="w-full pl-10 pr-4 py-2 bg-slate-100 border-transparent rounded-lg text-sm focus:bg-white focus:ring-2 focus:ring-primary-500 transition-all outline-none"
-              />
-            </div>
-          </div>
-          <div className="flex items-center space-x-4">
-            {/* Connection Status Badge with BCV / Custom Rate */}
-            <Link href="/settings/company" className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold select-none transition-all cursor-pointer hover:bg-indigo-100/30 ${
-              isOnline 
-                ? 'bg-indigo-50/50 border-indigo-100 text-indigo-700 hover:border-indigo-200' 
-                : 'bg-rose-50 border-rose-100 text-rose-700 animate-pulse hover:border-rose-200'
-            }`} title="Ir a Configuración de Moneda y Tasa">
-              {isOnline ? (
-                <>
-                  <Wifi className="h-3.5 w-3.5 text-indigo-600 animate-pulse" />
-                  <span>{rateLabel}: Bs. {rate.toFixed(2)}</span>
-                </>
-              ) : (
-                <>
-                  <WifiOff className="h-3.5 w-3.5 text-rose-500" />
-                  <span>Modo Offline (Bs. {rate.toFixed(2)})</span>
-                </>
-              )}
+        {/* Top Header con Breadcrumb y Monitor de Divisas Proporcional */}
+        <header className="h-16 bg-white border-b border-slate-200/80 flex items-center justify-between px-6 sm:px-8 sticky top-0 z-30 shadow-2xs">
+          
+          {/* 🧭 Breadcrumb Dinámico (Guía de Ubicación del Usuario) */}
+          <nav className="flex items-center gap-1.5 text-xs text-slate-500 overflow-x-auto py-1 scrollbar-hide mr-4">
+            <Link 
+              href="/" 
+              className="flex items-center gap-1 font-semibold text-slate-400 hover:text-[#0B2C4D] transition-colors shrink-0"
+              title="Ir al Inicio"
+            >
+              <Home className="w-3.5 h-3.5 text-slate-400" />
             </Link>
 
-            <button className="p-2 text-slate-400 hover:text-primary-600 hover:bg-slate-100 rounded-full transition-all relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border-2 border-white"></span>
+            {breadcrumbs.slice(1).map((crumb, idx) => {
+              const isLast = idx === breadcrumbs.slice(1).length - 1;
+              return (
+                <div key={crumb.href + idx} className="flex items-center gap-1.5 shrink-0">
+                  <ChevronRight className="w-3 h-3 text-slate-300 stroke-[2.5]" />
+                  {isLast ? (
+                    <span className="font-bold text-slate-800 bg-slate-100/80 px-2 py-0.5 rounded-md truncate max-w-[220px]">
+                      {crumb.label}
+                    </span>
+                  ) : (
+                    <Link 
+                      href={crumb.href} 
+                      className="font-medium text-slate-500 hover:text-[#0B2C4D] transition-colors"
+                    >
+                      {crumb.label}
+                    </Link>
+                  )}
+                </div>
+              );
+            })}
+          </nav>
+
+          {/* 💱 Monitor Dual de Divisas (Diseño Ergonómico, Proporcional & Refinado) */}
+          <div className="flex items-center space-x-3 shrink-0">
+            <Link 
+              href="/settings/company" 
+              className="flex items-center gap-1.5 select-none group cursor-pointer bg-slate-50 hover:bg-slate-100/80 p-1 rounded-xl border border-slate-200/70 transition-all"
+              title="Tasas oficiales vigentes del BCV. Clic para configurar."
+            >
+              {/* Badge Tasa USD */}
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-emerald-100 text-emerald-800 shadow-2xs group-hover:border-emerald-200 transition-all">
+                <span className="text-[10px] font-black text-emerald-600">$</span>
+                <span className="font-mono text-xs font-black text-slate-800">
+                  {currencyMode === 'MANUAL' ? manualRate.toFixed(2) : bcvUsdRate.toFixed(2)}
+                </span>
+                <span className="text-[9px] uppercase tracking-tighter text-slate-400 font-bold ml-0.5 hidden xl:inline-block">
+                  {currencyMode === 'MANUAL' ? 'Manual' : 'BCV'}
+                </span>
+              </div>
+
+              {/* Badge Tasa EUR */}
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-teal-100 text-teal-800 shadow-2xs group-hover:border-teal-200 transition-all">
+                <span className="text-[10px] font-black text-teal-600">€</span>
+                <span className="font-mono text-xs font-black text-slate-800">
+                  {bcvEurRate.toFixed(2)}
+                </span>
+                <span className="text-[9px] uppercase tracking-tighter text-slate-400 font-bold ml-0.5 hidden xl:inline-block">
+                  BCV
+                </span>
+              </div>
+            </Link>
+
+            {/* Offline Alert Badge if connection lost */}
+            {!isOnline && (
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold animate-pulse">
+                <WifiOff className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Offline</span>
+              </div>
+            )}
+
+            <button 
+              className="p-2 text-slate-400 hover:text-[#0B2C4D] hover:bg-slate-100 rounded-xl transition-all relative cursor-pointer"
+              title="Notificaciones del Sistema"
+            >
+              <Bell className="h-4 w-4" />
+              <span className="absolute top-2 right-2 h-1.5 w-1.5 bg-emerald-500 rounded-full"></span>
             </button>
-            <div className="h-8 w-px bg-slate-200 mx-2"></div>
-            <div className="flex items-center cursor-pointer group">
-              <div 
-                title={user.full_name}
-                className="h-9 w-9 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold border border-primary-200 group-hover:border-primary-400 transition-all"
-              >
+
+            <div className="h-6 w-px bg-slate-200"></div>
+
+            <div className="flex items-center cursor-pointer group" title={user.full_name}>
+              <div className="h-8 w-8 rounded-xl bg-slate-100 group-hover:bg-indigo-50 flex items-center justify-center text-[#0B2C4D] font-black text-xs border border-slate-200 group-hover:border-indigo-300 transition-all shadow-2xs">
                 {getInitials(user.full_name)}
               </div>
             </div>

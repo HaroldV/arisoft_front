@@ -70,9 +70,9 @@ export type SystemModule = typeof SYSTEM_MODULES[keyof typeof SYSTEM_MODULES];
 export const PLAN_DEFAULT_MODULES: Record<SaasPlanCode, SystemModule[]> = {
   [SAAS_PLAN_CODES.EMPRENDEDOR]: [
     SYSTEM_MODULES.POS,
-    SYSTEM_MODULES.SALES,
+    SYSTEM_MODULES.INVENTORY_PURCHASES,
     SYSTEM_MODULES.INVENTORY,
-    SYSTEM_MODULES.REPORTS,
+    SYSTEM_MODULES.BANKS,
     SYSTEM_MODULES.SETTINGS,
   ],
   [SAAS_PLAN_CODES.COMERCIAL_PRO]: [
@@ -98,18 +98,22 @@ export const PLAN_DEFAULT_MODULES: Record<SaasPlanCode, SystemModule[]> = {
 
 export const PLAN_DEFAULT_PERMISSIONS: Record<SaasPlanCode, string[]> = {
   [SAAS_PLAN_CODES.EMPRENDEDOR]: [
+    // 1. Módulo Ventas (POS)
     'pos:create',
     'sales:invoicing',
     'clients:manage',
+    // 2. Módulo Compras (INVENTORY_PURCHASES)
     'purchases:new',
     'purchases:invoices',
     'providers:manage',
+    // 3. Módulo Control de Inventario (INVENTORY)
     'inventory:create',
     'inventory:stock',
+    'inventory:warehouse',
     'inventory:categories',
-    'inventory:moves',
-    'accounts:receivables',
-    'reports:view',
+    // 4. Módulo Cuentas (BANKS)
+    'banks:accounts',
+    // 5. Módulo Configuración de Empresa (SETTINGS)
     'company:manage',
     'fiscal:manage',
     'users:manage',
@@ -124,7 +128,6 @@ export const PLAN_DEFAULT_PERMISSIONS: Record<SaasPlanCode, string[]> = {
     'pos:shifts',
     'purchases:orders',
     'purchases:receptions',
-    'purchases:new',
     'purchases:invoices',
     'providers:manage',
     'inventory:create',
@@ -153,7 +156,6 @@ export const PLAN_DEFAULT_PERMISSIONS: Record<SaasPlanCode, string[]> = {
     'pos:shifts',
     'purchases:orders',
     'purchases:receptions',
-    'purchases:new',
     'purchases:invoices',
     'providers:manage',
     'inventory:create',
@@ -173,6 +175,29 @@ export const PLAN_DEFAULT_PERMISSIONS: Record<SaasPlanCode, string[]> = {
     'fiscal:manage',
     'users:manage',
   ],
+};
+
+export const SAAS_ADDON_PRICING: Record<string, number> = {
+  PAYROLL: 10.00,
+  BANKS: 10.00,
+  REPORTS: 8.00,
+  SETTINGS: 5.00,
+};
+
+export const SAAS_SUBMODULE_PRICING: Record<string, number> = {
+  'sales:quotations': 3.00,
+  'sales:orders': 3.00,
+  'sales:deliveries': 3.00,
+  'pos:shifts': 3.50,
+  'purchases:orders': 3.50,
+  'purchases:receptions': 3.00,
+  'inventory:bulk_prices': 3.00,
+  'inventory:valuation': 3.00,
+  'inventory:warehouse': 4.00,
+  'accounts:payables': 4.00,
+  'banks:accounts': 4.00,
+  'accounts:history': 3.00,
+  'payroll:manage': 10.00,
 };
 
 const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').trim().replace(/\/+$/, '');

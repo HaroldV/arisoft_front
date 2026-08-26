@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import apiClient from '@/infrastructure/api/api-client';
 import { useAuth } from '@/context/AuthContext';
 import { TenantCompany, SaasPlan } from '../SuperAdminBackoffice';
+import { SAAS_ADDON_PRICING, PLAN_DEFAULT_MODULES, PLAN_DEFAULT_PERMISSIONS, SAAS_PLAN_CODES, type SaasPlanCode } from '@/constants/domain-constants';
 
 const MOCK_TENANTS: TenantCompany[] = [
   {
@@ -14,13 +15,14 @@ const MOCK_TENANTS: TenantCompany[] = [
     plan_name: 'CORPORATIVO',
     status: 'ACTIVE',
     user_count: 8,
-    max_users: 25,
+    max_users: 50,
     product_count: 1420,
-    max_products: 10000,
-    monthly_fee_usd: 75.00,
+    max_products: 999999,
+    monthly_fee_usd: 120.00,
     subscription_expires_at: '2026-12-31',
     created_at: '28/7/2026',
-    enabled_modules: ['POS', 'SALES', 'INVENTORY', 'BANKS', 'REPORTS', 'PAYROLL'],
+    enabled_modules: PLAN_DEFAULT_MODULES[SAAS_PLAN_CODES.CORPORATIVO],
+    enabled_permissions: PLAN_DEFAULT_PERMISSIONS[SAAS_PLAN_CODES.CORPORATIVO],
     owner_email: 'direccion@nuestrosaman.edu.ve',
     owner_name: 'Lic. Nelson Parra',
     logo_color: 'bg-emerald-600'
@@ -33,13 +35,14 @@ const MOCK_TENANTS: TenantCompany[] = [
     plan_name: 'COMERCIAL_PRO',
     status: 'ACTIVE',
     user_count: 4,
-    max_users: 10,
+    max_users: 5,
     product_count: 680,
-    max_products: 2500,
-    monthly_fee_usd: 35.00,
+    max_products: 5000,
+    monthly_fee_usd: 50.00,
     subscription_expires_at: '2026-09-15',
     created_at: '23/5/2026',
-    enabled_modules: ['POS', 'SALES', 'INVENTORY', 'BANKS', 'REPORTS'],
+    enabled_modules: PLAN_DEFAULT_MODULES[SAAS_PLAN_CODES.COMERCIAL_PRO],
+    enabled_permissions: PLAN_DEFAULT_PERMISSIONS[SAAS_PLAN_CODES.COMERCIAL_PRO],
     owner_email: 'contacto@ikaiuad.com',
     owner_name: 'Ing. Javier Soto',
     logo_color: 'bg-blue-600'
@@ -52,13 +55,14 @@ const MOCK_TENANTS: TenantCompany[] = [
     plan_name: 'COMERCIAL_PRO',
     status: 'ACTIVE',
     user_count: 5,
-    max_users: 10,
+    max_users: 5,
     product_count: 1850,
-    max_products: 2500,
-    monthly_fee_usd: 35.00,
+    max_products: 5000,
+    monthly_fee_usd: 50.00,
     subscription_expires_at: '2026-10-10',
     created_at: '23/5/2026',
-    enabled_modules: ['POS', 'SALES', 'INVENTORY', 'BANKS', 'REPORTS'],
+    enabled_modules: PLAN_DEFAULT_MODULES[SAAS_PLAN_CODES.COMERCIAL_PRO],
+    enabled_permissions: PLAN_DEFAULT_PERMISSIONS[SAAS_PLAN_CODES.COMERCIAL_PRO],
     owner_email: 'gerencia@portovenezuela.com',
     owner_name: 'Antonio Da Silva',
     logo_color: 'bg-blue-600'
@@ -71,13 +75,14 @@ const MOCK_TENANTS: TenantCompany[] = [
     plan_name: 'EMPRENDEDOR',
     status: 'ACTIVE',
     user_count: 2,
-    max_users: 3,
+    max_users: 2,
     product_count: 340,
     max_products: 500,
-    monthly_fee_usd: 15.00,
+    monthly_fee_usd: 25.00,
     subscription_expires_at: '2026-08-30',
     created_at: '8/5/2026',
-    enabled_modules: ['POS', 'SALES', 'INVENTORY'],
+    enabled_modules: PLAN_DEFAULT_MODULES[SAAS_PLAN_CODES.EMPRENDEDOR],
+    enabled_permissions: PLAN_DEFAULT_PERMISSIONS[SAAS_PLAN_CODES.EMPRENDEDOR],
     owner_email: 'ventas@cecual.com',
     owner_name: 'Cecilia Alvarado',
     logo_color: 'bg-blue-600'
@@ -90,13 +95,14 @@ const MOCK_TENANTS: TenantCompany[] = [
     plan_name: 'COMERCIAL_PRO',
     status: 'ACTIVE',
     user_count: 3,
-    max_users: 10,
+    max_users: 5,
     product_count: 520,
-    max_products: 2500,
-    monthly_fee_usd: 35.00,
+    max_products: 5000,
+    monthly_fee_usd: 50.00,
     subscription_expires_at: '2026-11-20',
     created_at: '8/5/2026',
-    enabled_modules: ['POS', 'SALES', 'INVENTORY', 'BANKS', 'REPORTS'],
+    enabled_modules: PLAN_DEFAULT_MODULES[SAAS_PLAN_CODES.COMERCIAL_PRO],
+    enabled_permissions: PLAN_DEFAULT_PERMISSIONS[SAAS_PLAN_CODES.COMERCIAL_PRO],
     owner_email: 'seguridad@academia.org',
     owner_name: 'Capitán Mahoney',
     logo_color: 'bg-blue-600'
@@ -109,13 +115,14 @@ const MOCK_TENANTS: TenantCompany[] = [
     plan_name: 'CORPORATIVO',
     status: 'ACTIVE',
     user_count: 12,
-    max_users: 25,
+    max_users: 50,
     product_count: 4200,
-    max_products: 10000,
-    monthly_fee_usd: 75.00,
+    max_products: 999999,
+    monthly_fee_usd: 120.00,
     subscription_expires_at: '2026-12-31',
     created_at: '8/5/2026',
-    enabled_modules: ['POS', 'SALES', 'INVENTORY', 'BANKS', 'REPORTS', 'PAYROLL'],
+    enabled_modules: PLAN_DEFAULT_MODULES[SAAS_PLAN_CODES.CORPORATIVO],
+    enabled_permissions: PLAN_DEFAULT_PERMISSIONS[SAAS_PLAN_CODES.CORPORATIVO],
     owner_email: 'harold@haroldv.com',
     owner_name: 'Harold Villalobos',
     logo_color: 'bg-blue-600'
@@ -241,23 +248,23 @@ export function useSuperAdminData() {
   const [isSavingPlan, setIsSavingPlan] = useState(false);
   const [planModalError, setPlanModalError] = useState<string | null>(null);
 
-  const [formPlan, setFormPlan] = useState<string>('COMERCIAL_PRO');
+  const [formPlan, setFormPlan] = useState<string>('EMPRENDEDOR');
   const [formStatus, setFormStatus] = useState<'ACTIVE' | 'SUSPENDED'>('ACTIVE');
-  const [formMaxUsers, setFormMaxUsers] = useState<number>(10);
-  const [formMaxProducts, setFormMaxProducts] = useState<number>(2500);
-  const [formMonthlyFee, setFormMonthlyFee] = useState<number>(35);
+  const [formMaxUsers, setFormMaxUsers] = useState<number>(2);
+  const [formMaxProducts, setFormMaxProducts] = useState<number>(500);
+  const [formMonthlyFee, setFormMonthlyFee] = useState<number>(25);
+  const [formBasePlanPrice, setFormBasePlanPrice] = useState<number>(25);
+  const [formHasCustomPricing, setFormHasCustomPricing] = useState<boolean>(false);
+  const [formDiscountType, setFormDiscountType] = useState<'FIXED' | 'PERCENTAGE'>('FIXED');
+  const [formDiscountValue, setFormDiscountValue] = useState<number>(0);
+  const [formPricingNotes, setFormPricingNotes] = useState<string>('');
   const [formOwnerEmail, setFormOwnerEmail] = useState('');
   const [formOwnerName, setFormOwnerName] = useState('');
   const [formOwnerPassword, setFormOwnerPassword] = useState('');
   const [formOwnerPasswordConfirm, setFormOwnerPasswordConfirm] = useState('');
-  const [formModules, setFormModules] = useState<string[]>(['POS', 'SALES', 'INVENTORY', 'BANKS', 'REPORTS']);
-  const [formPermissions, setFormPermissions] = useState<string[]>([
-    'pos:create', 'pos:refund', 'clients:manage',
-    'sales:view', 'sales:write',
-    'inventory:view', 'inventory:write', 'purchases:register', 'providers:manage',
-    'banks:view'
-  ]);
-  const [expandedModuleGroups, setExpandedModuleGroups] = useState<string[]>(['POS', 'INVENTORY', 'BANKS']);
+  const [formModules, setFormModules] = useState<string[]>(PLAN_DEFAULT_MODULES[SAAS_PLAN_CODES.EMPRENDEDOR]);
+  const [formPermissions, setFormPermissions] = useState<string[]>(PLAN_DEFAULT_PERMISSIONS[SAAS_PLAN_CODES.EMPRENDEDOR]);
+  const [expandedModuleGroups, setExpandedModuleGroups] = useState<string[]>(['POS', 'INVENTORY_PURCHASES', 'INVENTORY', 'BANKS', 'SETTINGS']);
   const [isSaving, setIsSaving] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
 
@@ -327,19 +334,55 @@ export function useSuperAdminData() {
     }
   };
 
+  const calculateSuggestedFee = (planCode: string, modules: string[], hasCustom: boolean, customFee: number) => {
+    if (hasCustom) return customFee;
+    const plan = saasPlans.find(p => p.code === planCode);
+    const planCodeTyped = planCode as SaasPlanCode;
+    const defaultModules: string[] = (plan?.enabled_modules && plan.enabled_modules.length > 0)
+      ? plan.enabled_modules
+      : (PLAN_DEFAULT_MODULES[planCodeTyped] || ['POS', 'INVENTORY_PURCHASES', 'INVENTORY', 'BANKS', 'SETTINGS']);
+    
+    const baseFee = plan ? Number(plan.monthly_fee_usd) : (planCode === 'EMPRENDEDOR' ? 25 : planCode === 'CORPORATIVO' ? 120 : 50);
+    
+    let addOnTotal = 0;
+    modules.forEach(m => {
+      if (!defaultModules.includes(m) && SAAS_ADDON_PRICING[m]) {
+        addOnTotal += SAAS_ADDON_PRICING[m];
+      }
+    });
+
+    return baseFee + addOnTotal;
+  };
+
   const handleSelectPlanInForm = (planCode: string) => {
     setFormPlan(planCode);
+    const planCodeTyped = planCode as SaasPlanCode;
     const selected = saasPlans.find(p => p.code === planCode);
-    if (selected) {
-      setFormMaxUsers(selected.max_users);
-      setFormMaxProducts(selected.max_products);
-      setFormMonthlyFee(selected.monthly_fee_usd);
-      if (selected.enabled_modules && selected.enabled_modules.length > 0) {
-        setFormModules(selected.enabled_modules);
-      }
-      if (selected.enabled_permissions && selected.enabled_permissions.length > 0) {
-        setFormPermissions(selected.enabled_permissions);
-      }
+    
+    const baseFee = selected 
+      ? Number(selected.monthly_fee_usd) 
+      : (planCode === 'EMPRENDEDOR' ? 25 : planCode === 'CORPORATIVO' ? 120 : 50);
+    const maxUsers = selected 
+      ? selected.max_users 
+      : (planCode === 'EMPRENDEDOR' ? 2 : planCode === 'CORPORATIVO' ? 50 : 5);
+    const maxProducts = selected 
+      ? selected.max_products 
+      : (planCode === 'EMPRENDEDOR' ? 500 : planCode === 'CORPORATIVO' ? 999999 : 5000);
+    const defaultModules: string[] = (selected?.enabled_modules && selected.enabled_modules.length > 0)
+      ? selected.enabled_modules
+      : (PLAN_DEFAULT_MODULES[planCodeTyped] || ['POS', 'INVENTORY_PURCHASES', 'INVENTORY', 'BANKS', 'SETTINGS']);
+    const defaultPermissions: string[] = (selected?.enabled_permissions && selected.enabled_permissions.length > 0)
+      ? selected.enabled_permissions
+      : (PLAN_DEFAULT_PERMISSIONS[planCodeTyped] || []);
+
+    setFormMaxUsers(maxUsers);
+    setFormMaxProducts(maxProducts);
+    setFormBasePlanPrice(baseFee);
+    setFormModules(defaultModules);
+    setFormPermissions(defaultPermissions);
+
+    if (!formHasCustomPricing) {
+      setFormMonthlyFee(baseFee);
     }
   };
 
@@ -465,6 +508,18 @@ export function useSuperAdminData() {
         setBcvLastUpdated(`Hoy, ${now.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })} (BCV Oficial)`);
         setSyncSuccess(`¡Tasas Oficiales BCV sincronizadas: USD Bs. ${usdRate.toFixed(2)}${eurText}${valueDate}!`);
         setTimeout(() => setSyncSuccess(null), 5000);
+
+        // Notificar inmediatamente al Header y al resto de la aplicación
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('exchange-rate-updated', {
+              detail: {
+                usdRate,
+                eurRate,
+              },
+            })
+          );
+        }
       }
     } catch (err: any) {
       console.error('Error triggering BCV sync:', err);
@@ -495,6 +550,18 @@ export function useSuperAdminData() {
         setBcvLastUpdated(`Hoy, ${now.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })} (Manual)`);
         setSyncSuccess(`¡Tasas Maestras Globales actualizadas manualmente (USD: Bs. ${usdRate.toFixed(2)} | EUR: Bs. ${eurRate?.toFixed(2) || '---'})!`);
         setTimeout(() => setSyncSuccess(null), 5000);
+
+        // Notificar inmediatamente al Header y al resto de la aplicación
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('exchange-rate-updated', {
+              detail: {
+                usdRate,
+                eurRate,
+              },
+            })
+          );
+        }
       }
     } catch (err: any) {
       console.error('Error saving manual BCV rate:', err);
@@ -518,40 +585,46 @@ export function useSuperAdminData() {
       setFormMaxUsers(tenant.max_users);
       setFormMaxProducts(tenant.max_products);
       setFormMonthlyFee(tenant.monthly_fee_usd);
+      setFormBasePlanPrice(tenant.base_plan_price || tenant.monthly_fee_usd || 25);
+      setFormHasCustomPricing(Boolean(tenant.has_custom_pricing));
+      setFormDiscountType(tenant.discount_type || 'FIXED');
+      setFormDiscountValue(tenant.discount_value || 0);
+      setFormPricingNotes(tenant.pricing_notes || '');
       setFormOwnerEmail(tenant.owner_email);
       setFormOwnerName(tenant.owner_name);
-      setFormModules(tenant.enabled_modules || ['POS', 'SALES', 'INVENTORY', 'BANKS', 'REPORTS']);
-      setFormPermissions(tenant.enabled_permissions || [
-        'pos:create', 'sales:invoicing', 'sales:quotations', 'sales:orders', 'sales:deliveries', 'clients:manage', 'pos:shifts',
-        'purchases:orders', 'purchases:receptions', 'purchases:new', 'purchases:invoices', 'providers:manage',
-        'inventory:create', 'inventory:stock', 'inventory:bulk_prices', 'inventory:valuation', 'inventory:warehouse', 'inventory:categories', 'inventory:moves',
-        'banks:accounts', 'accounts:receivables', 'accounts:payables', 'accounts:history',
-        'reports:view',
-        'company:manage', 'fiscal:manage', 'users:manage'
-      ]);
-      setExpandedModuleGroups(tenant.enabled_modules || ['POS']);
+      const planCodeTyped = (tenant.plan_name as SaasPlanCode) || SAAS_PLAN_CODES.COMERCIAL_PRO;
+      const tenantModules = tenant.enabled_modules && tenant.enabled_modules.length > 0 
+        ? tenant.enabled_modules 
+        : (PLAN_DEFAULT_MODULES[planCodeTyped] || ['POS', 'INVENTORY_PURCHASES', 'INVENTORY', 'BANKS', 'REPORTS', 'SETTINGS']);
+      const tenantPermissions = tenant.enabled_permissions && tenant.enabled_permissions.length > 0
+        ? tenant.enabled_permissions
+        : (PLAN_DEFAULT_PERMISSIONS[planCodeTyped] || []);
+
+      setFormModules(tenantModules);
+      setFormPermissions(tenantPermissions);
+      setExpandedModuleGroups(tenantModules);
     } else {
       setEditingTenant(null);
       setFormName('');
       setFormTaxId('');
       setFormSubdomain('');
-      setFormPlan('COMERCIAL_PRO');
+      setFormPlan('EMPRENDEDOR');
       setFormStatus('ACTIVE');
-      setFormMaxUsers(10);
-      setFormMaxProducts(2500);
-      setFormMonthlyFee(35);
+      setFormMaxUsers(2);
+      setFormMaxProducts(500);
+      setFormMonthlyFee(25);
+      setFormBasePlanPrice(25);
+      setFormHasCustomPricing(false);
+      setFormDiscountType('FIXED');
+      setFormDiscountValue(0);
+      setFormPricingNotes('');
       setFormOwnerEmail('');
       setFormOwnerName('');
-      setFormModules(['POS', 'SALES', 'INVENTORY', 'BANKS', 'REPORTS']);
-      setFormPermissions([
-        'pos:create', 'sales:invoicing', 'sales:quotations', 'sales:orders', 'sales:deliveries', 'clients:manage', 'pos:shifts',
-        'purchases:orders', 'purchases:receptions', 'purchases:new', 'purchases:invoices', 'providers:manage',
-        'inventory:create', 'inventory:stock', 'inventory:bulk_prices', 'inventory:valuation', 'inventory:warehouse', 'inventory:categories', 'inventory:moves',
-        'banks:accounts', 'accounts:receivables', 'accounts:payables', 'accounts:history',
-        'reports:view',
-        'company:manage', 'fiscal:manage', 'users:manage'
-      ]);
-      setExpandedModuleGroups(['POS', 'INVENTORY', 'BANKS']);
+      const defaultEmprendedorModules = PLAN_DEFAULT_MODULES[SAAS_PLAN_CODES.EMPRENDEDOR] || ['POS', 'INVENTORY_PURCHASES', 'INVENTORY', 'BANKS', 'SETTINGS'];
+      const defaultEmprendedorPermissions = PLAN_DEFAULT_PERMISSIONS[SAAS_PLAN_CODES.EMPRENDEDOR] || [];
+      setFormModules(defaultEmprendedorModules);
+      setFormPermissions(defaultEmprendedorPermissions);
+      setExpandedModuleGroups(['POS', 'INVENTORY_PURCHASES', 'INVENTORY', 'BANKS', 'SETTINGS']);
     }
     setFormResetPassword(false);
     setModalError(null);
@@ -561,13 +634,20 @@ export function useSuperAdminData() {
   const handleToggleModule = (modKey: string) => {
     const group = ALL_MODULE_GROUPS.find(g => g.key === modKey);
     const moduleEnabled = formModules.includes(modKey);
+    let nextModules: string[];
     if (moduleEnabled) {
-      setFormModules(prev => prev.filter(m => m !== modKey));
+      nextModules = formModules.filter(m => m !== modKey);
+      setFormModules(nextModules);
       const groupPerms = group?.submodules.map(s => s.key) || [];
       setFormPermissions(prev => prev.filter(p => !groupPerms.includes(p)));
     } else {
-      setFormModules(prev => [...prev, modKey]);
+      nextModules = [...formModules, modKey];
+      setFormModules(nextModules);
       setExpandedModuleGroups(prev => prev.includes(modKey) ? prev : [...prev, modKey]);
+    }
+
+    if (!formHasCustomPricing) {
+      setFormMonthlyFee(calculateSuggestedFee(formPlan, nextModules, false, formMonthlyFee));
     }
   };
 
@@ -579,13 +659,21 @@ export function useSuperAdminData() {
       const group = ALL_MODULE_GROUPS.find(g => g.key === parentKey);
       const groupPerms = group?.submodules.map(s => s.key) || [];
       if (!groupPerms.some(p => newPerms.includes(p))) {
-        setFormModules(prev => prev.filter(m => m !== parentKey));
+        const nextModules = formModules.filter(m => m !== parentKey);
+        setFormModules(nextModules);
+        if (!formHasCustomPricing) {
+          setFormMonthlyFee(calculateSuggestedFee(formPlan, nextModules, false, formMonthlyFee));
+        }
       }
     } else {
       setFormPermissions(prev => [...prev, permKey]);
       if (!formModules.includes(parentKey)) {
-        setFormModules(prev => [...prev, parentKey]);
+        const nextModules = [...formModules, parentKey];
+        setFormModules(nextModules);
         setExpandedModuleGroups(prev => prev.includes(parentKey) ? prev : [...prev, parentKey]);
+        if (!formHasCustomPricing) {
+          setFormMonthlyFee(calculateSuggestedFee(formPlan, nextModules, false, formMonthlyFee));
+        }
       }
     }
   };
@@ -637,6 +725,11 @@ export function useSuperAdminData() {
       max_users: Number(formMaxUsers),
       max_products: Number(formMaxProducts),
       monthly_fee_usd: Number(formMonthlyFee),
+      base_plan_price: Number(formBasePlanPrice),
+      has_custom_pricing: Boolean(formHasCustomPricing),
+      discount_type: formDiscountType,
+      discount_value: Number(formDiscountValue),
+      pricing_notes: formPricingNotes.trim(),
       owner_email: formOwnerEmail.trim(),
       owner_name: formOwnerName.trim() || 'Gerente General',
       enabled_modules: formModules,
@@ -664,9 +757,15 @@ export function useSuperAdminData() {
               max_users: payload.max_users,
               max_products: payload.max_products,
               monthly_fee_usd: payload.monthly_fee_usd,
+              base_plan_price: payload.base_plan_price,
+              has_custom_pricing: payload.has_custom_pricing,
+              discount_type: payload.discount_type,
+              discount_value: payload.discount_value,
+              pricing_notes: payload.pricing_notes,
               owner_email: payload.owner_email,
               owner_name: payload.owner_name,
               enabled_modules: payload.enabled_modules,
+              enabled_permissions: payload.enabled_permissions,
             }
             : t
         ));
@@ -852,6 +951,11 @@ export function useSuperAdminData() {
     formMaxUsers, setFormMaxUsers,
     formMaxProducts, setFormMaxProducts,
     formMonthlyFee, setFormMonthlyFee,
+    formBasePlanPrice, setFormBasePlanPrice,
+    formHasCustomPricing, setFormHasCustomPricing,
+    formDiscountType, setFormDiscountType,
+    formDiscountValue, setFormDiscountValue,
+    formPricingNotes, setFormPricingNotes,
     formOwnerEmail, setFormOwnerEmail,
     formOwnerName, setFormOwnerName,
     formOwnerPassword, setFormOwnerPassword,

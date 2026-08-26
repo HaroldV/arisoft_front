@@ -3,10 +3,17 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, Search, Edit2, Shield, CheckCircle2, XCircle, X, Key, AlertTriangle, AlertCircle, Percent, 
-  ShoppingCart, Package, Landmark, Settings, UserPlus 
+  ShoppingCart, Package, Landmark, Settings, UserPlus, FileText, ShoppingBag, Users, BarChart3 
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import { useAuth } from '@/context/AuthContext';
+import { 
+  PLAN_DEFAULT_PERMISSIONS, 
+  PLAN_DEFAULT_MODULES, 
+  SAAS_PLAN_CODES, 
+  SaasPlanCode, 
+  SYSTEM_MODULES 
+} from '@/constants/domain-constants';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -17,8 +24,12 @@ function cn(...inputs: ClassValue[]) {
 const getModuleIcon = (mod: string) => {
   switch (mod) {
     case 'POS': return ShoppingCart;
+    case 'SALES': return FileText;
+    case 'INVENTORY_PURCHASES': return ShoppingBag;
     case 'INVENTORY': return Package;
     case 'BANKS': return Landmark;
+    case 'PAYROLL': return Users;
+    case 'REPORTS': return BarChart3;
     case 'SETTINGS': return Settings;
     default: return Shield;
   }
@@ -59,41 +70,78 @@ interface ModuleGroup {
 const permissionGroups: ModuleGroup[] = [
   {
     module: 'POS',
-    label: 'Punto de Venta (POS / Ventas)',
+    label: '1. Módulo Punto de Venta (POS)',
     permissions: [
-      { key: 'pos:create', label: 'Registrar Ventas', description: 'Permite abrir el POS y registrar transacciones' },
-      { key: 'pos:discount', label: 'Aplicar Descuentos', description: 'Permite modificar precios o aplicar descuentos manuales' },
-      { key: 'pos:refund', label: 'Emitir Devoluciones', description: 'Permite generar notas de crédito y reembolsos' },
-      { key: 'clients:manage', label: 'Gestionar Clientes', description: 'Permite crear y editar el catálogo de clientes' },
+      { key: 'pos:create', label: 'Caja & Ventas POS', description: 'Permite registrar cobros y emitir tickets en punto de venta' },
+      { key: 'pos:shifts', label: 'Turnos y Arqueos', description: 'Permite aperturar, cerrar y auditar turnos de caja' },
+      { key: 'sales:invoicing', label: 'Facturación Fiscal', description: 'Permite generar facturas fiscales SENIAT' },
+      { key: 'clients:manage', label: 'Directorio de Clientes', description: 'Permite registrar y consultar clientes' },
+    ],
+  },
+  {
+    module: 'SALES',
+    label: '2. Módulo Ventas & Documentos',
+    permissions: [
+      { key: 'sales:quotations', label: 'Cotizaciones', description: 'Permite emitir y gestionar presupuestos comerciales' },
+      { key: 'sales:orders', label: 'Notas de Pedido', description: 'Permite procesar pedidos antes de su despacho' },
+      { key: 'sales:deliveries', label: 'Notas de Entrega', description: 'Permite generar guías y notas de entrega' },
+    ],
+  },
+  {
+    module: 'INVENTORY_PURCHASES',
+    label: '3. Módulo Compras & Proveedores',
+    permissions: [
+      { key: 'purchases:new', label: 'Compra Directa', description: 'Permite cargar compras directas al inventario' },
+      { key: 'purchases:orders', label: 'Órdenes de Compra', description: 'Permite generar órdenes formales a proveedores' },
+      { key: 'purchases:receptions', label: 'Recepciones de Almacén', description: 'Permite registrar entradas físicas de mercancía' },
+      { key: 'purchases:invoices', label: 'Facturas de Compra', description: 'Permite validar facturas de compras de proveedores' },
+      { key: 'providers:manage', label: 'Directorio de Proveedores', description: 'Permite crear y editar proveedores' },
     ],
   },
   {
     module: 'INVENTORY',
-    label: 'Inventario y Compras',
+    label: '4. Módulo Control de Inventario',
     permissions: [
-      { key: 'inventory:view', label: 'Visualizar Inventario', description: 'Permite ver existencias y stock' },
-      { key: 'inventory:write', label: 'Modificar Productos', description: 'Permite agregar/editar productos, categorías y bodegas' },
-      { key: 'inventory:adjust', label: 'Ajustes Manuales', description: 'Permite realizar ingresos/egresos manuales de stock' },
-      { key: 'purchases:register', label: 'Registrar Compras', description: 'Permite registrar facturas de compra de proveedores' },
-      { key: 'providers:manage', label: 'Gestionar Proveedores', description: 'Permite crear y editar proveedores' },
+      { key: 'inventory:create', label: 'Crear Productos', description: 'Permite registrar nuevos ítems en el catálogo' },
+      { key: 'inventory:stock', label: 'Existencias & Stock', description: 'Permite consultar existencias en tiempo real' },
+      { key: 'inventory:warehouse', label: 'Almacenes y Sucursales', description: 'Permite gestionar múltiples depósitos' },
+      { key: 'inventory:categories', label: 'Categorías de Producto', description: 'Permite organizar líneas y familias' },
+      { key: 'inventory:moves', label: 'Movimientos Kardex', description: 'Permite auditar el historial de entradas y salidas' },
+      { key: 'inventory:bulk_prices', label: 'Ajuste Masivo de Precios', description: 'Permite actualizar precios por lote' },
+      { key: 'inventory:valuation', label: 'Reportes de Valuación', description: 'Permite calcular el valor total del inventario' },
     ],
   },
   {
     module: 'BANKS',
-    label: 'Cuentas y Finanzas',
+    label: '5. Módulo Cuentas y Finanzas',
     permissions: [
-      { key: 'banks:view', label: 'Ver Cuentas', description: 'Permite ver saldos y movimientos bancarios' },
-      { key: 'banks:write', label: 'Crear/Editar Cuentas', description: 'Permite crear o configurar cuentas bancarias' },
-      { key: 'banks:transfer', label: 'Transferencias y Ajustes', description: 'Permite registrar transferencias y ajustes manuales' },
+      { key: 'banks:accounts', label: 'Cuentas Bancarias', description: 'Permite gestionar cuentas bancarias y cajas' },
+      { key: 'accounts:receivables', label: 'Cuentas por Cobrar (CxC)', description: 'Permite gestionar créditos y cobranzas a clientes' },
+      { key: 'accounts:payables', label: 'Cuentas por Pagar (CxP)', description: 'Permite controlar deudas y pagos a proveedores' },
+      { key: 'accounts:history', label: 'Historial Financiero', description: 'Permite auditar movimientos y libros auxiliares' },
+    ],
+  },
+  {
+    module: 'PAYROLL',
+    label: '6. Módulo Nómina & RRHH',
+    permissions: [
+      { key: 'payroll:manage', label: 'Procesamiento de Nómina', description: 'Permite calcular recibos y asignaciones salariales' },
+    ],
+  },
+  {
+    module: 'REPORTS',
+    label: '7. Módulo Reportes & BI',
+    permissions: [
+      { key: 'reports:view', label: 'Métricas y Tableros BI', description: 'Permite acceder a estadísticas y reportes ejecutivos' },
     ],
   },
   {
     module: 'SETTINGS',
-    label: 'Administración de Sistema',
+    label: '8. Módulo Configuración de Empresa',
     permissions: [
-      { key: 'users:manage', label: 'Gestionar Usuarios', description: 'Permite registrar personal y asignar permisos' },
-      { key: 'fiscal:manage', label: 'Configuración Fiscal', description: 'Permite ajustar folios y rangos de facturación' },
-      { key: 'company:manage', label: 'Perfil de Empresa', description: 'Permite editar los datos de registro de la empresa' },
+      { key: 'company:manage', label: 'Perfil de Empresa', description: 'Permite editar datos de la empresa y monedas' },
+      { key: 'fiscal:manage', label: 'Parámetros Fiscales', description: 'Permite configurar correlativos e impresoras fiscales' },
+      { key: 'users:manage', label: 'Gestión de Usuarios', description: 'Permite registrar personal y administrar roles' },
     ],
   },
 ];
@@ -137,6 +185,10 @@ export default function UserManagement() {
   const [isActive, setIsActive] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  // Quota and Subscription state
+  const [maxUsers, setMaxUsers] = useState<number>(2);
+  const [currentPlanName, setCurrentPlanName] = useState<string>('Emprendedor');
+  const [isQuotaModalOpen, setIsQuotaModalOpen] = useState(false);
 
   // Fetch team users
   const fetchUsers = async () => {
@@ -162,17 +214,45 @@ export default function UserManagement() {
     }
   };
 
+  // Subscription plan code state
+  const [currentPlanCode, setCurrentPlanCode] = useState<SaasPlanCode>(SAAS_PLAN_CODES.EMPRENDEDOR);
+
+  // Fetch subscription quota limits
+  const fetchSubscriptionStatus = async () => {
+    try {
+      const res = await apiClient.get('/subscription/my-status');
+      if (res.data?.current_plan) {
+        if (res.data.current_plan.max_users) setMaxUsers(Number(res.data.current_plan.max_users));
+        if (res.data.current_plan.name) setCurrentPlanName(res.data.current_plan.name);
+        if (res.data.current_plan.code) setCurrentPlanCode(res.data.current_plan.code);
+      }
+    } catch (err) {
+      console.warn('Could not fetch subscription plan quota:', err);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
     fetchRoles();
+    fetchSubscriptionStatus();
   }, []);
 
-  // Filter modules/permissions options based on current user's session
-  const allowedModules = currentUser?.enabled_modules || ['POS', 'INVENTORY'];
-  const allowedPermissions = currentUser?.permissions || [];
+  // Compute allowed modules and permissions strictly from currentUser session & SaaS Plan
+  const planDefaultModules = PLAN_DEFAULT_MODULES[currentPlanCode] || PLAN_DEFAULT_MODULES[SAAS_PLAN_CODES.EMPRENDEDOR];
+  const planDefaultPermissions = PLAN_DEFAULT_PERMISSIONS[currentPlanCode] || PLAN_DEFAULT_PERMISSIONS[SAAS_PLAN_CODES.EMPRENDEDOR];
+
+  const allowedModules = currentUser?.enabled_modules && currentUser.enabled_modules.length > 0
+    ? currentUser.enabled_modules
+    : planDefaultModules;
+
+  const allowedPermissions = currentUser?.permissions && currentUser.permissions.length > 0
+    ? currentUser.permissions
+    : planDefaultPermissions;
 
   const hasPermissionToDelegate = (perm: string) => {
-    if (currentUser?.role === 'OWNER') return true;
+    if (currentUser?.role === 'OWNER') {
+      return allowedPermissions.includes(perm);
+    }
     return allowedPermissions.includes(perm);
   };
 
@@ -189,6 +269,12 @@ export default function UserManagement() {
 
   // Helper to open create modal
   const handleOpenCreate = () => {
+    // Validar cuota máxima de usuarios permitida por el plan
+    if (users.length >= maxUsers) {
+      setIsQuotaModalOpen(true);
+      return;
+    }
+
     setModalMode('create');
     setSelectedUser(null);
     setFullName('');
@@ -331,11 +417,27 @@ export default function UserManagement() {
     };
 
     try {
-      await apiClient.post('/roles', payload);
+      const response = await apiClient.post('/roles', payload);
+      const newRoleItem = response.data;
+      
       setIsRoleModalOpen(false);
       setRoleName('');
       setRolePermissions([]);
-      fetchRoles();
+      
+      // Auto-seleccionar el nuevo rol en el formulario del usuario
+      if (newRoleItem) {
+        setRole(newRoleItem.name);
+        setRoleId(newRoleItem.id);
+        const perms = typeof newRoleItem.allowed_permissions === 'string'
+          ? (newRoleItem.allowed_permissions as string).split(',').filter(Boolean)
+          : Array.isArray(newRoleItem.allowed_permissions)
+            ? newRoleItem.allowed_permissions
+            : [];
+        setSelectedPermissions(perms);
+        setSelectedModules(getModulesForPermissions(perms));
+      }
+      
+      await fetchRoles();
     } catch (err: any) {
       setRoleFormError(err.response?.data?.message || 'Error al registrar el rol');
     } finally {
@@ -418,7 +520,18 @@ export default function UserManagement() {
             <Shield className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900">Gestión de Usuarios y Roles</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold tracking-tight text-slate-900">Gestión de Usuarios y Roles</h1>
+              {currentUser?.role === 'OWNER' && (
+                <span className={`text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full border ${
+                  users.length >= maxUsers 
+                    ? 'bg-rose-50 text-rose-700 border-rose-200' 
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                }`}>
+                  {users.length}/{maxUsers} Usuarios ({currentPlanName})
+                </span>
+              )}
+            </div>
             <p className="text-xs text-slate-500">Registra personal, personaliza roles jerárquicos y delimita permisos granulares de control.</p>
           </div>
         </div>
@@ -450,6 +563,45 @@ export default function UserManagement() {
           </div>
         )}
       </div>
+
+      {/* Quota Limit Reached Modal (STORY-UM-04) */}
+      {isQuotaModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="p-6 text-center space-y-4">
+              <div className="mx-auto w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 tracking-tight">
+                  Límite de Usuarios Alcanzado
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">
+                  Has alcanzado el límite máximo de <strong>{maxUsers} usuarios permitidos</strong> en tu <strong>Plan {currentPlanName}</strong> ({users.length}/{maxUsers} utilizados).
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Para registrar nuevos miembros en tu equipo de trabajo o ampliar los accesos de tu empresa, por favor actualiza tu suscripción.
+                </p>
+              </div>
+
+              <div className="pt-2 flex flex-col sm:flex-row gap-2 justify-center">
+                <button
+                  onClick={() => setIsQuotaModalOpen(false)}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-all cursor-pointer"
+                >
+                  Entendido / Cerrar
+                </button>
+                <a
+                  href="/settings/subscription"
+                  className="flex items-center justify-center gap-1.5 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold rounded-xl text-xs hover:from-indigo-500 hover:to-violet-500 transition-all shadow-md shadow-indigo-200 cursor-pointer"
+                >
+                  <span>💳 Ver Planes & Actualizar ↗</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs Layout */}
       <div className="flex border-b border-slate-200 bg-white p-2 rounded-xl shadow-xs gap-1 border">
@@ -780,12 +932,27 @@ export default function UserManagement() {
                     </div>
                   </div>
 
-                  {/* Role selection dropdown */}
+                  {/* Role selection dropdown with inline [+ Nuevo Rol] button */}
                   {!(modalMode === 'edit' && selectedUser?.id === currentUser?.id) && (
                     <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                        Rol Jerárquico Asignado
-                      </label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                          Rol Jerárquico Asignado
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRoleName('');
+                            setRolePermissions([]);
+                            setRoleFormError(null);
+                            setIsRoleModalOpen(true);
+                          }}
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-700 hover:underline cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Nuevo Rol</span>
+                        </button>
+                      </div>
                       <select
                         value={role}
                         onChange={e => {
@@ -846,10 +1013,12 @@ export default function UserManagement() {
                 {/* Granular Permissions Section */}
                 {!(modalMode === 'edit' && selectedUser?.id === currentUser?.id) && (
                   <div className="space-y-4">
-                    <div className="border-b border-slate-100 pb-2">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                        Asignación de Permisos Granulares (Anulación Manual)
+                    <div className="border-b border-slate-100 pb-2 flex items-center justify-between">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <Shield className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Asignación de Permisos</span>
                       </h3>
+                      <span className="text-[10px] text-slate-400 font-semibold">Submódulos habilitados en tu plan</span>
                     </div>
 
                     <div className="space-y-4 max-h-[35vh] overflow-y-auto pr-2 custom-scrollbar">

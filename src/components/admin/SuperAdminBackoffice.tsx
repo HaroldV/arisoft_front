@@ -31,6 +31,7 @@ import { MarketBiTab } from './subcomponents/MarketBiTab';
 import { TenantModal } from './subcomponents/TenantModal';
 import { TenantConfirmModal } from './subcomponents/TenantConfirmModal';
 import { ManualBcvModal } from './subcomponents/ManualBcvModal';
+import { AddonPricingTable } from './subcomponents/AddonPricingTable';
 import { useSuperAdminData, ALL_MODULE_GROUPS } from './hooks/useSuperAdminData';
 
 export interface SaasPlan {
@@ -65,6 +66,11 @@ export interface TenantCompany {
   product_count: number;
   max_products: number;
   monthly_fee_usd: number;
+  base_plan_price?: number;
+  has_custom_pricing?: boolean;
+  discount_type?: 'FIXED' | 'PERCENTAGE';
+  discount_value?: number;
+  pricing_notes?: string;
   subscription_expires_at: string;
   created_at: string;
   enabled_modules: string[];
@@ -122,6 +128,11 @@ export default function SuperAdminBackoffice() {
     formMaxUsers, setFormMaxUsers,
     formMaxProducts, setFormMaxProducts,
     formMonthlyFee, setFormMonthlyFee,
+    formBasePlanPrice,
+    formHasCustomPricing, setFormHasCustomPricing,
+    formDiscountType, setFormDiscountType,
+    formDiscountValue, setFormDiscountValue,
+    formPricingNotes, setFormPricingNotes,
     formOwnerEmail, setFormOwnerEmail,
     formOwnerName, setFormOwnerName,
     formOwnerPassword, setFormOwnerPassword,
@@ -605,6 +616,9 @@ export default function SuperAdminBackoffice() {
               );
             })}
           </div>
+
+          {/* TABLA VISUAL DE GESTIÓN Y PRECIOS DE SUBMÓDULOS & ADD-ONS */}
+          <AddonPricingTable masterBcvRate={masterBcvRate} />
         </div>
       )}
 
@@ -644,6 +658,15 @@ export default function SuperAdminBackoffice() {
         setMaxProducts={setFormMaxProducts}
         monthlyFee={formMonthlyFee}
         setMonthlyFee={setFormMonthlyFee}
+        basePlanPrice={formBasePlanPrice}
+        hasCustomPricing={formHasCustomPricing}
+        setHasCustomPricing={setFormHasCustomPricing}
+        discountType={formDiscountType}
+        setDiscountType={setFormDiscountType}
+        discountValue={formDiscountValue}
+        setDiscountValue={setFormDiscountValue}
+        pricingNotes={formPricingNotes}
+        setPricingNotes={setFormPricingNotes}
         ownerName={formOwnerName}
         setOwnerName={setFormOwnerName}
         ownerEmail={formOwnerEmail}

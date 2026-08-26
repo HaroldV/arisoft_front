@@ -9,17 +9,27 @@ export default {
   theme: {
     extend: {
       colors: {
+        brand: {
+          navy: '#0B2C4D',
+          navyLight: '#123D66',
+          navyDark: '#071D33',
+          emerald: '#10B981',
+          emeraldLight: '#34D399',
+          emeraldDark: '#059669',
+          cyan: '#06B6D4',
+          teal: '#0D9488',
+        },
         primary: {
-          50: '#f0f9ff',
-          100: '#e0f2fe',
-          200: '#bae6fd',
-          300: '#7dd3fc',
-          400: '#38bdf8',
-          500: '#0ea5e9', // Celeste base
-          600: '#0284c7', // Azul formal
-          700: '#0369a1',
-          800: '#075985',
-          900: '#0c4a6e',
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#0B2C4D', // Arivsoft Brand Navy
+          600: '#071D33', // Deep Brand Navy
+          700: '#051627',
+          800: '#030E1A',
+          900: '#02080F',
         },
         secondary: {
           50: '#f8fafc',

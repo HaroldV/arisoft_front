@@ -21,27 +21,27 @@ export default function AuthLayout({
         <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-indigo-600/15 rounded-full blur-3xl -translate-x-1/3 -translate-y-1/3 pointer-events-none" />
         <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-3xl translate-x-1/3 translate-y-1/3 pointer-events-none" />
 
-        {/* Header con Logo AriSoft */}
+        {/* Header con Logo Arivsoft */}
         <div className="relative z-10">
-          <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10 shadow-xs">
-            <img src="/logo-arisoft.png" alt="AriSoft Logo" className="h-8 w-auto object-contain brightness-0 invert" />
-            <span className="text-xs font-bold uppercase tracking-widest text-slate-300 border-l border-white/20 pl-3">ERP ARI</span>
+          <div className="inline-flex items-center gap-3 bg-white px-4 py-2 rounded-2xl shadow-md">
+            <img src="/logo.png" alt="Arivsoft Solutions Logo" className="h-8 w-auto object-contain" />
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-500 border-l border-slate-200 pl-3">ERP ARI</span>
           </div>
         </div>
 
         {/* Hero Text Contextual ERP */}
         <div className="relative z-10 my-auto py-10 max-w-xl">
-          <span className="text-xs font-extrabold uppercase tracking-widest text-indigo-400 block mb-3">
+          <span className="text-xs font-extrabold uppercase tracking-widest text-emerald-400 block mb-3">
             SISTEMA ERP & ADMINISTRACIÓN VENEZUELA
           </span>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-[1.15]">
             La gestión de hoy, <br />
-            <span className="bg-gradient-to-r from-indigo-400 via-blue-400 to-sky-300 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-sky-300 bg-clip-text text-transparent">
               organizada para crecer
             </span>
           </h1>
-          <p className="text-slate-400 text-sm sm:text-base mt-4 leading-relaxed font-normal">
-            AriSoft ERP conecta inventario, facturación fiscal SENIAT, cuentas por cobrar, cuentas por pagar y caja en una sola plataforma centralizada.
+          <p className="text-slate-300 text-sm sm:text-base mt-4 leading-relaxed font-normal">
+            Arivsoft ERP conecta inventario, facturación fiscal SENIAT, cuentas por cobrar, cuentas por pagar y caja en una sola plataforma centralizada.
           </p>
 
           {/* 3 Bloques Informativos de Propuesta de Valor */}
