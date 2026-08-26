@@ -4,6 +4,7 @@ import React from 'react';
 import { Building2, X, AlertCircle, RefreshCw, Check, ChevronDown } from 'lucide-react';
 import { TenantCompany, SaasPlan } from '../SuperAdminBackoffice';
 import { RifValidator } from '@/utils/rif-validator';
+import { SAAS_ADDON_PRICING, PLAN_DEFAULT_MODULES, SAAS_PLAN_CODES, type SaasPlanCode } from '@/constants/domain-constants';
 
 interface ModuleSubmodule {
   key: string;
@@ -41,6 +42,15 @@ interface TenantModalProps {
   setMaxProducts: (v: number) => void;
   monthlyFee: number;
   setMonthlyFee: (v: number) => void;
+  basePlanPrice?: number;
+  hasCustomPricing?: boolean;
+  setHasCustomPricing?: (v: boolean) => void;
+  discountType?: 'FIXED' | 'PERCENTAGE';
+  setDiscountType?: (v: 'FIXED' | 'PERCENTAGE') => void;
+  discountValue?: number;
+  setDiscountValue?: (v: number) => void;
+  pricingNotes?: string;
+  setPricingNotes?: (v: string) => void;
   ownerName: string;
   setOwnerName: (v: string) => void;
   ownerEmail: string;
@@ -84,6 +94,15 @@ export const TenantModal: React.FC<TenantModalProps> = ({
   setMaxProducts,
   monthlyFee,
   setMonthlyFee,
+  basePlanPrice = 25,
+  hasCustomPricing = false,
+  setHasCustomPricing,
+  discountType = 'FIXED',
+  setDiscountType,
+  discountValue = 0,
+  setDiscountValue,
+  pricingNotes = '',
+  setPricingNotes,
   ownerName,
   setOwnerName,
   ownerEmail,
@@ -193,7 +212,7 @@ export const TenantModal: React.FC<TenantModalProps> = ({
                     placeholder="nuestrosaman"
                     value={subdomain}
                     onChange={(e) => setSubdomain(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800 text-xs focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none lowercase"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none lowercase"
                   />
                 </div>
               </div>
@@ -209,38 +228,44 @@ export const TenantModal: React.FC<TenantModalProps> = ({
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
                     Plan de Suscripción
                   </label>
-                  <select
-                    value={plan}
-                    onChange={(e) => onSelectPlan(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-bold focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                  >
-                    {saasPlans.length > 0 ? (
-                      saasPlans.map(p => (
-                        <option key={p.id} value={p.code}>
-                          {p.name} (${Number(p.monthly_fee_usd || 0).toFixed(2)}/mes - {p.max_users} Usuarios)
-                        </option>
-                      ))
-                    ) : (
-                      <>
-                        <option value="EMPRENDEDOR">Emprendedor ($15.00/mes)</option>
-                        <option value="COMERCIAL_PRO">Comercial Pro ($35.00/mes)</option>
-                        <option value="CORPORATIVO">Corporativo ($60.00/mes)</option>
-                      </>
-                    )}
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={plan}
+                      onChange={(e) => onSelectPlan(e.target.value)}
+                      className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none cursor-pointer appearance-none"
+                    >
+                      {saasPlans.length > 0 ? (
+                        saasPlans.map(p => (
+                          <option key={p.id} value={p.code}>
+                            {p.name} (${Number(p.monthly_fee_usd || 0).toFixed(2)}/mes — {p.max_users} Usuarios · {p.max_products >= 999999 ? 'Ilimitado' : `${p.max_products.toLocaleString('es-VE')} Prods`})
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="EMPRENDEDOR">Emprendedor ($25.00/mes — 2 Usuarios · 500 Prods · 1 Almacén)</option>
+                          <option value="COMERCIAL_PRO">Comercial Pro ($50.00/mes — 5 Usuarios · 5.000 Prods · 5 Almacenes)</option>
+                          <option value="CORPORATIVO">Corporativo ($120.00/mes — 50 Usuarios · Ilimitado · Nómina)</option>
+                        </>
+                      )}
+                    </select>
+                    <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
                     Estado de la Cuenta
                   </label>
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value as any)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-bold focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                  >
-                    <option value="ACTIVE">Activa</option>
-                    <option value="SUSPENDED">Inactiva (Suspendida)</option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={status}
+                      onChange={(e) => setStatus(e.target.value as any)}
+                      className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none cursor-pointer appearance-none"
+                    >
+                      <option value="ACTIVE">Activa (Acceso Total)</option>
+                      <option value="SUSPENDED">Inactiva (Suspendida)</option>
+                    </select>
+                    <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
@@ -280,11 +305,68 @@ export const TenantModal: React.FC<TenantModalProps> = ({
                       step="0.01"
                       value={monthlyFee}
                       onChange={(e) => setMonthlyFee(Number(e.target.value))}
-                      className="w-full pl-7 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                      className={`w-full pl-7 pr-3.5 py-2.5 border rounded-xl font-mono text-slate-800 text-sm focus:bg-white focus:ring-2 outline-none ${
+                        hasCustomPricing
+                          ? 'bg-amber-50/60 border-amber-300 focus:ring-amber-500/20 text-amber-900 font-bold'
+                          : 'bg-slate-50 border-slate-200 focus:ring-indigo-500/20'
+                      }`}
                     />
                   </div>
                 </div>
               </div>
+
+              {/* Sub-panel de Tarifa Especial y Descuento Personalizado (Luminous Theme) */}
+              {setHasCustomPricing && (
+                <div className={`p-4 rounded-xl border transition-all ${
+                  hasCustomPricing 
+                    ? 'bg-gradient-to-br from-amber-50/70 via-white to-orange-50/40 border-amber-200 shadow-2xs' 
+                    : 'bg-slate-50/60 border-slate-200/70'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={hasCustomPricing}
+                        onChange={(e) => setHasCustomPricing(e.target.checked)}
+                        className="w-4 h-4 text-indigo-600 rounded-md border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                      />
+                      <span className="text-xs font-bold text-slate-800">
+                        Aplicar Tarifa Especial / Descuento Personalizado
+                      </span>
+                    </label>
+                    {hasCustomPricing && (
+                      <span className="text-[10px] font-bold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-md border border-amber-200">
+                        Tarifa Negociada Activa
+                      </span>
+                    )}
+                  </div>
+
+                  {hasCustomPricing && (
+                    <div className="mt-3.5 pt-3 border-t border-amber-200/60 space-y-3 animate-in fade-in duration-150">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                            Motivo / Justificación Comercial *
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ej. Convenio Aliado / Cliente Fundador"
+                            value={pricingNotes}
+                            onChange={(e) => setPricingNotes && setPricingNotes(e.target.value)}
+                            className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-slate-800 text-xs focus:ring-2 focus:ring-amber-500/20 outline-none"
+                          />
+                        </div>
+                        <div className="flex flex-col justify-end">
+                          <div className="p-2.5 bg-white/90 border border-slate-200/80 rounded-lg flex items-center justify-between">
+                            <span className="text-xs text-slate-500 font-medium">Precio Lista Base:</span>
+                            <span className="text-xs font-mono font-bold text-slate-700">${Number(basePlanPrice).toFixed(2)}/mes</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Contact Information & Initial Password */}
@@ -448,6 +530,24 @@ export const TenantModal: React.FC<TenantModalProps> = ({
                             {group.label}
                           </span>
                           <div className="flex items-center gap-2">
+                            {moduleEnabled && (() => {
+                              const planCodeTyped = (plan as SaasPlanCode) || SAAS_PLAN_CODES.EMPRENDEDOR;
+                              const planObj = saasPlans.find(p => p.code === plan);
+                              const defaultMods = planObj?.enabled_modules && planObj.enabled_modules.length > 0
+                                ? planObj.enabled_modules
+                                : (PLAN_DEFAULT_MODULES[planCodeTyped] || ['POS', 'INVENTORY_PURCHASES', 'INVENTORY', 'BANKS', 'SETTINGS']);
+                              const isAddon = !defaultMods.includes(group.key);
+
+                              return isAddon ? (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-200">
+                                  Add-on (+${(SAAS_ADDON_PRICING[group.key] || 10).toFixed(2)}/mes)
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-700">
+                                  En Plan
+                                </span>
+                              );
+                            })()}
                             {moduleEnabled && enabledSubCount > 0 && (
                               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${c.badge}`}>
                                 {enabledSubCount}/{group.submodules.length}

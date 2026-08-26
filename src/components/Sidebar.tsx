@@ -68,7 +68,7 @@ const menuConfig = [
       {
         label: 'Compras',
         icon: Building2,
-        module: 'INVENTORY',
+        module: 'INVENTORY_PURCHASES',
         tenantOnly: true,
         children: [
           { label: 'Órdenes de Compra', icon: FileText, href: '/inventory/purchases/orders', permission: 'purchases:orders' },
@@ -245,15 +245,17 @@ export default function Sidebar() {
   }).filter(Boolean);
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-slate-900 text-slate-300 border-r border-slate-800 transition-all duration-300 flex flex-col" >
-      <div className="flex h-16 items-center justify-center px-6 bg-white border-b border-slate-200 shrink-0">
-        <img src="/logo-arisoft.png" alt="ARI Soft Logo" className="h-10 w-auto object-contain" />
+    <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-[#071D33] text-slate-300 border-r border-[#0B2C4D]/80 transition-all duration-300 flex flex-col shadow-2xl" >
+      <div className="flex h-16 items-center justify-center px-4 bg-white border-b border-slate-200 shrink-0 shadow-xs">
+        <Link href="/" className="flex items-center justify-center">
+          <img src="/logo.png" alt="Arivsoft Solutions Logo" className="h-10 w-auto object-contain max-w-[200px]" />
+        </Link>
       </div>
 
-      <div className="flex-1 overflow-y-auto py-4 px-4 space-y-4 min-h-0 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto py-4 px-3.5 space-y-4 min-h-0 custom-scrollbar">
         {filteredMenu.map((group: any) => (
           <div key={group.title} className="space-y-1.5">
-            <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <h3 className="px-2.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
               {group.title}
             </h3>
             <div className="space-y-1">
@@ -264,22 +266,25 @@ export default function Sidebar() {
                       <button
                         onClick={() => toggleMenu(item.label)}
                         className={cn(
-                          "flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200 ease-in-out hover:bg-slate-800 hover:text-white",
-                          openMenus.includes(item.label) && "bg-slate-800 text-white"
+                          "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs font-semibold transition-all duration-200 ease-in-out hover:bg-[#0B2C4D] hover:text-white cursor-pointer",
+                          openMenus.includes(item.label) ? "bg-[#0B2C4D] text-white shadow-xs" : "text-slate-300"
                         )}
                       >
                         <div className="flex items-center">
-                          <item.icon className="mr-3 h-5 w-5 text-primary-400" />
-                          {item.label}
+                          <item.icon className={cn(
+                            "mr-2.5 h-4 w-4 transition-colors",
+                            openMenus.includes(item.label) ? "text-emerald-400" : "text-slate-400"
+                          )} />
+                          <span>{item.label}</span>
                         </div>
                         <ChevronDown className={cn(
-                          "h-4 w-4 transition-transform duration-200",
-                          openMenus.includes(item.label) && "rotate-180"
+                          "h-3.5 w-3.5 text-slate-400 transition-transform duration-200",
+                          openMenus.includes(item.label) && "rotate-180 text-emerald-400"
                         )} />
                       </button>
                       <div className={cn(
-                        "mt-1 space-y-1 overflow-hidden transition-all duration-300 ease-in-out pl-6",
-                        openMenus.includes(item.label) ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
+                        "mt-1 space-y-0.5 overflow-hidden transition-all duration-300 ease-in-out pl-4",
+                        openMenus.includes(item.label) ? "max-h-[500px] opacity-100 py-1" : "max-h-0 opacity-0"
                       )}>
                         {item.children.map((sub: any) => {
                           const isSubActive = pathname === sub.href;
@@ -289,14 +294,19 @@ export default function Sidebar() {
                               href={sub.href}
                               onClick={(e) => handleRestrictedNavigation(e, sub.label, sub.href)}
                               className={cn(
-                                "flex items-center rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-200 ease-in-out hover:translate-x-0.5",
+                                "flex items-center rounded-lg px-2.5 py-2 text-xs font-medium transition-all duration-200 ease-in-out hover:translate-x-0.5 group relative",
                                 isSubActive
-                                  ? "text-indigo-300 bg-slate-800 font-bold animate-in fade-in duration-200"
-                                  : "text-slate-400 hover:text-indigo-300 hover:bg-slate-800/60"
+                                  ? "text-emerald-300 bg-[#0B2C4D] font-bold shadow-xs border-l-2 border-emerald-400"
+                                  : "text-slate-400 hover:text-white hover:bg-[#0B2C4D]/60"
                               )}
                             >
-                              {sub.icon && <sub.icon className={cn("mr-2.5 h-4 w-4 shrink-0", isSubActive ? "text-indigo-300" : "text-indigo-400")} />}
-                              {sub.label}
+                              {sub.icon && (
+                                <sub.icon className={cn(
+                                  "mr-2 h-3.5 w-3.5 shrink-0 transition-colors",
+                                  isSubActive ? "text-emerald-400" : "text-slate-400 group-hover:text-emerald-300"
+                                )} />
+                              )}
+                              <span>{sub.label}</span>
                             </Link>
                           );
                         })}
@@ -307,14 +317,17 @@ export default function Sidebar() {
                       href={item.href}
                       onClick={(e) => handleRestrictedNavigation(e, item.label, item.href)}
                       className={cn(
-                        "flex items-center rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200 ease-in-out hover:bg-slate-800 hover:text-white hover:translate-x-0.5",
+                        "flex items-center rounded-xl px-3 py-2.5 text-xs font-semibold transition-all duration-200 ease-in-out hover:bg-[#0B2C4D] hover:text-white hover:translate-x-0.5 group",
                         pathname === item.href
-                          ? "bg-slate-800 text-white font-bold"
-                          : "text-slate-350"
+                          ? "bg-[#0B2C4D] text-emerald-300 font-bold shadow-xs border-l-2 border-emerald-400"
+                          : "text-slate-300"
                       )}
                     >
-                      <item.icon className="mr-3 h-5 w-5 text-primary-400" />
-                      {item.label}
+                      <item.icon className={cn(
+                        "mr-2.5 h-4 w-4 transition-colors",
+                        pathname === item.href ? "text-emerald-400" : "text-slate-400 group-hover:text-emerald-300"
+                      )} />
+                      <span>{item.label}</span>
                     </Link>
                   )}
                 </div>
@@ -324,20 +337,22 @@ export default function Sidebar() {
         ))}
       </div>
 
-      <div className="p-4 border-t border-slate-800 bg-slate-900 shrink-0">
-        <div className="flex items-center px-2 mb-4">
-          <UserCircle className="h-8 w-8 text-primary-400 mr-3" />
-          <div className="flex flex-col">
-            <span className="text-sm font-medium text-white truncate w-32">{user?.full_name || 'Cargando...'}</span>
-            <span className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">{user?.role || 'User'}</span>
+      <div className="p-3.5 border-t border-[#0B2C4D] bg-[#051627] shrink-0">
+        <div className="flex items-center px-1 mb-3">
+          <div className="p-1 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 mr-2.5">
+            <UserCircle className="h-6 w-6" />
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs font-bold text-white truncate w-36">{user?.full_name || 'Cargando...'}</span>
+            <span className="text-[10px] text-emerald-400 uppercase font-black tracking-wider">{user?.role || 'User'}</span>
           </div>
         </div>
 
         <button
           onClick={logout}
-          className="flex w-full items-center justify-center rounded-xl bg-slate-800/80 px-4 py-2.5 text-xs font-semibold text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition-all duration-200 border border-slate-700/50 cursor-pointer"
+          className="flex w-full items-center justify-center rounded-xl bg-[#0B2C4D]/60 hover:bg-rose-950/40 hover:border-rose-900/60 px-3 py-2 text-xs font-bold text-rose-300 hover:text-rose-200 transition-all duration-200 border border-[#0B2C4D] cursor-pointer"
         >
-          <LogOut className="mr-2 h-4 w-4" />
+          <LogOut className="mr-2 h-3.5 w-3.5" />
           Cerrar Sesión
         </button>
       </div>

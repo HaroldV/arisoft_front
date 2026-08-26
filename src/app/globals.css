@@ -10,11 +10,19 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --color-brand-navy: #0B2C4D;
+  --color-brand-navy-light: #123D66;
+  --color-brand-navy-dark: #071D33;
+  --color-brand-emerald: #10B981;
+  --color-brand-emerald-light: #34D399;
+  --color-brand-emerald-dark: #059669;
+  --color-brand-cyan: #06B6D4;
+  --color-brand-teal: #0D9488;
   --color-primary-50: #eff6ff;
   --color-primary-100: #dbeafe;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
+  --color-primary-500: #0B2C4D;
+  --color-primary-600: #071D33;
+  --color-primary-700: #051627;
 }
 
 @media (prefers-color-scheme: dark) {

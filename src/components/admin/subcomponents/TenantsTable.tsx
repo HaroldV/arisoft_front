@@ -252,8 +252,17 @@ export const TenantsTable: React.FC<TenantsTableProps> = ({
                   <td className="py-3.5 px-4 text-center font-mono font-bold text-slate-800">
                     {t.product_count} / {t.max_products}
                   </td>
-                  <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">
-                    ${Number(t.monthly_fee_usd || 0).toFixed(2)}
+                  <td className="py-3.5 px-4 text-right font-mono">
+                    <div className="flex flex-col items-end">
+                      <span className="font-bold text-slate-900 text-sm">
+                        ${Number(t.monthly_fee_usd || 0).toFixed(2)}
+                      </span>
+                      {t.has_custom_pricing && (
+                        <span className="text-[9px] font-sans font-bold text-amber-700 bg-amber-50 border border-amber-200/80 px-1.5 py-0.2 rounded mt-0.5" title={t.pricing_notes || 'Tarifa especial negociada'}>
+                          Especial
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3.5 px-4 text-center">
                     <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
