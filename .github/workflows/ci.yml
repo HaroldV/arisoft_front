@@ -35,8 +35,8 @@ jobs:
 
       - name: 3. Next.js Production Build
         env:
-          NEXT_PUBLIC_API_URL: https://backend-production-c3aa.up.railway.app
-          NEXT_PUBLIC_SAAS_DOMAIN: erparisoft.com
-          NEXT_PUBLIC_DEFAULT_BCV_RATE: 36.50
-          NEXT_PUBLIC_APP_NAME: ARI ERP
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || secrets.NEXT_PUBLIC_API_URL || 'https://backend-production-c3aa.up.railway.app' }}
+          NEXT_PUBLIC_SAAS_DOMAIN: ${{ vars.NEXT_PUBLIC_SAAS_DOMAIN || 'erparisoft.com' }}
+          NEXT_PUBLIC_DEFAULT_BCV_RATE: ${{ vars.NEXT_PUBLIC_DEFAULT_BCV_RATE || '36.50' }}
+          NEXT_PUBLIC_APP_NAME: ${{ vars.NEXT_PUBLIC_APP_NAME || 'ARI ERP' }}
         run: npm run build
