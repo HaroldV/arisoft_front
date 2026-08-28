@@ -38,7 +38,7 @@ export default function ChangePasswordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isFormValid) return;
+    if (!isFormValid || isLoading) return;
 
     setIsLoading(true);
     setError(null);
@@ -46,21 +46,22 @@ export default function ChangePasswordPage() {
 
     try {
       await apiClient.post('/auth/change-password', { newPassword });
-      setSuccessMessage('¡Contraseña actualizada exitosamente! Redirigiendo...');
+      setSuccessMessage('¡Contraseña actualizada exitosamente! Redirigiendo a tu espacio de trabajo...');
       
       updateUser({ must_change_password: false });
 
+      // Direct hard redirect to ensure cookies, session state and layout guards re-evaluate cleanly
       setTimeout(() => {
-        if (user?.role === 'SUPER_ADMIN') {
-          router.push('/admin');
+        const destination = user?.role === 'SUPER_ADMIN' ? '/admin' : '/';
+        if (typeof window !== 'undefined') {
+          window.location.href = destination;
         } else {
-          router.push('/');
+          router.replace(destination);
         }
-      }, 1500);
+      }, 1000);
     } catch (err: any) {
       console.error('Error changing password:', err);
       setError(err?.response?.data?.message || 'No se pudo actualizar la contraseña. Intenta nuevamente.');
-    } finally {
       setIsLoading(false);
     }
   };
