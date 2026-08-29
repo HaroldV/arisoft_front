@@ -6,9 +6,15 @@ import { useAuth } from '@/context/AuthContext';
 import Sidebar from "@/components/Sidebar";
 import SandboxBanner from "@/components/SandboxBanner";
 import { SubscriptionBlockedModal } from "@/components/modals/SubscriptionBlockedModal";
-import { Bell, Wifi, WifiOff, ChevronRight, Home, DollarSign, Euro } from 'lucide-react';
+import { Bell, Wifi, WifiOff, ChevronRight, Home, DollarSign, Euro, Menu } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import Link from 'next/link';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 export default function DashboardLayout({
   children,
@@ -18,11 +24,38 @@ export default function DashboardLayout({
   const { user, isLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
   const [bcvUsdRate, setBcvUsdRate] = useState<number>(772.54);
   const [bcvEurRate, setBcvEurRate] = useState<number>(894.49);
   const [currencyMode, setCurrencyMode] = useState<string>('BCV');
   const [manualRate, setManualRate] = useState<number>(780.00);
+
+  // En pantallas móviles/tablets (< 1024px), inicializar cerrado
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setIsSidebarOpen(false);
+    }
+  }, []);
+
+  // En pantallas móviles/tablets (< 1024px), cerrar automáticamente al navegar
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setIsSidebarOpen(false);
+    }
+  }, [pathname]);
+
+  // Bloquear el scroll del body en móviles/tablets cuando el menú esté desplegado
+  useEffect(() => {
+    if (isSidebarOpen && typeof window !== 'undefined' && window.innerWidth < 1024) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isSidebarOpen]);
 
   // Mapeo amigable de rutas para el Breadcrumb
   const getBreadcrumbItems = () => {
@@ -232,53 +265,72 @@ export default function DashboardLayout({
 
   return (
     <div className="bg-slate-50 min-h-screen">
-      <Sidebar />
-      <div className="sm:ml-64 flex flex-col min-h-screen">
+      <Sidebar 
+        isOpen={isSidebarOpen} 
+        onClose={() => setIsSidebarOpen(false)} 
+        onToggle={() => setIsSidebarOpen(prev => !prev)} 
+      />
+      <div className={cn(
+        "flex flex-col min-h-screen transition-all duration-300 ease-in-out",
+        isSidebarOpen ? "lg:ml-64" : "ml-0"
+      )}>
         <SandboxBanner />
-        {/* Top Header con Breadcrumb y Monitor de Divisas Proporcional */}
-        <header className="h-16 bg-white border-b border-slate-200/80 flex items-center justify-between px-6 sm:px-8 sticky top-0 z-30 shadow-2xs">
+        {/* Top Header con Breadcrumb y Monitor de Divisas Proporcional y Responsivo */}
+        <header className="h-16 bg-white border-b border-slate-200/80 flex items-center justify-between px-3 sm:px-6 lg:px-8 sticky top-0 z-30 shadow-2xs gap-2 min-w-0">
           
-          {/* 🧭 Breadcrumb Dinámico (Guía de Ubicación del Usuario) */}
-          <nav className="flex items-center gap-1.5 text-xs text-slate-500 overflow-x-auto py-1 scrollbar-hide mr-4">
-            <Link 
-              href="/" 
-              className="flex items-center gap-1 font-semibold text-slate-400 hover:text-[#0B2C4D] transition-colors shrink-0"
-              title="Ir al Inicio"
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            {/* Botón Toggle en Cabecera (Accesible en todos los dispositivos) */}
+            <button
+              onClick={() => setIsSidebarOpen(prev => !prev)}
+              className="p-2 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50/80 active:scale-95 transition-all border border-slate-200/80 shadow-2xs cursor-pointer shrink-0 flex items-center justify-center group"
+              aria-label="Alternar menú de navegación"
+              title={isSidebarOpen ? "Colapsar menú lateral" : "Expandir menú lateral"}
             >
-              <Home className="w-3.5 h-3.5 text-slate-400" />
-            </Link>
+              <Menu className="w-4.5 h-4.5 text-slate-600 group-hover:text-indigo-600 transition-colors" />
+            </button>
 
-            {breadcrumbs.slice(1).map((crumb, idx) => {
-              const isLast = idx === breadcrumbs.slice(1).length - 1;
-              return (
-                <div key={crumb.href + idx} className="flex items-center gap-1.5 shrink-0">
-                  <ChevronRight className="w-3 h-3 text-slate-300 stroke-[2.5]" />
-                  {isLast ? (
-                    <span className="font-bold text-slate-800 bg-slate-100/80 px-2 py-0.5 rounded-md truncate max-w-[220px]">
-                      {crumb.label}
-                    </span>
-                  ) : (
-                    <Link 
-                      href={crumb.href} 
-                      className="font-medium text-slate-500 hover:text-[#0B2C4D] transition-colors"
-                    >
-                      {crumb.label}
-                    </Link>
-                  )}
-                </div>
-              );
-            })}
-          </nav>
+            {/* 🧭 Breadcrumb Dinámico Adaptativo */}
+            <nav className="flex items-center gap-1 sm:gap-1.5 text-xs text-slate-500 overflow-x-auto py-1 scrollbar-hide min-w-0">
+              <Link 
+                href="/" 
+                className="flex items-center gap-1 font-semibold text-slate-400 hover:text-[#0B2C4D] transition-colors shrink-0"
+                title="Ir al Inicio"
+              >
+                <Home className="w-3.5 h-3.5 text-slate-400" />
+              </Link>
 
-          {/* 💱 Monitor Dual de Divisas (Diseño Ergonómico, Proporcional & Refinado) */}
-          <div className="flex items-center space-x-3 shrink-0">
+              {breadcrumbs.slice(1).map((crumb, idx) => {
+                const isLast = idx === breadcrumbs.slice(1).length - 1;
+                return (
+                  <div key={crumb.href + idx} className="flex items-center gap-1 sm:gap-1.5 shrink-0 min-w-0">
+                    <ChevronRight className="w-3 h-3 text-slate-300 stroke-[2.5] shrink-0" />
+                    {isLast ? (
+                      <span className="font-bold text-slate-800 bg-slate-100/80 px-2 py-0.5 rounded-md truncate max-w-[110px] xs:max-w-[150px] sm:max-w-[200px] md:max-w-none">
+                        {crumb.label}
+                      </span>
+                    ) : (
+                      <Link 
+                        href={crumb.href} 
+                        className="font-medium text-slate-500 hover:text-[#0B2C4D] transition-colors truncate max-w-[80px] xs:max-w-[120px] sm:max-w-none hidden sm:inline"
+                      >
+                        {crumb.label}
+                      </Link>
+                    )}
+                  </div>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* 💱 Monitor Dual de Divisas & Perfil (Diseño Responsivo) */}
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <Link 
               href="/settings/company" 
-              className="flex items-center gap-1.5 select-none group cursor-pointer bg-slate-50 hover:bg-slate-100/80 p-1 rounded-xl border border-slate-200/70 transition-all"
+              className="flex items-center gap-1 select-none group cursor-pointer bg-slate-50 hover:bg-slate-100/80 p-1 rounded-xl border border-slate-200/70 transition-all"
               title="Tasas oficiales vigentes del BCV. Clic para configurar."
             >
               {/* Badge Tasa USD */}
-              <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-emerald-100 text-emerald-800 shadow-2xs group-hover:border-emerald-200 transition-all">
+              <div className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg bg-white border border-emerald-100 text-emerald-800 shadow-2xs group-hover:border-emerald-200 transition-all">
                 <span className="text-[10px] font-black text-emerald-600">$</span>
                 <span className="font-mono text-xs font-black text-slate-800">
                   {currencyMode === 'MANUAL' ? manualRate.toFixed(2) : bcvUsdRate.toFixed(2)}
@@ -288,8 +340,8 @@ export default function DashboardLayout({
                 </span>
               </div>
 
-              {/* Badge Tasa EUR */}
-              <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-teal-100 text-teal-800 shadow-2xs group-hover:border-teal-200 transition-all">
+              {/* Badge Tasa EUR (oculto en pantallas muy pequeñas para no saturar el header) */}
+              <div className="hidden xs:flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg bg-white border border-teal-100 text-teal-800 shadow-2xs group-hover:border-teal-200 transition-all">
                 <span className="text-[10px] font-black text-teal-600">€</span>
                 <span className="font-mono text-xs font-black text-slate-800">
                   {bcvEurRate.toFixed(2)}
@@ -302,24 +354,24 @@ export default function DashboardLayout({
 
             {/* Offline Alert Badge if connection lost */}
             {!isOnline && (
-              <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold animate-pulse">
+              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold animate-pulse">
                 <WifiOff className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Offline</span>
+                <span className="hidden md:inline">Offline</span>
               </div>
             )}
 
             <button 
-              className="p-2 text-slate-400 hover:text-[#0B2C4D] hover:bg-slate-100 rounded-xl transition-all relative cursor-pointer"
+              className="p-1.5 sm:p-2 text-slate-400 hover:text-[#0B2C4D] hover:bg-slate-100 rounded-xl transition-all relative cursor-pointer"
               title="Notificaciones del Sistema"
             >
               <Bell className="h-4 w-4" />
-              <span className="absolute top-2 right-2 h-1.5 w-1.5 bg-emerald-500 rounded-full"></span>
+              <span className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 h-1.5 w-1.5 bg-emerald-500 rounded-full"></span>
             </button>
 
-            <div className="h-6 w-px bg-slate-200"></div>
+            <div className="h-5 sm:h-6 w-px bg-slate-200"></div>
 
             <div className="flex items-center cursor-pointer group" title={user.full_name}>
-              <div className="h-8 w-8 rounded-xl bg-slate-100 group-hover:bg-indigo-50 flex items-center justify-center text-[#0B2C4D] font-black text-xs border border-slate-200 group-hover:border-indigo-300 transition-all shadow-2xs">
+              <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-xl bg-slate-100 group-hover:bg-indigo-50 flex items-center justify-center text-[#0B2C4D] font-black text-xs border border-slate-200 group-hover:border-indigo-300 transition-all shadow-2xs">
                 {getInitials(user.full_name)}
               </div>
             </div>
@@ -327,8 +379,8 @@ export default function DashboardLayout({
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 p-8">
-          <div className="max-w-[1600px] mx-auto">
+        <main className="flex-1 p-3.5 sm:p-6 lg:p-8 min-w-0 w-full overflow-x-hidden">
+          <div className="max-w-[1600px] mx-auto min-w-0 w-full">
             {children}
           </div>
         </main>

@@ -1,0 +1,42 @@
+name: Frontend CI & Quality Gate
+
+on:
+  push:
+    branches: [ develop, main ]
+  pull_request:
+    branches: [ develop, main ]
+
+jobs:
+  frontend-quality:
+    name: Frontend Quality Gate (Types, Lint, Build & Clean Code)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: 1. Strict TypeScript Typecheck
+        run: npx tsc --noEmit
+
+      - name: 2. ESLint UI & Best Practices
+        run: npm run lint
+
+      - name: 3. Next.js Production Build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_SAAS_DOMAIN: ${{ vars.NEXT_PUBLIC_SAAS_DOMAIN }}
+          NEXT_PUBLIC_DEFAULT_BCV_RATE: ${{ vars.NEXT_PUBLIC_DEFAULT_BCV_RATE }}
+          NEXT_PUBLIC_APP_NAME: ${{ vars.NEXT_PUBLIC_APP_NAME }}
+        run: npm run build

@@ -99,9 +99,10 @@ export const AddonPricingTable: React.FC<AddonPricingTableProps> = ({ masterBcvR
 
       {/* Tabla Desglosada por Módulos y Submódulos */}
       <div className="rounded-xl border border-slate-200/80 overflow-hidden bg-white shadow-2xs">
-        <table className="w-full text-left text-xs">
-          <thead className="bg-slate-50/90 border-b border-slate-200/70 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
-            <tr>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50/90 border-b border-slate-200/70 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
+              <tr>
               <th className="py-3 px-4">Módulo / Submódulo Específico</th>
               <th className="py-3 px-4">Clave del Permiso</th>
               <th className="py-3 px-4 text-center">Tipo de Add-on</th>
@@ -182,6 +183,7 @@ export const AddonPricingTable: React.FC<AddonPricingTableProps> = ({ masterBcvR
             })}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
