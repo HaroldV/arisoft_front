@@ -161,21 +161,21 @@ export default function NewPurchasePage() {
 
   // Autofill receiving WMS default values when locations are loaded
   useEffect(() => {
-    if (locations.length > 0 && items.length === 1 && items[0].productId === '') {
+    if (locations.length > 0) {
       const defaultWarehouseId = locations[0]?.id || '';
       const defaultSubLocations = locations[0]?.children || [];
       const defaultLocationId = defaultSubLocations[0]?.id || defaultWarehouseId;
 
-      setItems([{
-        productId: '',
-        quantity: 1,
-        unitCostUsd: 0.00,
-        warehouseId: defaultWarehouseId,
-        locationId: defaultLocationId,
-        batchNumber: '',
-        productionDate: '',
-        expirationDate: ''
-      }]);
+      setItems(prev => {
+        if (prev.length === 1 && prev[0].productId === '') {
+          return [{
+            ...prev[0],
+            warehouseId: defaultWarehouseId,
+            locationId: defaultLocationId,
+          }];
+        }
+        return prev;
+      });
     }
   }, [locations]);
 
