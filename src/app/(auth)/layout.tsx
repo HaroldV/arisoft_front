@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import { Layers, TrendingUp, MessageSquareQuote } from 'lucide-react';
 
 export default function AuthLayout({
@@ -24,7 +25,7 @@ export default function AuthLayout({
         {/* Header con Logo Arivsoft */}
         <div className="relative z-10">
           <div className="inline-flex items-center gap-3 bg-white px-4 py-2 rounded-2xl shadow-md">
-            <img src="/logo.png" alt="Arivsoft Solutions Logo" className="h-8 w-auto object-contain" />
+            <Image src="/logo.png" alt="Arivsoft Solutions Logo" width={120} height={32} className="h-8 w-auto object-contain" priority />
             <span className="text-xs font-bold uppercase tracking-widest text-slate-500 border-l border-slate-200 pl-3">ERP ARI</span>
           </div>
         </div>

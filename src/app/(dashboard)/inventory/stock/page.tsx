@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import { ActionTooltip } from '@/components/ActionTooltip';
+import Link from 'next/link';
 
 interface Product {
   id: string;
@@ -397,6 +398,13 @@ export default function StockPage() {
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Listado de Productos</h1>
           <p className="text-slate-500">Listado de todos los productos creados con sus niveles de stock y valoración en tiempo real.</p>
         </div>
+        <Link
+          href="/inventory/initial"
+          className="flex items-center gap-1.5 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-primary-600/10 hover:shadow-lg cursor-pointer"
+        >
+          <Plus className="h-4.5 w-4.5" />
+          Registrar Producto
+        </Link>
       </div>
 
       {error && (

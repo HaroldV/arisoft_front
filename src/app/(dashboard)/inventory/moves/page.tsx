@@ -77,7 +77,7 @@ export default function MovesPage() {
   const [formSourceLocationId, setFormSourceLocationId] = useState('');
   const [formDestLocationId, setFormDestLocationId] = useState('');
 
-  const fetchMoves = async () => {
+  const fetchMoves = React.useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -93,7 +93,7 @@ export default function MovesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedProduct, selectedType, startDate, endDate]);
 
   const fetchProducts = async () => {
     try {
@@ -120,7 +120,7 @@ export default function MovesPage() {
 
   useEffect(() => {
     fetchMoves();
-  }, [selectedProduct, selectedType, startDate, endDate]);
+  }, [fetchMoves]);
 
   // Build flat hierarchical options list
   const buildHierarchicalOptions = (nodes: LocationNode[], level = 0): { id: string; name: string }[] => {
