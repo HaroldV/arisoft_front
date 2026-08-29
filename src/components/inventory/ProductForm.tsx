@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import { SearchableSelect } from '@/components/SearchableSelect';
+import Link from 'next/link';
 
 interface Variation {
   name: string;
@@ -322,11 +323,11 @@ export const ProductForm: React.FC = () => {
         taxType: taxType,
         isPerishable: isPerishable,
         hasBatchControl: hasBatchControl,
-        batchNumber: undefined,
-        productionDate: undefined,
-        expirationDate: undefined,
-        locationId: undefined,
-        initialStock: 0,
+        batchNumber: hasBatchControl && batchNumber.trim() ? batchNumber.trim() : undefined,
+        productionDate: productionDate || undefined,
+        expirationDate: expirationDate || undefined,
+        locationId: selectedSubLocationId || selectedWarehouseId || undefined,
+        initialStock: Number(formData.initialStock) || 0,
         unitOfMeasure: formData.unitOfMeasure.trim(),
         category: formData.categoryId ? undefined : formData.category.trim(),
         categoryId: formData.categoryId || undefined,
@@ -394,11 +395,27 @@ export const ProductForm: React.FC = () => {
       </div>
 
       {success && (
-        <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-100 flex items-start gap-3 text-emerald-800 text-sm animate-in fade-in slide-in-from-top-1 duration-200">
-          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500 mt-0.5" />
-          <div>
-            <p className="font-semibold text-emerald-950">¡Producto Registrado!</p>
-            <p className="text-xs text-emerald-700 mt-0.5">El producto y su movimiento de stock de apertura fueron guardados con éxito.</p>
+        <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-emerald-800 text-sm animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500 mt-0.5" />
+            <div>
+              <p className="font-semibold text-emerald-950">¡Producto Registrado con Éxito!</p>
+              <p className="text-xs text-emerald-700 mt-0.5">El producto se encuentra disponible de inmediato en el Catálogo de Stock y en el POS de Ventas.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href="/inventory/stock"
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-all shadow-xs"
+            >
+              Ver en Stock
+            </Link>
+            <Link
+              href="/pos"
+              className="px-3 py-1.5 bg-white hover:bg-emerald-100/60 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-semibold transition-all shadow-2xs"
+            >
+              Ir al POS
+            </Link>
           </div>
         </div>
       )}
@@ -708,12 +725,28 @@ export const ProductForm: React.FC = () => {
           </div>
         )}
 
-        <div className="md:col-span-2 p-4 rounded-xl bg-indigo-50 border border-indigo-100 flex items-start gap-3 text-indigo-800 text-xs my-1">
+        <div>
+          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Stock Inicial (Apertura)</label>
+          <div className="relative">
+            <Package className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
+            <input
+              type="number"
+              step="1"
+              min="0"
+              placeholder="0"
+              className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm placeholder-slate-400 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200"
+              value={formData.initialStock === 0 ? '' : formData.initialStock}
+              onChange={(e) => setFormData({ ...formData, initialStock: Number(e.target.value) || 0 })}
+            />
+          </div>
+        </div>
+
+        <div className="md:col-span-2 p-4 rounded-xl bg-indigo-50/80 border border-indigo-100 flex items-start gap-3 text-indigo-800 text-xs my-1">
           <AlertCircle className="h-5 w-5 shrink-0 text-indigo-500 mt-0.5" />
           <div className="flex-1 space-y-1">
-            <p className="font-bold text-indigo-950">Cumplimiento de Auditoría WMS</p>
+            <p className="font-bold text-indigo-950">Gestión y Apertura de Inventario</p>
             <p className="leading-relaxed">
-              El stock inicial del producto se registrará en cero (0) de manera predeterminada. Para valorizar existencias e ingresar stock físico a las ubicaciones del almacén, asocie este producto a un registro de compra oficial en la sección de <a href="/inventory/purchases/new" className="font-bold underline text-indigo-700 hover:text-indigo-900">Registrar Compra</a>.
+              Puedes indicar un <strong>Stock Inicial</strong> de apertura ahora mismo (se asignará automáticamente al Almacén Principal si no seleccionas una ubicación), o dejarlo en 0 e ingresar mercadería formalmente mediante <Link href="/inventory/purchases/new" className="font-bold underline text-indigo-700 hover:text-indigo-900">Registrar Compra</Link>.
             </p>
           </div>
         </div>

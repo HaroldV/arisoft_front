@@ -20,9 +20,11 @@ import {
   Percent,
   X,
   MapPin,
-  Calendar
+  Calendar,
+  Warehouse
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
+import { SearchableSelect } from '@/components/SearchableSelect';
 
 interface Provider {
   id: string;
@@ -281,15 +283,17 @@ export default function NewPurchasePage() {
 
     try {
       const response = await apiClient.post('/inventory/products', [payload]);
-      const createdProd = response.data[0];
+      const createdItem = response.data?.success?.[0] || (Array.isArray(response.data) ? response.data[0] : null);
+      const createdProductId = createdItem?.productId || createdItem?.id;
 
       // Refresh product list
       const productsRes = await apiClient.get('/inventory/products');
-      setProducts(productsRes.data);
+      const updatedProducts = Array.isArray(productsRes.data) ? productsRes.data : (productsRes.data?.items || []);
+      setProducts(updatedProducts);
 
       // Auto-assign created product to the active row
-      if (activeItemIndexForProductCreation !== null && createdProd) {
-        handleProductSelect(activeItemIndexForProductCreation, createdProd.id);
+      if (activeItemIndexForProductCreation !== null && createdProductId) {
+        handleProductSelect(activeItemIndexForProductCreation, createdProductId);
         handleItemChange(activeItemIndexForProductCreation, 'unitCostUsd', quickProductCost);
       }
 
@@ -426,20 +430,18 @@ export default function NewPurchasePage() {
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-5">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Proveedor</label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-              <select
-                required
-                className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 bg-white font-medium"
-                value={selectedProviderId}
-                onChange={(e) => setSelectedProviderId(e.target.value)}
-              >
-                <option value="">Seleccione proveedor...</option>
-                {providers.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
+            <SearchableSelect
+              icon={User}
+              value={selectedProviderId}
+              onChange={(val) => setSelectedProviderId(val)}
+              options={providers.map(p => ({
+                value: p.id,
+                label: p.name,
+                sublabel: p.tax_id ? `RIF: ${p.tax_id}` : undefined
+              }))}
+              placeholder="Buscar o seleccionar proveedor..."
+              required
+            />
           </div>
 
           <div>
@@ -485,6 +487,18 @@ export default function NewPurchasePage() {
             </button>
           </div>
 
+          {products.length === 0 && (
+            <div className="p-4 rounded-xl bg-amber-50 border border-amber-200/80 flex items-start gap-3 text-amber-900 text-xs animate-in fade-in duration-200">
+              <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="flex-1 space-y-1">
+                <p className="font-bold text-amber-950">Catálogo de productos vacío</p>
+                <p className="leading-relaxed text-slate-600">
+                  Aún no tienes productos registrados. Puedes crear tus productos directamente desde aquí haciendo clic en el botón <strong>"+"</strong> al lado del selector de productos, o registrarlos previamente en <a href="/inventory/initial" target="_blank" className="font-bold underline text-amber-700 hover:text-amber-900">Registrar Producto</a>.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-4">
             {items.map((item, index) => (
               <div key={index} className="border border-slate-100 p-4 rounded-2xl bg-slate-50/30 space-y-4 animate-in fade-in duration-200">
@@ -494,25 +508,25 @@ export default function NewPurchasePage() {
                   <div className="flex-1 w-full">
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Producto *</label>
                     <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <Package className="absolute left-3 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                        <select
-                          required
-                          className="block w-full pl-10 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 bg-white font-medium"
+                      <div className="flex-1 min-w-0">
+                        <SearchableSelect
+                          icon={Package}
                           value={item.productId}
-                          onChange={(e) => handleProductSelect(index, e.target.value)}
-                        >
-                          <option value="">Seleccione producto...</option>
-                          {products.map(p => (
-                            <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
-                          ))}
-                        </select>
+                          onChange={(val) => handleProductSelect(index, val)}
+                          options={products.map(p => ({
+                            value: p.id,
+                            label: p.name,
+                            sublabel: `SKU: ${p.sku}`
+                          }))}
+                          placeholder="Buscar o seleccionar producto..."
+                          required
+                        />
                       </div>
                       <button
                         type="button"
                         onClick={() => handleOpenQuickProductModal(index)}
                         title="Crear producto nuevo en catálogo"
-                        className="p-2 border border-slate-200 hover:border-indigo-500 hover:text-indigo-600 rounded-xl bg-slate-50 hover:bg-indigo-50/20 transition-all cursor-pointer flex items-center justify-center shrink-0"
+                        className="p-2.5 border border-slate-200 hover:border-indigo-500 hover:text-indigo-600 rounded-xl bg-slate-50 hover:bg-indigo-50/20 transition-all cursor-pointer flex items-center justify-center shrink-0"
                       >
                         <Plus className="h-4 w-4" />
                       </button>
@@ -527,7 +541,7 @@ export default function NewPurchasePage() {
                       required
                       min="1"
                       placeholder="0"
-                      className="block w-full p-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 text-right font-medium"
+                      className="block w-full p-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 text-right font-medium bg-slate-50/50 focus:bg-white"
                       value={item.quantity}
                       onChange={(e) => handleItemChange(index, 'quantity', Number(e.target.value))}
                     />
@@ -544,7 +558,7 @@ export default function NewPurchasePage() {
                         required
                         min="0"
                         placeholder="0.00"
-                        className="block w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 text-right font-medium"
+                        className="block w-full pl-8 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 text-right font-medium bg-slate-50/50 focus:bg-white"
                         value={item.unitCostUsd || ''}
                         onChange={(e) => handleItemChange(index, 'unitCostUsd', Number(e.target.value))}
                       />
@@ -569,27 +583,23 @@ export default function NewPurchasePage() {
                     <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
                       Almacén de Destino {locations.length > 0 ? '*' : '(Se auto-creará Almacén Principal)'}
                     </label>
-                    <div className="relative">
-                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                      <select
-                        required={locations.length > 0}
-                        disabled={locations.length === 0}
-                        className="block w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary-500/20 bg-white font-medium disabled:opacity-75 disabled:bg-slate-50"
-                        value={item.warehouseId}
-                        onChange={(e) => handleWarehouseChange(index, e.target.value)}
-                      >
-                        {locations.length > 0 ? (
-                          <>
-                            <option value="">Seleccione almacén...</option>
-                            {locations.map(loc => (
-                              <option key={loc.id} value={loc.id}>{loc.name}</option>
-                            ))}
-                          </>
-                        ) : (
-                          <option value="">Almacén Principal (Automático)</option>
-                        )}
-                      </select>
-                    </div>
+                    <SearchableSelect
+                      icon={Warehouse}
+                      value={item.warehouseId}
+                      onChange={(val) => handleWarehouseChange(index, val)}
+                      disabled={locations.length === 0}
+                      options={locations.length > 0 ? [
+                        { value: '', label: '-- Seleccione Almacén --' },
+                        ...locations.map(loc => ({
+                          value: loc.id,
+                          label: loc.name,
+                        }))
+                      ] : [
+                        { value: '', label: 'Almacén Principal (Automático)' }
+                      ]}
+                      placeholder={locations.length > 0 ? "Buscar o seleccionar almacén..." : "Almacén Principal (Automático)"}
+                      required={locations.length > 0}
+                    />
                   </div>
 
                   {(() => {
@@ -600,20 +610,17 @@ export default function NewPurchasePage() {
                     return (
                       <div className="animate-in fade-in duration-200">
                         <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Ubicación Específica *</label>
-                        <div className="relative">
-                          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                          <select
-                            required
-                            className="block w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary-500/20 bg-white font-medium"
-                            value={item.locationId}
-                            onChange={(e) => handleItemChange(index, 'locationId', e.target.value)}
-                          >
-                            <option value="">Seleccione pasillo, estante o bin...</option>
-                            {buildHierarchicalOptions(subLocations).map(opt => (
-                              <option key={opt.id} value={opt.id}>{opt.name}</option>
-                            ))}
-                          </select>
-                        </div>
+                        <SearchableSelect
+                          icon={MapPin}
+                          value={item.locationId}
+                          onChange={(val) => handleItemChange(index, 'locationId', val)}
+                          options={buildHierarchicalOptions(subLocations).map(opt => ({
+                            value: opt.id,
+                            label: opt.name,
+                          }))}
+                          placeholder="Buscar o seleccionar pasillo, estante o bin..."
+                          required
+                        />
                       </div>
                     );
                   })()}

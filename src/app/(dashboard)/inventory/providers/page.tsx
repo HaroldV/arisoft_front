@@ -187,7 +187,8 @@ export default function ProvidersPage() {
     if (!formData.name.trim()) {
       errs['name'] = true;
     }
-    if (!taxNumber.trim()) {
+    const cleanTaxId = formData.tax_id.trim().replace(/[^VJGEP0-9]/gi, '');
+    if (!cleanTaxId || cleanTaxId.length < 2) {
       errs['taxNumber'] = true;
     }
 
@@ -205,7 +206,7 @@ export default function ProvidersPage() {
     try {
       const payload = {
         name: formData.name.trim(),
-        tax_id: getFormattedTaxId(taxPrefix, taxNumber),
+        tax_id: formData.tax_id.trim().toUpperCase(),
         email: formData.email.trim() || undefined,
         phone: formData.phone.trim() || undefined,
         address: formData.address.trim() || undefined,
