@@ -8,6 +8,8 @@ import {
   Building2,
   PackageSearch,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   LogOut,
   UserCircle,
   ShoppingCart,
@@ -156,7 +158,13 @@ const menuConfig = [
   }
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+  onToggle?: () => void;
+}
+
+export default function Sidebar({ isOpen = false, onClose, onToggle }: SidebarProps) {
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const [openMenus, setOpenMenus] = useState<string[]>([]);
@@ -170,6 +178,8 @@ export default function Sidebar() {
       e.preventDefault();
       setBlockedSectionName(label);
       setIsBlockedModalOpen(true);
+    } else if (onClose && typeof window !== 'undefined' && window.innerWidth < 1024) {
+      onClose();
     }
   };
 
@@ -245,12 +255,59 @@ export default function Sidebar() {
   }).filter(Boolean);
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-[#071D33] text-slate-300 border-r border-[#0B2C4D]/80 transition-all duration-300 flex flex-col shadow-2xl" >
-      <div className="flex h-16 items-center justify-center px-4 bg-white border-b border-slate-200 shrink-0 shadow-xs">
-        <Link href="/" className="flex items-center justify-center">
-          <img src="/logo.png" alt="Arivsoft Solutions Logo" className="h-10 w-auto object-contain max-w-[200px]" />
-        </Link>
-      </div>
+    <>
+      {/* Backdrop oscuro para tablets y móviles */}
+      {isOpen && (
+        <div 
+          onClick={onClose}
+          className="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-xs transition-opacity lg:hidden"
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Botón flotante para ABRIR el sidebar en Desktop/Laptop (Anclado al borde izquierdo) */}
+      {!isOpen && onToggle && (
+        <button
+          onClick={onToggle}
+          className="hidden lg:flex fixed left-0 top-1/2 -translate-y-1/2 z-40 bg-[#071D33] hover:bg-indigo-600 text-slate-300 hover:text-white border-y border-r border-indigo-900/60 py-3 px-1.5 rounded-r-xl shadow-xl transition-all duration-200 cursor-pointer items-center justify-center group hover:pr-2.5 active:scale-95"
+          title="Desplegar menú lateral (Click)"
+          aria-label="Abrir barra lateral"
+        >
+          <ChevronRight className="w-4 h-4 text-emerald-400 group-hover:text-white transition-transform group-hover:translate-x-0.5" />
+        </button>
+      )}
+
+      <aside 
+        className={cn(
+          "fixed left-0 top-0 z-50 h-screen w-72 max-w-[85vw] lg:w-64 bg-[#071D33] text-slate-300 border-r border-[#0B2C4D]/80 transition-transform duration-300 ease-in-out flex flex-col shadow-2xl",
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        {/* Pestaña flotante ejecutiva para CERRAR el sidebar en Desktop/Laptop */}
+        {onToggle && (
+          <button
+            onClick={onToggle}
+            className="hidden lg:flex absolute -right-3.5 top-1/2 -translate-y-1/2 z-50 bg-[#071D33] hover:bg-indigo-600 text-slate-400 hover:text-white border border-[#0B2C4D] hover:border-indigo-400 w-7 h-7 rounded-full shadow-xl items-center justify-center transition-all duration-200 cursor-pointer group active:scale-90"
+            title="Colapsar menú lateral (Click)"
+            aria-label="Cerrar barra lateral"
+          >
+            <ChevronLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
+          </button>
+        )}
+
+        <div className="flex h-16 items-center justify-between px-4 bg-white border-b border-slate-200 shrink-0 shadow-xs">
+          <Link href="/" onClick={onClose} className="flex items-center justify-center">
+            <img src="/logo.png" alt="Arivsoft Solutions Logo" className="h-9 w-auto object-contain max-w-[160px]" />
+          </Link>
+          {/* Botón cerrar para tablets y móviles */}
+          <button
+            onClick={onClose}
+            className="lg:hidden p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-all cursor-pointer"
+            aria-label="Cerrar menú"
+          >
+            <span className="text-2xl font-bold leading-none">&times;</span>
+          </button>
+        </div>
 
       <div className="flex-1 overflow-y-auto py-4 px-3.5 space-y-4 min-h-0 custom-scrollbar">
         {filteredMenu.map((group: any) => (
@@ -363,5 +420,6 @@ export default function Sidebar() {
         targetSection={blockedSectionName}
       />
     </aside>
+    </>
   );
 }

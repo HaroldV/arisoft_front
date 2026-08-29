@@ -205,9 +205,10 @@ export const TenantsTable: React.FC<TenantsTableProps> = ({
       {/* VISTA 2: DATA TABLE CLÁSICA */}
       {!isLoading && viewMode === 'TABLE' && (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/90 border-b border-slate-200/70 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
-              <tr>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50/90 border-b border-slate-200/70 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
+                <tr>
                 <th className="py-3 px-4">Empresa / Razón Social</th>
                 <th className="py-3 px-4">RIF Fiscal</th>
                 <th className="py-3 px-4">Plan SaaS</th>
@@ -318,6 +319,7 @@ export const TenantsTable: React.FC<TenantsTableProps> = ({
               ))}
             </tbody>
           </table>
+          </div>
           {tenants.length === 0 && !isLoading && (
             <div className="flex flex-col items-center justify-center py-14 text-slate-400">
               <Building2 className="w-8 h-8 mb-3 text-slate-300" />
