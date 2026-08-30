@@ -5,6 +5,7 @@ import { Building2, X, AlertCircle, RefreshCw, Check, ChevronDown } from 'lucide
 import { TenantCompany, SaasPlan } from '../SuperAdminBackoffice';
 import { RifValidator } from '@/utils/rif-validator';
 import { SAAS_ADDON_PRICING, PLAN_DEFAULT_MODULES, SAAS_PLAN_CODES, type SaasPlanCode } from '@/constants/domain-constants';
+import { CurrencyInput } from '@/components/CurrencyInput';
 
 interface ModuleSubmodule {
   key: string;
@@ -297,21 +298,13 @@ export const TenantModal: React.FC<TenantModalProps> = ({
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
                     Cuota Mensual (USD)
                   </label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">$</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={monthlyFee}
-                      onChange={(e) => setMonthlyFee(Number(e.target.value))}
-                      className={`w-full pl-7 pr-3.5 py-2.5 border rounded-xl font-mono text-slate-800 text-sm focus:bg-white focus:ring-2 outline-none ${
-                        hasCustomPricing
-                          ? 'bg-amber-50/60 border-amber-300 focus:ring-amber-500/20 text-amber-900 font-bold'
-                          : 'bg-slate-50 border-slate-200 focus:ring-indigo-500/20'
-                      }`}
-                    />
-                  </div>
+                  <CurrencyInput
+                    value={monthlyFee}
+                    onChange={(val) => setMonthlyFee(val)}
+                    placeholder="0.00"
+                    currencyPrefix="$"
+                    className={hasCustomPricing ? 'bg-amber-50/60 border-amber-300 focus:ring-amber-500/20 text-amber-900 font-bold' : ''}
+                  />
                 </div>
               </div>
 
@@ -442,17 +435,17 @@ export const TenantModal: React.FC<TenantModalProps> = ({
                 </div>
               )}
 
-              {/* Custom Password Fields (Only when creating a new tenant) */}
-              {!editingTenant && setOwnerPassword && setOwnerPasswordConfirm && (
+              {/* Custom Password Fields (Required when creating, optional when editing) */}
+              {setOwnerPassword && setOwnerPasswordConfirm && (!editingTenant || !resetPassword) && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                      Contraseña Temporal de Acceso *
+                      {editingTenant ? 'Establecer Nueva Contraseña (Opcional)' : 'Contraseña Temporal de Acceso *'}
                     </label>
                     <input
                       type="text"
-                      required
-                      placeholder="Mínimo 6 caracteres (Ej. Admin123!)"
+                      required={!editingTenant}
+                      placeholder={editingTenant ? "Dejar en blanco para no cambiar" : "Mínimo 6 caracteres (Ej. Admin123!)"}
                       value={ownerPassword}
                       onChange={(e) => setOwnerPassword(e.target.value)}
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-mono focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
@@ -460,12 +453,12 @@ export const TenantModal: React.FC<TenantModalProps> = ({
                   </div>
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                      Confirmar Contraseña *
+                      {editingTenant ? 'Confirmar Nueva Contraseña' : 'Confirmar Contraseña *'}
                     </label>
                     <input
                       type="text"
-                      required
-                      placeholder="Repita la contraseña"
+                      required={!editingTenant || Boolean(ownerPassword)}
+                      placeholder={editingTenant ? "Repita la nueva contraseña" : "Repita la contraseña"}
                       value={ownerPasswordConfirm}
                       onChange={(e) => setOwnerPasswordConfirm(e.target.value)}
                       className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-slate-800 text-sm font-mono focus:bg-white focus:ring-2 outline-none ${

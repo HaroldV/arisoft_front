@@ -30,6 +30,23 @@ export const ORDER_STATUS = {
 
 export type OrderStatus = typeof ORDER_STATUS[keyof typeof ORDER_STATUS];
 
+export const PRODUCT_TAX_TYPES = {
+  TAXABLE: 'TAXABLE',
+  EXEMPT: 'EXEMPT',
+  EXONERATED: 'EXONERATED',
+} as const;
+
+export type ProductTaxType = typeof PRODUCT_TAX_TYPES[keyof typeof PRODUCT_TAX_TYPES];
+
+export const STOCK_LEVEL_FILTERS = {
+  ALL: 'ALL',
+  IN_STOCK: 'IN_STOCK',
+  LOW_STOCK: 'LOW_STOCK',
+  OUT_OF_STOCK: 'OUT_OF_STOCK',
+} as const;
+
+export type StockLevelFilter = typeof STOCK_LEVEL_FILTERS[keyof typeof STOCK_LEVEL_FILTERS];
+
 export const RIF_TYPES = {
   JURIDICO: 'JURIDICO',
   NATURAL_V: 'NATURAL_V',

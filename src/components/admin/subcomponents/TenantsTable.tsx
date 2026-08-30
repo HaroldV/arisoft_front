@@ -150,6 +150,16 @@ export const TenantsTable: React.FC<TenantsTableProps> = ({
                   </div>
                 </div>
 
+                {t.owner_email && (
+                  <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
+                      <span className="font-semibold text-slate-800 truncate">{t.owner_name || 'Propietario'}</span>
+                    </div>
+                    <span className="font-mono text-[10px] text-slate-500 truncate ml-2">{t.owner_email}</span>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium px-1">
                   <span>Creada el {t.created_at || '28/7/2026'}</span>
                   <span className="font-bold text-slate-700 uppercase text-[10px]">
@@ -232,6 +242,11 @@ export const TenantsTable: React.FC<TenantsTableProps> = ({
                         <p className="text-[10px] text-slate-400 font-mono">
                           {t.subdomain}.{APP_CONFIG.SAAS_DOMAIN}
                         </p>
+                        {t.owner_email && (
+                          <p className="text-[10px] text-indigo-600 font-medium truncate max-w-[200px]">
+                            👤 {t.owner_name || 'Propietario'} ({t.owner_email})
+                          </p>
+                        )}
                       </div>
                     </div>
                   </td>

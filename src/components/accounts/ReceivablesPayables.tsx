@@ -32,6 +32,7 @@ import {
   TrendingDown,
   Check
 } from 'lucide-react';
+import { CurrencyInput } from '@/components/CurrencyInput';
 
 interface PaymentLog {
   id: string;
@@ -1489,36 +1490,29 @@ export default function ReceivablesPayables({ forcedTab }: ReceivablesPayablesPr
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-                    Monto a Abonar ({payMethod.includes('BS') ? 'Bs.' : '$'})
+                    Monto a Abonar ({payMethod.includes('BS') ? 'Bs.' : '$'}) *
                   </label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-2.5 text-slate-400 text-sm font-semibold">
-                      {payMethod.includes('BS') ? 'Bs.' : '$'}
-                    </span>
-                    <input
-                      type="number"
-                      step="any"
-                      required
-                      placeholder="0.00"
-                      value={payAmount}
-                      onChange={(e) => setPayAmount(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-mono font-bold text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                    />
-                  </div>
+                  <CurrencyInput
+                    value={payAmount}
+                    onChange={(val) => setPayAmount(val ? val.toString() : '')}
+                    placeholder="0.00"
+                    currencyPrefix={payMethod.includes('BS') ? 'Bs.' : '$'}
+                    required
+                  />
                 </div>
 
                 {payMethod.includes('BS') && (
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-                      Tasa de Cambio (Bs / USD)
+                      Tasa de Cambio (Bs / USD) *
                     </label>
-                    <input
-                      type="number"
-                      step="any"
-                      required
+                    <CurrencyInput
                       value={payExchangeRate}
-                      onChange={(e) => setPayExchangeRate(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-mono font-bold text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      onChange={(val) => setPayExchangeRate(val ? val.toString() : '')}
+                      placeholder="0.00"
+                      currencyPrefix="Bs."
+                      decimals={4}
+                      required
                     />
                   </div>
                 )}

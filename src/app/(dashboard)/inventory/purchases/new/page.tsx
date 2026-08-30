@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import { SearchableSelect } from '@/components/SearchableSelect';
+import { CurrencyInput } from '@/components/CurrencyInput';
 
 interface Provider {
   id: string;
@@ -548,21 +549,15 @@ export default function NewPurchasePage() {
                   </div>
 
                   {/* Unit Cost */}
-                  <div className="w-full md:w-32">
+                  <div className="w-full md:w-36">
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Costo Unit (USD) *</label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                      <input
-                        type="number"
-                        step="0.01"
-                        required
-                        min="0"
-                        placeholder="0.00"
-                        className="block w-full pl-8 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 text-right font-medium bg-slate-50/50 focus:bg-white"
-                        value={item.unitCostUsd || ''}
-                        onChange={(e) => handleItemChange(index, 'unitCostUsd', Number(e.target.value))}
-                      />
-                    </div>
+                    <CurrencyInput
+                      value={item.unitCostUsd}
+                      onChange={(val) => handleItemChange(index, 'unitCostUsd', val)}
+                      placeholder="0.00"
+                      currencyPrefix="$"
+                      required
+                    />
                   </div>
 
                   {/* Trash Button */}
@@ -864,36 +859,24 @@ export default function NewPurchasePage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Costo Base (USD) *</label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                    <input 
-                      type="number"
-                      step="0.01"
-                      required
-                      min="0"
-                      placeholder="0.00"
-                      className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-right font-medium"
-                      value={quickProductCost || ''}
-                      onChange={(e) => setQuickProductCost(Number(e.target.value))}
-                    />
-                  </div>
+                  <CurrencyInput
+                    value={quickProductCost}
+                    onChange={(val) => setQuickProductCost(val)}
+                    placeholder="0.00"
+                    currencyPrefix="$"
+                    required
+                  />
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Precio Venta (USD) *</label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                    <input 
-                      type="number"
-                      step="0.01"
-                      required
-                      min="0"
-                      placeholder="0.00"
-                      className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-right font-medium"
-                      value={quickProductPrice || ''}
-                      onChange={(e) => setQuickProductPrice(Number(e.target.value))}
-                    />
-                  </div>
+                  <CurrencyInput
+                    value={quickProductPrice}
+                    onChange={(val) => setQuickProductPrice(val)}
+                    placeholder="0.00"
+                    currencyPrefix="$"
+                    required
+                  />
                 </div>
               </div>
 

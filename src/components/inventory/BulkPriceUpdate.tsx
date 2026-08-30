@@ -14,6 +14,7 @@ import {
   Package
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
+import { CurrencyInput } from '@/components/CurrencyInput';
 
 interface Product {
   id: string;
@@ -194,20 +195,13 @@ export function BulkPriceUpdate() {
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
               {mode === 'MARGIN' ? 'Porcentaje de Margen (% sobre Costo)' : mode === 'PERCENTAGE_INCREASE' ? 'Porcentaje de Incremento (%)' : 'Precio Fijo USD ($)'}
             </label>
-            <div className="relative">
-              {mode === 'FIXED_PRICE' ? (
-                <DollarSign className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-              ) : (
-                <Percent className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-              )}
-              <input
-                type="number"
-                step="0.1"
-                className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition-all font-mono font-bold"
-                value={value}
-                onChange={(e) => setValue(Number(e.target.value))}
-              />
-            </div>
+            <CurrencyInput
+              value={value}
+              onChange={(val) => setValue(val)}
+              placeholder="0.00"
+              currencyPrefix={mode === 'FIXED_PRICE' ? '$' : '%'}
+              icon={mode === 'FIXED_PRICE' ? DollarSign : Percent}
+            />
           </div>
 
           <div>
