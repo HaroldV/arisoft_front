@@ -19,10 +19,13 @@ import {
   CreditCard,
   Percent,
   Check,
-  UserCheck
+  UserCheck,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import { useAuth } from '@/context/AuthContext';
+import { CurrencyInput } from '@/components/CurrencyInput';
 
 interface Product {
   id: string;
@@ -57,6 +60,7 @@ export const PosInterface: React.FC = () => {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [posViewMode, setPosViewMode] = useState<'GRID' | 'LIST'>('LIST');
   const [exchangeRate, setExchangeRate] = useState<number>(36.50);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discountPercent, setDiscountPercent] = useState<number>(0);
@@ -395,82 +399,183 @@ export const PosInterface: React.FC = () => {
         
         {/* Left Side: Product catalog and search */}
         <div className="flex-1 flex flex-col bg-white border-r border-slate-200">
-          <div className="p-4 border-b border-slate-100 bg-slate-50/30">
-            <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
+          <div className="p-3.5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Buscar productos por SKU o Nombre..."
-                className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
+                placeholder="Buscar por código SKU, código de barras o nombre..."
+                className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder-slate-400"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* View Mode Toggle (Grid vs Fast List) */}
+            <div className="bg-slate-200/70 p-1 rounded-xl flex items-center gap-1 shrink-0 border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setPosViewMode('LIST')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer select-none ${
+                  posViewMode === 'LIST'
+                    ? 'bg-white text-indigo-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Modo Lista Rápida (Recomendado para mostrador)"
+              >
+                <List className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Lista Rápida</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPosViewMode('GRID')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer select-none ${
+                  posViewMode === 'GRID'
+                    ? 'bg-white text-indigo-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Modo Cuadrícula Táctil"
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Cuadrícula</span>
+              </button>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
             {isLoading ? (
-              <div className="h-full flex items-center justify-center flex-col gap-2">
-                <Loader2 className="h-8 w-8 text-primary-600 animate-spin" />
-                <span className="text-sm text-slate-400 font-semibold">Cargando catálogo...</span>
+              <div className="h-full flex items-center justify-center flex-col gap-2 py-16">
+                <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
+                <span className="text-xs text-slate-500 font-semibold">Cargando catálogo...</span>
               </div>
             ) : filteredProducts.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
+              <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400 py-16">
                 <AlertCircle className="h-10 w-10 text-slate-300 mb-2" />
-                <p className="text-sm font-semibold">No se encontraron productos disponibles</p>
+                <p className="text-sm font-semibold text-slate-600">No se encontraron productos disponibles</p>
+                <p className="text-xs text-slate-400 mt-0.5">Intenta con otro término de búsqueda.</p>
+              </div>
+            ) : posViewMode === 'LIST' ? (
+              /* FAST COMPACT LIST VIEW */
+              <div className="bg-white rounded-xl border border-slate-200/80 overflow-hidden shadow-2xs">
+                <div className="divide-y divide-slate-100">
+                  {filteredProducts.map((p) => {
+                    const isCritical = (p.current_stock ?? 0) <= 5 && (p.current_stock ?? 0) > 0;
+                    const isOut = (p.current_stock ?? 0) <= 0;
+
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => addToCart(p)}
+                        className="p-3 hover:bg-indigo-50/40 active:bg-indigo-50 transition-colors flex items-center justify-between gap-3 cursor-pointer group select-none"
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100/90 border border-slate-200/70 px-2 py-0.5 rounded-md shrink-0">
+                            {p.sku}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-bold text-slate-900 text-xs sm:text-sm truncate group-hover:text-indigo-600 transition-colors">
+                              {p.name}
+                            </h4>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full border ${
+                                isOut 
+                                  ? 'bg-rose-50 text-rose-700 border-rose-200' 
+                                  : isCritical 
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200' 
+                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              }`}>
+                                {isOut ? 'Agotado' : isCritical ? 'Stock Crítico' : 'Disponible'}
+                              </span>
+                              <span className="text-[11px] text-slate-400 font-medium">
+                                Stock: <strong className="text-slate-700 font-mono">{p.current_stock ?? 0} un</strong>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Price & Add Button */}
+                        <div className="flex items-center gap-4 shrink-0">
+                          <div className="text-right">
+                            <div className="text-sm sm:text-base font-black text-slate-900 font-mono leading-tight">
+                              ${(p.priceUsd ?? 0).toFixed(2)}
+                            </div>
+                            <div className="text-[10px] font-bold text-slate-500 font-mono">
+                              Bs. {((p.priceUsd ?? 0) * exchangeRate).toFixed(2)}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addToCart(p);
+                            }}
+                            className="p-2 bg-indigo-50 group-hover:bg-indigo-600 text-indigo-600 group-hover:text-white rounded-xl border border-indigo-200/70 group-hover:border-indigo-600 transition-all shadow-2xs cursor-pointer active:scale-90"
+                            title="Agregar al carrito"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              /* GRID VIEW (Touch / Tablet Mode) */
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {filteredProducts.map((p) => {
-                  const isCritical = p.current_stock <= 5;
-                  const isOut = p.current_stock === 0;
-                  const rawUrl = p.image_url || p.imageUrl;
-                  const resolvedUrl = rawUrl
-                    ? (rawUrl.startsWith('http') || rawUrl.startsWith('data:') ? rawUrl : `http://localhost:4000${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`)
-                    : null;
-
-                  const n = (p.name || '').toLowerCase();
-                  const sampleImg = n.includes('papel') || n.includes('resma') ? 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=400&auto=format&fit=crop'
-                    : n.includes('tinta') || n.includes('cartucho') || n.includes('hp') ? 'https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?w=400&auto=format&fit=crop'
-                    : n.includes('boligrafo') || n.includes('marcador') || n.includes('solita') ? 'https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=400&auto=format&fit=crop'
-                    : n.includes('harina') || n.includes('pan') ? 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=400&auto=format&fit=crop'
-                    : n.includes('cafe') || n.includes('bebida') ? 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=400&auto=format&fit=crop'
-                    : n.includes('rif') || n.includes('documento') ? 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=400&auto=format&fit=crop'
-                    : 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=400&auto=format&fit=crop';
-
-                  const imgUrl = resolvedUrl || sampleImg;
+                  const isCritical = (p.current_stock ?? 0) <= 5 && (p.current_stock ?? 0) > 0;
+                  const isOut = (p.current_stock ?? 0) <= 0;
 
                   return (
                     <button
                       key={p.id}
                       onClick={() => addToCart(p)}
-                      className="flex flex-col text-left p-3.5 rounded-2xl border border-slate-200 hover:border-primary-500 hover:shadow-md transition-all group cursor-pointer bg-white overflow-hidden"
+                      className="flex flex-col text-left p-3.5 rounded-2xl border border-slate-200/90 hover:border-indigo-400 hover:shadow-md hover:bg-indigo-50/20 active:scale-98 transition-all group cursor-pointer bg-white overflow-hidden"
                     >
-                      <div className="w-full h-24 rounded-xl overflow-hidden mb-2.5 bg-slate-100 border border-slate-100 flex items-center justify-center shrink-0">
-                        <img
-                          src={imgUrl}
-                          alt={p.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                        />
-                      </div>
-                      <span className="font-mono text-[10px] text-slate-400 font-semibold">{p.sku}</span>
-                      <h4 className="font-bold text-slate-800 text-sm mt-0.5 group-hover:text-primary-700 truncate w-full">{p.name}</h4>
-                      
-                      <div className="flex flex-col mt-2">
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-sm font-black text-slate-900">${p.priceUsd.toFixed(2)}</span>
-                          <span className="text-[10px] text-slate-400 font-medium">USD</span>
-                        </div>
-                        <div className="text-[11px] font-bold text-slate-500 font-mono mt-0.5">
-                          Bs. {(p.priceUsd * exchangeRate).toFixed(2)}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between mt-auto pt-2.5 border-t border-slate-100 w-full text-[11px] font-semibold">
-                        <span className={isOut ? 'text-rose-600' : isCritical ? 'text-amber-600' : 'text-emerald-600'}>
+                      <div className="flex items-center justify-between w-full mb-1">
+                        <span className="font-mono text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/60">
+                          {p.sku}
+                        </span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          isOut 
+                            ? 'bg-rose-50 text-rose-700 border-rose-200' 
+                            : isCritical 
+                            ? 'bg-amber-50 text-amber-700 border-amber-200' 
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        }`}>
                           {isOut ? 'Agotado' : isCritical ? 'Crítico' : 'Disponible'}
                         </span>
-                        <span className="text-slate-500">{p.current_stock} un</span>
+                      </div>
+
+                      <h4 className="font-bold text-slate-900 text-sm mt-1 group-hover:text-indigo-600 line-clamp-2 w-full leading-tight min-h-[2.5rem]">
+                        {p.name}
+                      </h4>
+                      
+                      <div className="flex items-baseline justify-between mt-3 pt-2 border-t border-slate-100 w-full">
+                        <div>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-base font-black text-slate-900 font-mono">${(p.priceUsd ?? 0).toFixed(2)}</span>
+                            <span className="text-[10px] text-slate-400 font-bold">USD</span>
+                          </div>
+                          <div className="text-[11px] font-bold text-slate-500 font-mono">
+                            Bs. {((p.priceUsd ?? 0) * exchangeRate).toFixed(2)}
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Stock</span>
+                          <span className="text-xs font-bold text-slate-700 font-mono">{p.current_stock ?? 0} un</span>
+                        </div>
                       </div>
                     </button>
                   );
@@ -919,15 +1024,14 @@ export const PosInterface: React.FC = () => {
 
                               <div>
                                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Monto ({line.currency})</label>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  min="0.01"
-                                  className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                <CurrencyInput
                                   value={line.amountOriginal}
-                                  onChange={(e) => {
-                                    setPaymentLines(paymentLines.map((l, i) => i === idx ? { ...l, amountOriginal: Number(e.target.value) } : l));
+                                  onChange={(val) => {
+                                    setPaymentLines(paymentLines.map((l, i) => i === idx ? { ...l, amountOriginal: val } : l));
                                   }}
+                                  placeholder="0.00"
+                                  currencyPrefix={line.currency === 'USD' ? '$' : 'Bs.'}
+                                  className="p-2 text-xs font-mono font-bold"
                                 />
                               </div>
                             </div>

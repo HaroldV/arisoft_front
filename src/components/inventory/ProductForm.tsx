@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import { SearchableSelect } from '@/components/SearchableSelect';
+import { CurrencyInput } from '@/components/CurrencyInput';
 import Link from 'next/link';
 
 interface Variation {
@@ -652,36 +653,23 @@ export const ProductForm: React.FC = () => {
 
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Costo Base (USD)</label>
-          <div className="relative">
-            <DollarSign className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-            <input
-              type="number"
-              step="0.01"
-              required
-              placeholder="0.00"
-              min="0"
-              className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm placeholder-slate-400 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200"
-              value={formData.costUsd || ''}
-              onChange={(e) => setFormData({ ...formData, costUsd: Number(e.target.value) })}
-            />
-          </div>
+          <CurrencyInput
+            value={formData.costUsd}
+            onChange={(val) => setFormData(prev => ({ ...prev, costUsd: val }))}
+            placeholder="0.00"
+            currencyPrefix="$"
+          />
         </div>
 
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Precio de Venta (USD)</label>
-          <div className="relative">
-            <DollarSign className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-            <input
-              type="number"
-              step="0.01"
-              required
-              placeholder="0.00"
-              min="0"
-              className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm placeholder-slate-400 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200"
-              value={formData.priceUsd || ''}
-              onChange={(e) => setFormData({ ...formData, priceUsd: Number(e.target.value) })}
-            />
-          </div>
+          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Precio de Venta (USD) *</label>
+          <CurrencyInput
+            value={formData.priceUsd}
+            onChange={(val) => setFormData(prev => ({ ...prev, priceUsd: val }))}
+            placeholder="0.00"
+            currencyPrefix="$"
+            required
+          />
         </div>
 
         <div>
@@ -835,14 +823,12 @@ export const ProductForm: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 mb-1">Costo Unit. (Opcional)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                  <CurrencyInput
+                    value={varForm.unit_cost}
+                    onChange={(val) => setVarForm(prev => ({ ...prev, unit_cost: val }))}
                     placeholder="0.00"
-                    className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-white text-right"
-                    value={varForm.unit_cost || ''}
-                    onChange={(e) => setVarForm({ ...varForm, unit_cost: Number(e.target.value) })}
+                    currencyPrefix="$"
+                    className="p-2 text-xs"
                   />
                 </div>
                 <div className="md:col-span-4 flex justify-between items-center gap-3">

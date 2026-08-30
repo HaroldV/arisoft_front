@@ -590,8 +590,8 @@ export function useSuperAdminData() {
       setFormDiscountType(tenant.discount_type || 'FIXED');
       setFormDiscountValue(tenant.discount_value || 0);
       setFormPricingNotes(tenant.pricing_notes || '');
-      setFormOwnerEmail(tenant.owner_email);
-      setFormOwnerName(tenant.owner_name);
+      setFormOwnerEmail(tenant.owner_email || '');
+      setFormOwnerName(tenant.owner_name || '');
       const planCodeTyped = (tenant.plan_name as SaasPlanCode) || SAAS_PLAN_CODES.COMERCIAL_PRO;
       const tenantModules = tenant.enabled_modules && tenant.enabled_modules.length > 0 
         ? tenant.enabled_modules 
@@ -770,6 +770,7 @@ export function useSuperAdminData() {
             : t
         ));
         setIsModalOpen(false);
+        await fetchTenants();
         if (resetPassword) {
           setNewTenantPassword(resetPassword);
         } else {
