@@ -21,9 +21,11 @@ import {
   ArrowRight,
   Building2,
   CalendarDays,
-  Package
+  Package,
+  Eye
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
+import { CurrencyInput } from '@/components/CurrencyInput';
 import { SearchableSelect } from '@/components/SearchableSelect';
 
 interface OrderItem {
@@ -69,6 +71,7 @@ export function PurchaseOrdersList() {
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [selectedViewOrder, setSelectedViewOrder] = useState<PurchaseOrder | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -165,33 +168,28 @@ export function PurchaseOrdersList() {
     setFormItems(filtered.map((item, i) => ({ ...item, item_number: i + 1 })));
   };
 
-  const handleItemChange = (index: number, field: string, value: any) => {
-    const updated = [...formItems];
-    const target = updated[index];
-    if (field === 'productId') {
-      const selectedProd = products.find(p => p.id === value);
-      target.productId = value;
-      if (selectedProd) {
-        target.unitCostUsd = selectedProd.costUsd || 0;
-        target.sku = selectedProd.sku || '';
+  const handleUpdateItem = (index: number, patch: Partial<OrderItem>) => {
+    setFormItems(prev => prev.map((item, i) => {
+      if (i !== index) return item;
+      const updated = { ...item, ...patch };
+      if (patch.discountPercentage !== undefined || patch.quantityOrdered !== undefined || patch.unitCostUsd !== undefined) {
+        const qty = updated.quantityOrdered || 0;
+        const cost = updated.unitCostUsd || 0;
+        const disc = updated.discountPercentage || 0;
+        updated.discountAmount = (qty * cost * disc) / 100;
       }
-    } else if (field === 'sku') {
-      target.sku = value;
-    } else if (field === 'quantityOrdered') {
-      target.quantityOrdered = Number(value);
-    } else if (field === 'unitCostUsd') {
-      target.unitCostUsd = Number(value);
-    } else if (field === 'discountPercentage') {
-      target.discountPercentage = Number(value);
-      target.discountAmount = (target.quantityOrdered * target.unitCostUsd * Number(value)) / 100;
-    } else if (field === 'taxRate') {
-      target.taxRate = Number(value);
-    } else if (field === 'model') {
-      target.model = value;
-    } else if (field === 'lineComment') {
-      target.lineComment = value;
-    }
-    setFormItems(updated);
+      return updated;
+    }));
+  };
+
+  const handleSelectProduct = (index: number, productId: string, productName?: string) => {
+    const selectedProd = products.find(p => p.id === productId);
+    handleUpdateItem(index, {
+      productId,
+      unitCostUsd: selectedProd?.costUsd ?? 0,
+      sku: selectedProd?.sku ?? '',
+      lineComment: productName ?? selectedProd?.name ?? '',
+    });
   };
 
   // Live Calculations
@@ -404,6 +402,7 @@ export function PurchaseOrdersList() {
                   <th className="py-4 px-6">Fecha Emisión</th>
                   <th className="py-4 px-6 text-right">Total USD</th>
                   <th className="py-4 px-6 text-center">Estado</th>
+                  <th className="py-4 px-6 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
@@ -425,6 +424,17 @@ export function PurchaseOrdersList() {
                         }`}>
                         {o.status === ORDER_STATUS.SENT ? 'Sin Procesar' : o.status === ORDER_STATUS.COMPLETED ? 'Procesado' : o.status}
                       </span>
+                    </td>
+                    <td className="py-4 px-6 text-center">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedViewOrder(o)}
+                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all duration-200 cursor-pointer inline-flex items-center gap-1 text-xs font-bold"
+                        title="Ver detalle de la orden"
+                      >
+                        <Eye className="w-4 h-4" />
+                        <span>Ver</span>
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -628,10 +638,7 @@ export function PurchaseOrdersList() {
                                 icon={Package}
                                 value={item.productId}
                                 onChange={(val, opt) => {
-                                  handleItemChange(idx, 'productId', val);
-                                  if (opt && opt.label) {
-                                    handleItemChange(idx, 'lineComment', opt.label);
-                                  }
+                                  handleSelectProduct(idx, val, opt?.label);
                                 }}
                                 options={products.map(p => ({
                                   value: p.id,
@@ -652,7 +659,7 @@ export function PurchaseOrdersList() {
                                   }`}
                                 value={item.sku || ''}
                                 onChange={(e) => {
-                                  handleItemChange(idx, 'sku', e.target.value);
+                                  handleUpdateItem(idx, { sku: e.target.value });
                                   if (errorFields[`item_sku_${idx}`]) {
                                     setErrorFields({ ...errorFields, [`item_sku_${idx}`]: false });
                                   }
@@ -670,7 +677,7 @@ export function PurchaseOrdersList() {
                                 placeholder="Modelo..."
                                 className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
                                 value={item.model || ''}
-                                onChange={(e) => handleItemChange(idx, 'model', e.target.value)}
+                                onChange={(e) => handleUpdateItem(idx, { model: e.target.value })}
                               />
                             </td>
                             <td className="py-2 px-3 text-right">
@@ -679,16 +686,18 @@ export function PurchaseOrdersList() {
                                 min="1"
                                 className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-right font-mono"
                                 value={item.quantityOrdered}
-                                onChange={(e) => handleItemChange(idx, 'quantityOrdered', e.target.value)}
+                                onChange={(e) => handleUpdateItem(idx, { quantityOrdered: Number(e.target.value) })}
                               />
                             </td>
-                            <td className="py-2 px-3 text-right">
-                              <input
-                                type="number"
-                                step="0.0001"
-                                className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-right font-mono"
+                            <td className="py-2 px-3 text-right w-28">
+                              <CurrencyInput
                                 value={item.unitCostUsd}
-                                onChange={(e) => handleItemChange(idx, 'unitCostUsd', e.target.value)}
+                                onChange={(val) => handleUpdateItem(idx, { unitCostUsd: Number(val) || 0 })}
+                                size="sm"
+                                placeholder="0.00"
+                                currencyPrefix="$"
+                                icon={null}
+                                decimals={4}
                               />
                             </td>
                             <td className="py-2 px-3 text-right">
@@ -697,7 +706,7 @@ export function PurchaseOrdersList() {
                                 step="0.1"
                                 className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-right font-mono"
                                 value={item.discountPercentage || 0}
-                                onChange={(e) => handleItemChange(idx, 'discountPercentage', e.target.value)}
+                                onChange={(e) => handleUpdateItem(idx, { discountPercentage: Number(e.target.value) || 0 })}
                               />
                             </td>
                             <td className="py-2 px-3 text-right">
@@ -706,7 +715,7 @@ export function PurchaseOrdersList() {
                                 step="0.1"
                                 className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-right font-mono"
                                 value={item.taxRate || 16}
-                                onChange={(e) => handleItemChange(idx, 'taxRate', e.target.value)}
+                                onChange={(e) => handleUpdateItem(idx, { taxRate: Number(e.target.value) || 0 })}
                               />
                             </td>
                             <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">
@@ -813,6 +822,163 @@ export function PurchaseOrdersList() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* View Order Detail Modal (Sally Enterprise UX Standard) */}
+      {selectedViewOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-50 border border-indigo-100 rounded-xl text-indigo-600">
+                  <ShoppingBag className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Detalle de Orden de Compra {selectedViewOrder.order_number}</h3>
+                  <p className="text-xs text-slate-500 font-medium">Emisión de acuerdo comercial con proveedor</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedViewOrder(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6 overflow-y-auto flex-1">
+              {/* Metadata Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-2xs">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Proveedor</span>
+                  <span className="font-bold text-slate-900 text-sm block truncate">{selectedViewOrder.supplier_name}</span>
+                  {selectedViewOrder.supplier_rif && <span className="font-mono text-xs text-slate-500">RIF: {selectedViewOrder.supplier_rif}</span>}
+                </div>
+
+                <div className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-2xs">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Condición & Moneda</span>
+                  <span className="font-bold text-slate-900 text-sm block">{selectedViewOrder.payment_term || 'CONTADO'}</span>
+                  <span className="text-xs text-slate-500">{selectedViewOrder.currency || 'USD'} ({selectedViewOrder.is_national ? 'Nacional' : 'Importación'})</span>
+                </div>
+
+                <div className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-2xs">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Fecha Emisión</span>
+                  <span className="font-bold text-slate-900 text-sm block">{new Date(selectedViewOrder.created_at).toLocaleDateString()}</span>
+                  <span className="text-xs text-slate-500">Hora: {new Date(selectedViewOrder.created_at).toLocaleTimeString()}</span>
+                </div>
+
+                <div className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-2xs">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Estado de Orden</span>
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full inline-flex items-center gap-1 ${
+                    selectedViewOrder.status === ORDER_STATUS.COMPLETED ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                    selectedViewOrder.status === ORDER_STATUS.SENT ? 'bg-blue-50 text-blue-700 border border-blue-100' :
+                    'bg-slate-100 text-slate-600 border border-slate-200'
+                  }`}>
+                    {selectedViewOrder.status === ORDER_STATUS.SENT ? 'Sin Procesar' : selectedViewOrder.status === ORDER_STATUS.COMPLETED ? 'Procesado' : selectedViewOrder.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* Items Table */}
+              <div className="rounded-2xl border border-slate-200/80 overflow-hidden bg-white shadow-2xs">
+                <div className="px-4 py-3 bg-slate-50/90 border-b border-slate-200/70 text-slate-700 font-bold text-xs uppercase tracking-wider flex justify-between items-center">
+                  <span>Renglones Acordados en la Orden</span>
+                  <span className="text-[11px] font-mono text-slate-500">Total ítems: {selectedViewOrder.items?.length || 0}</span>
+                </div>
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200">
+                    <tr>
+                      <th className="py-2.5 px-4 w-10 text-center">#</th>
+                      <th className="py-2.5 px-4 min-w-[200px]">Artículo / Producto</th>
+                      <th className="py-2.5 px-4 text-right w-24">Cant. Pedida</th>
+                      <th className="py-2.5 px-4 text-right w-24">Cant. Recibida</th>
+                      <th className="py-2.5 px-4 text-right w-28">Costo Unit. ($)</th>
+                      <th className="py-2.5 px-4 text-right w-28">IVA</th>
+                      <th className="py-2.5 px-4 text-right w-32">Total Renglón ($)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(selectedViewOrder.items && selectedViewOrder.items.length > 0) ? (
+                      selectedViewOrder.items.map((item: any, idx: number) => {
+                        const qty = Number(item.quantity_ordered || item.quantityOrdered || 0);
+                        const received = Number(item.quantity_received || item.quantityReceived || 0);
+                        const cost = Number(item.unit_cost_usd || item.unitCostUsd || 0);
+                        const taxRate = Number(item.tax_rate || item.taxRate || 16);
+                        const totalLine = Number(item.total_cost_usd || (qty * cost * (1 + taxRate / 100)) || 0);
+                        const prodObj = products.find(p => p.id === (item.product_id || item.productId));
+                        const name = prodObj?.name || item.line_comment || item.lineComment || `Producto #${idx + 1}`;
+                        const sku = prodObj?.sku || item.sku;
+
+                        return (
+                          <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-3 px-4 text-center font-mono font-bold text-slate-500">{idx + 1}</td>
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-2">
+                                <div className="p-1.5 bg-slate-100 rounded-lg text-slate-600 shrink-0">
+                                  <Package className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <span className="font-bold text-slate-900 block">{name}</span>
+                                  {sku && <span className="text-[11px] font-mono text-slate-500">SKU: {sku}</span>}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">{qty}</td>
+                            <td className="py-3 px-4 text-right font-mono text-emerald-700 font-bold">{received}</td>
+                            <td className="py-3 px-4 text-right font-mono text-slate-800">${cost.toFixed(4)}</td>
+                            <td className="py-3 px-4 text-right font-mono text-slate-600">{taxRate}%</td>
+                            <td className="py-3 px-4 text-right font-mono font-bold text-indigo-700">${totalLine.toFixed(2)}</td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-slate-400">
+                          No hay renglones detallados registrados para esta orden.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Luminous Financial Summary */}
+              <div className="p-5 bg-gradient-to-br from-indigo-50/90 via-slate-50 to-blue-50/60 border border-indigo-100/90 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="text-xs text-slate-500">
+                  <span>Orden registrada por: <strong className="text-slate-700">{selectedViewOrder.created_by_user_name || 'Operador'}</strong></span>
+                </div>
+                <div className="flex items-center gap-6 font-mono text-xs">
+                  <div>
+                    <span className="text-slate-500 block">Subtotal:</span>
+                    <span className="font-bold text-slate-900">${Number(selectedViewOrder.subtotal_usd || 0).toFixed(2)}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">IVA:</span>
+                    <span className="font-bold text-slate-900">${Number(selectedViewOrder.tax_usd || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="border-l border-indigo-200 pl-6 text-base font-bold text-indigo-700">
+                    <span className="text-xs text-slate-500 block">TOTAL ORDEN:</span>
+                    <span>${Number(selectedViewOrder.total_usd || 0).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end px-6 py-4 border-t border-slate-100 bg-slate-50/50 shrink-0">
+              <button
+                type="button"
+                onClick={() => setSelectedViewOrder(null)}
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-all cursor-pointer text-sm"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}

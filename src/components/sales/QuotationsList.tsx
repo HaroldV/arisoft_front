@@ -21,6 +21,7 @@ import apiClient from '@/infrastructure/api/api-client';
 import ProductCombobox, { CatalogProduct } from './ProductCombobox';
 import ClientCombobox, { ClientOption } from './ClientCombobox';
 import { ActionTooltip } from '@/components/ActionTooltip';
+import { CurrencyInput } from '@/components/CurrencyInput';
 
 interface QuotationItem {
   id?: string;
@@ -574,15 +575,15 @@ export default function QuotationsList() {
                             className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 text-xs font-mono font-bold text-center"
                           />
                         </div>
-                        <div className="w-28">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="Precio ($)"
+                        <div className="w-32">
+                          <CurrencyInput
                             value={fi.unit_price_usd}
-                            onChange={(e) => updateFormItem(index, 'unit_price_usd', e.target.value)}
-                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 text-xs font-mono font-bold text-right"
+                            onChange={(val) => updateFormItem(index, 'unit_price_usd', val)}
+                            size="sm"
+                            placeholder="Precio ($)"
+                            currencyPrefix="$"
+                            icon={null}
+                            decimals={2}
                           />
                         </div>
                         {formItems.length > 1 && (
