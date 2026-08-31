@@ -16,8 +16,6 @@ import {
   PackageCheck,
   TrendingUp,
   Trash2,
-  Barcode,
-  Layers,
   DollarSign,
   Download,
   Eye,
@@ -27,6 +25,7 @@ import {
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import { SearchableSelect } from '@/components/SearchableSelect';
+import { CurrencyInput } from '@/components/CurrencyInput';
 
 interface ReceptionItem {
   id?: string;
@@ -37,7 +36,9 @@ interface ReceptionItem {
   quantityReceived: number;
   quantityPending?: number;
   quantityReturned?: number;
-  unitCostUsd: number;
+  unitCostUsd: number; // Costo Factura Proveedor
+  landedFreightUnit?: number; // Flete prorrateado unitario
+  landedCostUsd?: number; // Costo Total / CPP (unitCostUsd + landedFreightUnit)
   discountPercentage?: number;
   discountAmount?: number;
   taxRate?: number;
@@ -60,7 +61,9 @@ interface ReceptionNote {
   payment_term?: string;
   currency?: string;
   exchange_rate?: number;
+  is_national?: boolean;
   status: string;
+  notes?: string;
   created_by_user_name?: string;
   created_at: string;
   items?: any[];
@@ -69,13 +72,14 @@ interface ReceptionNote {
 export function PurchaseReceptionsList() {
   const [receptions, setReceptions] = useState<ReceptionNote[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [showModal, setShowModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [viewDetailModal, setViewDetailModal] = useState<ReceptionNote | null>(null);
+  const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   // Aux Data
-  const [providers, setProviders] = useState<{ id: string; name: string; rif?: string }[]>([]);
+  const [providers, setProviders] = useState<{ id: string; name: string; tax_id: string }[]>([]);
   const [products, setProducts] = useState<{ id: string; name: string; sku: string; costUsd: number }[]>([]);
   const [orders, setOrders] = useState<{ id: string; order_number: string; supplier_name: string; total_usd?: number; items?: any[] }[]>([]);
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
@@ -85,6 +89,7 @@ export function PurchaseReceptionsList() {
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
   const [formSupplierName, setFormSupplierName] = useState('');
   const [formSupplierRif, setFormSupplierRif] = useState('');
+  const [hasNdrNumber, setHasNdrNumber] = useState<boolean>(false);
   const [formNdrNumber, setFormNdrNumber] = useState('');
   const [formWarehouseName, setFormWarehouseName] = useState('Almacén Principal');
   const [formPaymentTerm, setFormPaymentTerm] = useState('CONTADO');
@@ -108,10 +113,9 @@ export function PurchaseReceptionsList() {
   } | null>(null);
 
   // Active Modals for Item Details
-  const [activeSerialIndex, setActiveSerialIndex] = useState<number | null>(null);
-  const [activeBatchIndex, setActiveBatchIndex] = useState<number | null>(null);
   const [showLandedCostModal, setShowLandedCostModal] = useState<boolean>(false);
   const [landedFreightCost, setLandedFreightCost] = useState<number>(0);
+  const [appliedFreightCost, setAppliedFreightCost] = useState<number>(0);
 
   useEffect(() => {
     fetchReceptions();
@@ -288,30 +292,22 @@ export function PurchaseReceptionsList() {
     setFormItems(filtered.map((item, i) => ({ ...item, itemNumber: i + 1 })));
   };
 
-  const handleItemChange = (index: number, field: string, value: any) => {
-    const updated = [...formItems];
-    const target = updated[index];
-    if (field === 'productId') {
-      const selectedProd = products.find(p => p.id === value);
-      target.productId = value;
-      if (selectedProd) target.unitCostUsd = selectedProd.costUsd || 0;
-    } else if (field === 'quantityReceived') {
-      target.quantityReceived = Number(value);
-    } else if (field === 'unitCostUsd') {
-      target.unitCostUsd = Number(value);
-    } else if (field === 'discountPercentage') {
-      target.discountPercentage = Number(value);
-    } else if (field === 'model') {
-      target.model = value;
-    } else if (field === 'batchNumber') {
-      target.batchNumber = value;
-    } else if (field === 'expirationDate') {
-      target.expirationDate = value;
-    }
-    setFormItems(updated);
+  const handleUpdateItem = (index: number, patch: Partial<ReceptionItem>) => {
+    setFormItems(prev => prev.map((item, i) => {
+      if (i !== index) return item;
+      return { ...item, ...patch };
+    }));
   };
 
-  // Landed Cost Proration Algorithm
+  const handleSelectProduct = (index: number, productId: string) => {
+    const selectedProd = products.find(p => p.id === productId);
+    handleUpdateItem(index, {
+      productId,
+      unitCostUsd: selectedProd?.costUsd ?? 0,
+    });
+  };
+
+  // Landed Cost Proration Algorithm (Alternativa B: Costo Factura + Flete Unit. + Costo Final CPP)
   const applyLandedCostProration = () => {
     if (landedFreightCost <= 0 || formItems.length === 0) return;
 
@@ -327,16 +323,29 @@ export function PurchaseReceptionsList() {
       const proportion = itemValue / totalValueOfItems;
       const allocatedFreight = landedFreightCost * proportion;
       const extraPerUnit = item.quantityReceived > 0 ? allocatedFreight / item.quantityReceived : 0;
-      
+      const finalCost = item.unitCostUsd + extraPerUnit;
+
       return {
         ...item,
-        unitCostUsd: Number((item.unitCostUsd + extraPerUnit).toFixed(4)),
+        landedFreightUnit: Number(extraPerUnit.toFixed(4)),
+        landedCostUsd: Number(finalCost.toFixed(4)),
       };
     });
 
     setFormItems(prorated);
+    setAppliedFreightCost(landedFreightCost);
     setShowLandedCostModal(false);
     setLandedFreightCost(0);
+  };
+
+  const removeLandedCostProration = () => {
+    const cleaned = formItems.map(item => ({
+      ...item,
+      landedFreightUnit: 0,
+      landedCostUsd: item.unitCostUsd,
+    }));
+    setFormItems(cleaned);
+    setAppliedFreightCost(0);
   };
   const [errorFields, setErrorFields] = useState<{ [key: string]: boolean }>({});
 
@@ -351,7 +360,12 @@ export function PurchaseReceptionsList() {
       subtotal += net;
       totalTax += tax;
     });
-    return { subtotal, totalTax, total: subtotal + totalTax };
+    return { 
+      subtotal, 
+      freightCost: appliedFreightCost,
+      totalTax, 
+      total: subtotal + totalTax 
+    };
   };
 
   const totals = calculateTotals();
@@ -491,6 +505,7 @@ export function PurchaseReceptionsList() {
                   <th className="py-4 px-6">Almacén Destino</th>
                   <th className="py-4 px-6">Fecha Recepción</th>
                   <th className="py-4 px-6 text-center">Estado</th>
+                  <th className="py-4 px-6 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
@@ -508,6 +523,17 @@ export function PurchaseReceptionsList() {
                       <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-xs font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
                         <CheckCircle className="w-3 h-3 text-emerald-500" /> Procesado (Stock + CPP)
                       </span>
+                    </td>
+                    <td className="py-4 px-6 text-center">
+                      <button
+                        type="button"
+                        onClick={() => setViewDetailModal(r)}
+                        className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all duration-200 cursor-pointer inline-flex items-center gap-1 text-xs font-bold"
+                        title="Ver detalle de la recepción"
+                      >
+                        <Eye className="w-4 h-4" />
+                        <span>Ver</span>
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -654,15 +680,46 @@ export function PurchaseReceptionsList() {
 
                 {/* Operational Reception Fields */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">N° NDR (Guía / Despacho del Proveedor)</label>
-                    <input
-                      type="text"
-                      placeholder="Ej. NDR-009812 / Guía 44512"
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono font-semibold text-emerald-700 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                      value={formNdrNumber}
-                      onChange={(e) => setFormNdrNumber(e.target.value)}
-                    />
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        N° NDR (Guía / Despacho) <span className="text-[10px] lowercase font-normal text-slate-400">(Opcional)</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = !hasNdrNumber;
+                          setHasNdrNumber(next);
+                          if (!next) setFormNdrNumber('');
+                        }}
+                        className={`text-[11px] font-bold px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                          hasNdrNumber 
+                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' 
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700'
+                        }`}
+                      >
+                        {hasNdrNumber ? '✓ Con Guía' : '+ Agregar N° Guía'}
+                      </button>
+                    </div>
+
+                    {hasNdrNumber ? (
+                      <input
+                        type="text"
+                        placeholder="Ej. NDR-009812 / Guía 44512"
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono font-semibold text-emerald-700 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all animate-in fade-in duration-150"
+                        value={formNdrNumber}
+                        onChange={(e) => setFormNdrNumber(e.target.value)}
+                        autoFocus
+                      />
+                    ) : (
+                      <div 
+                        onClick={() => setHasNdrNumber(true)}
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-dashed border-slate-200 hover:border-emerald-300 rounded-xl text-xs text-slate-400 hover:text-emerald-600 transition-all cursor-pointer flex items-center justify-between"
+                      >
+                        <span>Sin guía física adjunta (Opcional)</span>
+                        <span className="text-[10px] font-semibold text-emerald-600 underline">Activar</span>
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -695,14 +752,29 @@ export function PurchaseReceptionsList() {
               {/* 2. Items Table Section */}
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Productos Físicamente Recibidos</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Productos Físicamente Recibidos</span>
+                    {appliedFreightCost > 0 && (
+                      <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 animate-in fade-in">
+                        <span>Flete Prorrateado: +${appliedFreightCost.toFixed(2)}</span>
+                        <button
+                          type="button"
+                          onClick={removeLandedCostProration}
+                          className="text-amber-900 hover:text-rose-600 font-bold ml-1 cursor-pointer"
+                          title="Quitar prorrateo"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    )}
+                  </div>
                   {selectedOrderId && formItems.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setShowLandedCostModal(true)}
                       className="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold hover:bg-amber-100 flex items-center gap-1 cursor-pointer transition-colors"
                     >
-                      <TrendingUp className="w-3.5 h-3.5" /> Prorratear Flete (Landed Cost)
+                      <TrendingUp className="w-3.5 h-3.5" /> {appliedFreightCost > 0 ? 'Recalcular Flete' : 'Prorratear Flete'}
                     </button>
                   )}
                 </div>
@@ -712,50 +784,42 @@ export function PurchaseReceptionsList() {
                     <thead>
                       <tr className="bg-slate-100 border-b border-slate-200 text-slate-600 uppercase font-semibold">
                         <th className="py-2.5 px-3 w-10 text-center">Reng</th>
-                        <th className="py-2.5 px-3 min-w-[180px]">Artículo / Producto</th>
-                        <th className="py-2.5 px-3 w-24">Modelo</th>
+                        <th className="py-2.5 px-3 min-w-[200px]">Artículo / Producto</th>
                         <th className="py-2.5 px-3 w-24 text-right">Cant Recibida</th>
-                        <th className="py-2.5 px-3 w-28 text-right">Costo U. ($)</th>
+                        <th className="py-2.5 px-3 w-28 text-right">Costo Factura ($)</th>
+                        {appliedFreightCost > 0 && (
+                          <>
+                            <th className="py-2.5 px-3 w-24 text-right text-amber-700 bg-amber-50/50">+ Flete Unit. ($)</th>
+                            <th className="py-2.5 px-3 w-28 text-right text-indigo-700 bg-indigo-50/50">Costo CPP ($)</th>
+                          </>
+                        )}
                         <th className="py-2.5 px-3 w-20 text-right">Pendiente</th>
-                        <th className="py-2.5 px-3 w-32 text-right">Neto ($)</th>
-                        <th className="py-2.5 px-3 w-28 text-center">Trazabilidad</th>
+                        <th className="py-2.5 px-3 w-32 text-right">Neto Factura ($)</th>
                         <th className="py-2.5 px-3 w-10 text-center"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {formItems.map((item, idx) => {
                         const net = item.quantityReceived * item.unitCostUsd;
+                        const freightUnit = item.landedFreightUnit || 0;
+                        const finalCost = item.landedCostUsd || (item.unitCostUsd + freightUnit);
+                        const prodObj = products.find(p => p.id === item.productId);
+                        const prodName = prodObj?.name || item.lineComment || `Producto #${idx + 1}`;
+                        const prodSku = prodObj?.sku;
 
                         return (
                           <tr key={idx} className="hover:bg-slate-50/50">
                             <td className="py-2 px-3 text-center font-mono font-bold text-slate-500">{idx + 1}</td>
                             <td className="py-2 px-3">
-                              <SearchableSelect
-                                icon={Package}
-                                value={item.productId}
-                                onChange={(val, opt) => {
-                                  handleItemChange(idx, 'productId', val);
-                                  if (opt && opt.label) {
-                                    handleItemChange(idx, 'lineComment', opt.label);
-                                  }
-                                }}
-                                options={products.map(p => ({
-                                  value: p.id,
-                                  label: p.name,
-                                  sublabel: `SKU: ${p.sku}`,
-                                }))}
-                                placeholder="Buscar producto..."
-                                allowCustomInput={true}
-                              />
-                            </td>
-                            <td className="py-2 px-3">
-                              <input
-                                type="text"
-                                placeholder="Modelo..."
-                                className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
-                                value={item.model || ''}
-                                onChange={(e) => handleItemChange(idx, 'model', e.target.value)}
-                              />
+                              <div className="flex items-center gap-2">
+                                <div className="p-1.5 bg-slate-100 rounded-lg text-slate-600 shrink-0">
+                                  <Package className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <span className="block font-bold text-slate-900 truncate">{prodName}</span>
+                                  {prodSku && <span className="block text-[11px] font-mono text-slate-500">SKU: {prodSku}</span>}
+                                </div>
+                              </div>
                             </td>
                             <td className="py-2 px-3 text-right">
                               <input
@@ -763,49 +827,34 @@ export function PurchaseReceptionsList() {
                                 min="1"
                                 className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-right font-mono"
                                 value={item.quantityReceived}
-                                onChange={(e) => handleItemChange(idx, 'quantityReceived', e.target.value)}
+                                onChange={(e) => handleUpdateItem(idx, { quantityReceived: Number(e.target.value) })}
                               />
                             </td>
-                            <td className="py-2 px-3 text-right">
-                              <input
-                                type="number"
-                                step="0.0001"
-                                className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-right font-mono"
+                            <td className="py-2 px-3 text-right w-28">
+                              <CurrencyInput
                                 value={item.unitCostUsd}
-                                onChange={(e) => handleItemChange(idx, 'unitCostUsd', e.target.value)}
+                                onChange={(val) => handleUpdateItem(idx, { unitCostUsd: Number(val) || 0 })}
+                                size="sm"
+                                decimals={4}
+                                icon={null}
+                                className="w-full text-right font-mono"
                               />
                             </td>
+                            {appliedFreightCost > 0 && (
+                              <>
+                                <td className="py-2 px-3 text-right font-mono text-xs font-bold text-amber-700 bg-amber-50/30">
+                                  +${freightUnit.toFixed(4)}
+                                </td>
+                                <td className="py-2 px-3 text-right font-mono text-xs font-black text-indigo-700 bg-indigo-50/30">
+                                  ${finalCost.toFixed(4)}
+                                </td>
+                              </>
+                            )}
                             <td className="py-2 px-3 text-right font-mono text-slate-500">
                               {item.quantityPending || 0}
                             </td>
                             <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">
                               ${net.toFixed(2)}
-                            </td>
-                            <td className="py-2 px-3 text-center">
-                              <div className="flex items-center justify-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => setActiveSerialIndex(idx)}
-                                  className={`p-1 rounded text-[10px] font-bold flex items-center gap-0.5 cursor-pointer ${
-                                    item.serials && item.serials.length > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'
-                                  }`}
-                                  title="Capturar Seriales"
-                                >
-                                  <Barcode className="w-3 h-3" />
-                                  <span>{item.serials?.length || 0}</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setActiveBatchIndex(idx)}
-                                  className={`p-1 rounded text-[10px] font-bold flex items-center gap-0.5 cursor-pointer ${
-                                    item.batchNumber ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
-                                  }`}
-                                  title="Capturar Lote y Expiración"
-                                >
-                                  <Layers className="w-3 h-3" />
-                                  <span>Lote</span>
-                                </button>
-                              </div>
                             </td>
                             <td className="py-2 px-3 text-center">
                               <button
@@ -827,14 +876,20 @@ export function PurchaseReceptionsList() {
               {/* 3. Footer Summary */}
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-slate-100">
                 <div className="text-xs text-slate-500">
-                  <span>Al procesar la nota, se actualizará el stock de forma atómica y se calculará el Costo Promedio Ponderado (CPP).</span>
+                  <span>Al procesar la nota, se actualizará el stock de forma atómica y se registrará el Costo Promedio Ponderado (CPP).</span>
                 </div>
 
                 <div className="bg-slate-50 px-6 py-3 rounded-2xl border border-slate-200/80 flex items-center gap-6 text-xs font-mono">
                   <div>
-                    <span className="text-slate-500 block">Subtotal:</span>
+                    <span className="text-slate-500 block">Subtotal Factura:</span>
                     <span className="font-bold text-slate-800">${totals.subtotal.toFixed(2)}</span>
                   </div>
+                  {totals.freightCost > 0 && (
+                    <div className="text-amber-700 bg-amber-50/80 border border-amber-200/80 px-2.5 py-1 rounded-xl">
+                      <span className="text-[10px] uppercase font-bold text-amber-600 block">Flete Prorrateado:</span>
+                      <span className="font-bold">+${totals.freightCost.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div>
                     <span className="text-slate-500 block">IVA Acumulado:</span>
                     <span className="font-bold text-slate-800">${totals.totalTax.toFixed(2)}</span>
@@ -868,122 +923,41 @@ export function PurchaseReceptionsList() {
         </div>
       )}
 
-      {/* Serial Capture Modal */}
-      {activeSerialIndex !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-xl w-full max-w-md p-6 space-y-4">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Barcode className="w-4 h-4 text-indigo-600" /> Captura de Seriales (Renglón {activeSerialIndex + 1})
-              </h4>
-              <button onClick={() => setActiveSerialIndex(null)} className="p-1 text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-500">Ingresa un número de serial por línea para las {formItems[activeSerialIndex]?.quantityReceived} unidades recibidas:</p>
-
-            <textarea
-              rows={5}
-              placeholder="SN-100001&#10;SN-100002&#10;SN-100003..."
-              className="w-full p-3 bg-slate-50 border rounded-xl text-xs font-mono"
-              value={(formItems[activeSerialIndex]?.serials || []).join('\n')}
-              onChange={(e) => {
-                const lines = e.target.value.split('\n');
-                const updated = [...formItems];
-                updated[activeSerialIndex].serials = lines;
-                setFormItems(updated);
-              }}
-            />
-
-            <button
-              onClick={() => setActiveSerialIndex(null)}
-              className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs rounded-xl cursor-pointer"
-            >
-              Guardar Seriales
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Batch Capture Modal */}
-      {activeBatchIndex !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-xl w-full max-w-md p-6 space-y-4">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Layers className="w-4 h-4 text-emerald-600" /> Lote y Vencimiento (Renglón {activeBatchIndex + 1})
-              </h4>
-              <button onClick={() => setActiveBatchIndex(null)} className="p-1 text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block font-semibold uppercase tracking-wider text-slate-500 mb-1">Número de Lote</label>
-                <input
-                  type="text"
-                  placeholder="LOT-2024-001"
-                  className="w-full px-3 py-2 bg-slate-50 border rounded-xl font-mono"
-                  value={formItems[activeBatchIndex]?.batchNumber || ''}
-                  onChange={(e) => handleItemChange(activeBatchIndex, 'batchNumber', e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold uppercase tracking-wider text-slate-500 mb-1">Fecha de Expiración</label>
-                <input
-                  type="date"
-                  className="w-full px-3 py-2 bg-slate-50 border rounded-xl"
-                  value={formItems[activeBatchIndex]?.expirationDate || ''}
-                  onChange={(e) => handleItemChange(activeBatchIndex, 'expirationDate', e.target.value)}
-                />
-              </div>
-            </div>
-
-            <button
-              onClick={() => setActiveBatchIndex(null)}
-              className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs rounded-xl cursor-pointer"
-            >
-              Guardar Lote
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Landed Cost Proration Modal */}
       {showLandedCostModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
           <div className="bg-white rounded-2xl border border-slate-100 shadow-xl w-full max-w-md p-6 space-y-4">
             <div className="flex justify-between items-center border-b pb-3">
               <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <DollarSign className="w-4 h-4 text-amber-600" /> Calculadora de Prorrateo de Flete / Costos
+                <DollarSign className="w-4 h-4 text-amber-600" /> Prorrateo de Flete / Costo en Destino (CPP)
               </h4>
               <button onClick={() => setShowLandedCostModal(false)} className="p-1 text-slate-400 hover:text-slate-600">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-500">Ingresa el costo total del flete o gastos de importación en USD para prorratearlo proporcionalmente entre todos los renglones recibidos:</p>
+            <p className="text-xs text-slate-500">
+              Ingresa el costo total del flete o transporte en USD para distribuirlo proporcionalmente entre los artículos recibidos. El costo de factura original no se borrará, se mostrarán ambas cifras desglosadas:
+            </p>
 
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Monto Total Flete ($)</label>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-sm font-mono font-bold"
+              <CurrencyInput
                 value={landedFreightCost}
-                onChange={(e) => setLandedFreightCost(Number(e.target.value))}
+                onChange={(val) => setLandedFreightCost(val)}
+                placeholder="0.00"
+                decimals={2}
+                icon={DollarSign}
+                className="w-full font-mono font-bold"
               />
             </div>
 
             <button
               onClick={applyLandedCostProration}
-              className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white font-medium text-xs rounded-xl cursor-pointer"
+              disabled={landedFreightCost <= 0}
+              className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 disabled:opacity-50 text-white font-semibold text-xs rounded-xl cursor-pointer transition-all shadow-xs"
             >
-              Aplicar Prorrateo a Costo Unitario
+              Calcular Prorrateo y Costo CPP
             </button>
           </div>
         </div>
@@ -1033,6 +1007,164 @@ export function PurchaseReceptionsList() {
                 className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-medium rounded-xl transition-all cursor-pointer text-xs shadow-xs"
               >
                 Entendido, Continuar Recepción
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Reception Detail Modal (Sally Enterprise UX Standard) */}
+      {viewDetailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-600">
+                  <Truck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Nota de Recepción {viewDetailModal.reception_number}</h3>
+                  <p className="text-xs text-slate-500 font-medium">Entrada física a almacén y costo promedio ponderado (CPP)</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewDetailModal(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6 overflow-y-auto flex-1">
+              {/* Metadata Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-2xs">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Proveedor</span>
+                  <span className="font-bold text-slate-900 text-sm block truncate">{viewDetailModal.supplier_name}</span>
+                  {viewDetailModal.supplier_rif && <span className="font-mono text-xs text-slate-500">RIF: {viewDetailModal.supplier_rif}</span>}
+                </div>
+
+                <div className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-2xs">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">N° Guía / NDR</span>
+                  <span className="font-bold text-emerald-700 font-mono text-sm block">{viewDetailModal.ndr_number || 'Sin N° Guía'}</span>
+                  <span className="text-xs text-slate-500">Almacén: {viewDetailModal.warehouse_name}</span>
+                </div>
+
+                <div className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-2xs">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Fecha de Recepción</span>
+                  <span className="font-bold text-slate-900 text-sm block">{new Date(viewDetailModal.created_at).toLocaleDateString()}</span>
+                  <span className="text-xs text-slate-500">Hora: {new Date(viewDetailModal.created_at).toLocaleTimeString()}</span>
+                </div>
+
+                <div className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-2xs">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Estado de Inventario</span>
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 inline-flex items-center gap-1">
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> Stock y CPP Actualizado
+                  </span>
+                </div>
+              </div>
+
+              {/* Items Table */}
+              <div className="rounded-2xl border border-slate-200/80 overflow-hidden bg-white shadow-2xs">
+                <div className="px-4 py-3 bg-slate-50/90 border-b border-slate-200/70 text-slate-700 font-bold text-xs uppercase tracking-wider flex justify-between items-center">
+                  <span>Productos Físicamente Recibidos</span>
+                  <span className="text-[11px] font-mono text-slate-500">Total ítems: {viewDetailModal.items?.length || 0}</span>
+                </div>
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200">
+                    <tr>
+                      <th className="py-2.5 px-4 w-10 text-center">#</th>
+                      <th className="py-2.5 px-4 min-w-[200px]">Artículo / Producto</th>
+                      <th className="py-2.5 px-4 text-right w-24">Cant. Recibida</th>
+                      <th className="py-2.5 px-4 text-right w-28">Costo Factura ($)</th>
+                      <th className="py-2.5 px-4 text-right w-24">Pendiente</th>
+                      <th className="py-2.5 px-4 text-right w-32">Neto Factura ($)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(viewDetailModal.items && viewDetailModal.items.length > 0) ? (
+                      viewDetailModal.items.map((item: any, idx: number) => {
+                        const qty = Number(item.quantity_received || item.quantityReceived || 0);
+                        const cost = Number(item.unit_cost_usd || item.unitCostUsd || 0);
+                        const net = Number(item.net_total || (qty * cost) || 0);
+                        const pending = Number(item.quantity_pending || item.quantityPending || 0);
+                        const prodObj = products.find(p => p.id === (item.product_id || item.productId));
+                        const name = prodObj?.name || item.line_comment || item.lineComment || `Producto #${idx + 1}`;
+                        const sku = prodObj?.sku || item.sku;
+
+                        return (
+                          <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-3 px-4 text-center font-mono font-bold text-slate-500">{idx + 1}</td>
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-2">
+                                <div className="p-1.5 bg-slate-100 rounded-lg text-slate-600 shrink-0">
+                                  <Package className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <span className="font-bold text-slate-900 block">{name}</span>
+                                  {sku && <span className="text-[11px] font-mono text-slate-500">SKU: {sku}</span>}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-right font-mono font-bold text-emerald-700">{qty}</td>
+                            <td className="py-3 px-4 text-right font-mono text-slate-900">${cost.toFixed(4)}</td>
+                            <td className="py-3 px-4 text-right font-mono text-slate-500">{pending}</td>
+                            <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">${net.toFixed(2)}</td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-slate-400">
+                          No hay renglones detallados registrados para esta recepción.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Luminous Financial Summary */}
+              <div className="p-5 bg-gradient-to-br from-emerald-50/90 via-slate-50 to-teal-50/60 border border-emerald-100/90 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="text-xs text-slate-500">
+                  <span>Recepción registrada por: <strong className="text-slate-700">{viewDetailModal.created_by_user_name || 'Operador'}</strong></span>
+                </div>
+                <div className="flex items-center gap-6 font-mono text-xs">
+                  <div>
+                    <span className="text-slate-500 block">Condición de Pago:</span>
+                    <span className="font-bold text-slate-900">{viewDetailModal.payment_term || 'CONTADO'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Moneda:</span>
+                    <span className="font-bold text-slate-900">{viewDetailModal.currency || 'USD'}</span>
+                  </div>
+                  <div className="border-l border-emerald-200 pl-6 text-base font-bold text-emerald-700">
+                    <span className="text-xs text-slate-500 block">TOTAL RECEPCIÓN:</span>
+                    <span>
+                      ${(
+                        viewDetailModal.items?.reduce(
+                          (acc: number, item: any) =>
+                            acc + Number(item.net_total || (Number(item.quantity_received || 0) * Number(item.unit_cost_usd || 0))),
+                          0
+                        ) || 0
+                      ).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end px-6 py-4 border-t border-slate-100 bg-slate-50/50 shrink-0">
+              <button
+                type="button"
+                onClick={() => setViewDetailModal(null)}
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-all cursor-pointer text-sm"
+              >
+                Cerrar
               </button>
             </div>
           </div>

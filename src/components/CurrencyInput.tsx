@@ -7,7 +7,7 @@ export interface CurrencyInputProps {
   value: number | string | undefined | null;
   onChange: (numericValue: number) => void;
   currencyPrefix?: string; // '$', 'Bs.', '€', '%'
-  icon?: LucideIcon;
+  icon?: LucideIcon | null;
   placeholder?: string;
   decimals?: number;
   min?: number;
@@ -19,6 +19,7 @@ export interface CurrencyInputProps {
   name?: string;
   autoFocus?: boolean;
   error?: boolean;
+  size?: 'sm' | 'md' | 'lg';
 }
 
 export const CurrencyInput: React.FC<CurrencyInputProps> = ({
@@ -37,6 +38,7 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
   name,
   autoFocus = false,
   error = false,
+  size = 'md',
 }) => {
   const [displayValue, setDisplayValue] = useState<string>('');
   const isFocused = useRef(false);
@@ -111,13 +113,14 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
     }
   };
 
+  const isSmall = size === 'sm';
   const hasIcon = Boolean(Icon);
 
   return (
     <div className="relative w-full">
       {Icon && (
-        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center pointer-events-none text-slate-400">
-          <Icon className="h-4.5 w-4.5" />
+        <div className={`absolute ${isSmall ? 'left-2.5' : 'left-3.5'} top-1/2 -translate-y-1/2 flex items-center pointer-events-none text-slate-400`}>
+          <Icon className={isSmall ? "h-3.5 w-3.5" : "h-4.5 w-4.5"} />
         </div>
       )}
 
@@ -136,8 +139,10 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
         onFocus={handleFocus}
         onBlur={handleBlur}
         className={`block w-full ${
-          hasIcon ? 'pl-11' : 'pl-3.5'
-        } ${currencyPrefix ? 'pr-12' : 'pr-3.5'} py-2.5 border rounded-xl text-sm font-medium transition-all duration-200 outline-none ${
+          hasIcon ? (isSmall ? 'pl-8' : 'pl-11') : (isSmall ? 'pl-2.5' : 'pl-3.5')
+        } ${currencyPrefix ? (isSmall ? 'pr-8' : 'pr-12') : (isSmall ? 'pr-2.5' : 'pr-3.5')} ${
+          isSmall ? 'py-1.5 text-xs rounded-lg' : 'py-2.5 text-sm rounded-xl'
+        } border font-medium transition-all duration-200 outline-none ${
           error
             ? 'border-rose-300 ring-2 ring-rose-500/20 bg-rose-50/20 text-rose-900 focus:border-rose-500'
             : 'border-slate-200 bg-slate-50/50 focus:bg-white text-slate-900 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 placeholder-slate-400'
@@ -145,8 +150,8 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
       />
 
       {currencyPrefix && (
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
-          <span className="text-[11px] font-bold text-slate-400 font-mono bg-slate-100/90 px-1.5 py-0.5 rounded-md border border-slate-200/60">
+        <div className={`absolute ${isSmall ? 'right-2' : 'right-3'} top-1/2 -translate-y-1/2 flex items-center pointer-events-none`}>
+          <span className={`${isSmall ? 'text-[9px] px-1 py-0.2' : 'text-[11px] px-1.5 py-0.5'} font-bold text-slate-400 font-mono bg-slate-100/90 rounded-md border border-slate-200/60`}>
             {currencyPrefix}
           </span>
         </div>

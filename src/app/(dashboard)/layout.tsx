@@ -117,7 +117,7 @@ export default function DashboardLayout({
     const fetchRates = async () => {
       try {
         // 1. Obtener tasas maestras del backend (actualizadas por cronjob BCV o superadmin)
-        const bcvRes = await apiClient.get('/admin/bcv/rate');
+        const bcvRes = await apiClient.get('/auth/bcv/rate');
         if (bcvRes.data) {
           if (bcvRes.data.USD?.rate) setBcvUsdRate(Number(bcvRes.data.USD.rate));
           else if (bcvRes.data.rate) setBcvUsdRate(Number(bcvRes.data.rate));
@@ -322,31 +322,31 @@ export default function DashboardLayout({
             </nav>
           </div>
 
-          {/* 💱 Monitor Dual de Divisas & Perfil (Diseño Responsivo) */}
+          {/* 💱 Monitor Dual de Divisas & Perfil (BCV USD + BCV EUR) */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <Link 
               href="/settings/company" 
-              className="flex items-center gap-1 select-none group cursor-pointer bg-slate-50 hover:bg-slate-100/80 p-1 rounded-xl border border-slate-200/70 transition-all"
-              title="Tasas oficiales vigentes del BCV. Clic para configurar."
+              className="flex items-center gap-1.5 select-none group cursor-pointer bg-slate-50 hover:bg-slate-100/80 p-1 rounded-xl border border-slate-200/70 transition-all shadow-2xs"
+              title="Tasas oficiales vigentes del Banco Central de Venezuela (BCV). Clic para configurar."
             >
-              {/* Badge Tasa USD */}
+              {/* Badge Tasa BCV USD */}
               <div className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg bg-white border border-emerald-100 text-emerald-800 shadow-2xs group-hover:border-emerald-200 transition-all">
                 <span className="text-[10px] font-black text-emerald-600">$</span>
                 <span className="font-mono text-xs font-black text-slate-800">
                   {currencyMode === 'MANUAL' ? manualRate.toFixed(2) : bcvUsdRate.toFixed(2)}
                 </span>
-                <span className="text-[9px] uppercase tracking-tighter text-slate-400 font-bold ml-0.5 hidden xl:inline-block">
+                <span className="text-[9px] uppercase tracking-tighter text-slate-400 font-bold ml-0.5 hidden md:inline-block">
                   {currencyMode === 'MANUAL' ? 'Manual' : 'BCV'}
                 </span>
               </div>
 
-              {/* Badge Tasa EUR (oculto en pantallas muy pequeñas para no saturar el header) */}
-              <div className="hidden xs:flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg bg-white border border-teal-100 text-teal-800 shadow-2xs group-hover:border-teal-200 transition-all">
-                <span className="text-[10px] font-black text-teal-600">€</span>
+              {/* Badge Tasa BCV EUR */}
+              <div className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg bg-white border border-blue-100 text-blue-800 shadow-2xs group-hover:border-blue-200 transition-all">
+                <span className="text-[10px] font-black text-blue-600">€</span>
                 <span className="font-mono text-xs font-black text-slate-800">
                   {bcvEurRate.toFixed(2)}
                 </span>
-                <span className="text-[9px] uppercase tracking-tighter text-slate-400 font-bold ml-0.5 hidden xl:inline-block">
+                <span className="text-[9px] uppercase tracking-tighter text-slate-400 font-bold ml-0.5 hidden md:inline-block">
                   BCV
                 </span>
               </div>

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Layers, Sparkles, Check, Edit3, Save, RotateCcw } from 'lucide-react';
 import { ALL_MODULE_GROUPS } from '../hooks/useSuperAdminData';
 import { SAAS_SUBMODULE_PRICING, SAAS_ADDON_PRICING } from '@/constants/domain-constants';
+import { CurrencyInput } from '@/components/CurrencyInput';
 
 interface AddonPricingTableProps {
   masterBcvRate: number;
@@ -155,15 +156,15 @@ export const AddonPricingTable: React.FC<AddonPricingTableProps> = ({ masterBcvR
                         </td>
                         <td className="py-2.5 px-4 text-right font-mono">
                           {isEditing ? (
-                            <div className="flex items-center justify-end gap-1">
-                              <span className="text-slate-400 font-bold">$</span>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.5"
+                            <div className="w-24 ml-auto">
+                              <CurrencyInput
                                 value={currentRate}
-                                onChange={(e) => handleRateChange(sub.key, Number(e.target.value))}
-                                className="w-20 px-2 py-1 bg-white border border-indigo-200 rounded-lg text-right font-mono font-bold text-xs text-slate-900 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                                onChange={(val) => handleRateChange(sub.key, val)}
+                                size="sm"
+                                placeholder="0.00"
+                                currencyPrefix="$"
+                                icon={null}
+                                decimals={2}
                               />
                             </div>
                           ) : (

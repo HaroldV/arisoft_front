@@ -20,6 +20,47 @@ export const ACCOUNT_STATUS = {
 
 export type AccountStatus = typeof ACCOUNT_STATUS[keyof typeof ACCOUNT_STATUS];
 
+export const ACCOUNT_TYPES = {
+  PAYABLE: 'PAYABLE',
+  RECEIVABLE: 'RECEIVABLE',
+} as const;
+
+export type AccountType = typeof ACCOUNT_TYPES[keyof typeof ACCOUNT_TYPES];
+
+export const ENTITY_TYPES = {
+  PROVIDER: 'PROVIDER',
+  CLIENT: 'CLIENT',
+  PARTNER: 'PARTNER',
+} as const;
+
+export type EntityType = typeof ENTITY_TYPES[keyof typeof ENTITY_TYPES];
+
+export const PAYMENT_METHODS = {
+  CASH_BS: 'CASH_BS',
+  DEBIT_BS: 'DEBIT_BS',
+  CASH_USD: 'CASH_USD',
+  TRANSFER_USD: 'TRANSFER_USD',
+} as const;
+
+export type PaymentMethod = typeof PAYMENT_METHODS[keyof typeof PAYMENT_METHODS];
+
+export const PAYMENT_TERMS = {
+  CONTADO: 'CONTADO',
+  CREDITO_7: 'CREDITO_7',
+  CREDITO_15: 'CREDITO_15',
+  CREDITO_30: 'CREDITO_30',
+} as const;
+
+export type PaymentTerm = typeof PAYMENT_TERMS[keyof typeof PAYMENT_TERMS];
+
+export const CURRENCIES = {
+  USD: 'USD',
+  VES: 'VES',
+  EUR: 'EUR',
+} as const;
+
+export type Currency = typeof CURRENCIES[keyof typeof CURRENCIES];
+
 export const ORDER_STATUS = {
   DRAFT: 'DRAFT',
   SENT: 'SENT',
