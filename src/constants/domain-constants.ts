@@ -44,6 +44,23 @@ export const PAYMENT_METHODS = {
 
 export type PaymentMethod = typeof PAYMENT_METHODS[keyof typeof PAYMENT_METHODS];
 
+export const PAYMENT_TERMS = {
+  CONTADO: 'CONTADO',
+  CREDITO_7: 'CREDITO_7',
+  CREDITO_15: 'CREDITO_15',
+  CREDITO_30: 'CREDITO_30',
+} as const;
+
+export type PaymentTerm = typeof PAYMENT_TERMS[keyof typeof PAYMENT_TERMS];
+
+export const CURRENCIES = {
+  USD: 'USD',
+  VES: 'VES',
+  EUR: 'EUR',
+} as const;
+
+export type Currency = typeof CURRENCIES[keyof typeof CURRENCIES];
+
 export const ORDER_STATUS = {
   DRAFT: 'DRAFT',
   SENT: 'SENT',
