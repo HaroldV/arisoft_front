@@ -177,7 +177,21 @@ export function PurchaseOrderDetailModal({ order, products, onClose }: PurchaseO
         </div>
 
         {/* Modal Footer */}
-        <div className="flex items-center justify-end px-6 py-4 border-t border-slate-100 bg-slate-50/50 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/50 shrink-0">
+          <div>
+            {order.status !== 'CANCELLED' && order.status !== ORDER_STATUS.COMPLETED && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  window.location.href = `/inventory/purchases/receptions?orderId=${order.id}&new=true`;
+                }}
+                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:from-emerald-700 active:to-teal-700 text-white font-semibold rounded-xl transition-all shadow-md shadow-emerald-200 text-sm cursor-pointer"
+              >
+                <span>Procesar Recepción de Almacén</span>
+              </button>
+            )}
+          </div>
           <button
             type="button"
             onClick={onClose}

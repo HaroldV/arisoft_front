@@ -27,6 +27,13 @@ import apiClient from '@/infrastructure/api/api-client';
 import { useAuth } from '@/context/AuthContext';
 import { CurrencyInput } from '@/components/CurrencyInput';
 
+export interface ProductVariation {
+  name: string;
+  quantity: number;
+  sku?: string;
+  unit_cost?: number;
+}
+
 interface Product {
   id: string;
   sku: string;
@@ -37,6 +44,7 @@ interface Product {
   current_stock: number;
   image_url?: string;
   imageUrl?: string;
+  variations?: ProductVariation[];
 }
 
 interface Client {
@@ -48,6 +56,7 @@ interface Client {
 interface CartItem {
   product: Product;
   quantity: number;
+  variation?: ProductVariation;
 }
 
 export const PosInterface: React.FC = () => {
@@ -57,6 +66,9 @@ export const PosInterface: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  
+  // Variation Selection Modal
+  const [variationModalProduct, setVariationModalProduct] = useState<Product | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClientId, setSelectedClientId] = useState<string>('');
@@ -204,24 +216,38 @@ export const PosInterface: React.FC = () => {
     }
   }, [searchQuery, products]);
 
-  const addToCart = (product: Product) => {
+  const addToCart = (product: Product, variation?: ProductVariation) => {
+    // If product has variations and none was selected yet, open variation selector modal
+    if (!variation && product.variations && product.variations.length > 0) {
+      setVariationModalProduct(product);
+      return;
+    }
+
     setCart(prev => {
-      const existing = prev.find(item => item.product.id === product.id);
+      const existing = prev.find(item => 
+        item.product.id === product.id && 
+        (item.variation?.name === variation?.name)
+      );
+
       if (existing) {
         return prev.map(item => 
-          item.product.id === product.id 
+          item.product.id === product.id && item.variation?.name === variation?.name
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
-      return [...prev, { product, quantity: 1 }];
+      return [...prev, { product, quantity: 1, variation }];
     });
+
+    if (variationModalProduct) {
+      setVariationModalProduct(null);
+    }
   };
 
-  const updateQuantity = (productId: string, delta: number) => {
+  const updateQuantity = (productId: string, delta: number, variationName?: string) => {
     setCart(prev => 
       prev.map(item => {
-        if (item.product.id === productId) {
+        if (item.product.id === productId && item.variation?.name === variationName) {
           const newQty = item.quantity + delta;
           return newQty > 0 ? { ...item, quantity: newQty } : null;
         }
@@ -230,8 +256,8 @@ export const PosInterface: React.FC = () => {
     );
   };
 
-  const removeFromCart = (productId: string) => {
-    setCart(prev => prev.filter(item => item.product.id !== productId));
+  const removeFromCart = (productId: string, variationName?: string) => {
+    setCart(prev => prev.filter(item => !(item.product.id === productId && item.variation?.name === variationName)));
   };
 
   // Calculations
@@ -485,6 +511,11 @@ export const PosInterface: React.FC = () => {
                               {p.name}
                             </h4>
                             <div className="flex items-center gap-2 mt-0.5">
+                              {p.variations && p.variations.length > 0 && (
+                                <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-1.5 py-0.2 rounded-full">
+                                  {p.variations.length} {p.variations.length === 1 ? 'Variante' : 'Variantes'}
+                                </span>
+                              )}
                               <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full border ${
                                 isOut 
                                   ? 'bg-rose-50 text-rose-700 border-rose-200' 
@@ -519,7 +550,7 @@ export const PosInterface: React.FC = () => {
                               addToCart(p);
                             }}
                             className="p-2 bg-indigo-50 group-hover:bg-indigo-600 text-indigo-600 group-hover:text-white rounded-xl border border-indigo-200/70 group-hover:border-indigo-600 transition-all shadow-2xs cursor-pointer active:scale-90"
-                            title="Agregar al carrito"
+                            title={p.variations && p.variations.length > 0 ? "Seleccionar variación" : "Agregar al carrito"}
                           >
                             <Plus className="h-4 w-4" />
                           </button>
@@ -560,6 +591,11 @@ export const PosInterface: React.FC = () => {
                       <h4 className="font-bold text-slate-900 text-sm mt-1 group-hover:text-indigo-600 line-clamp-2 w-full leading-tight min-h-[2.5rem]">
                         {p.name}
                       </h4>
+                      {p.variations && p.variations.length > 0 && (
+                        <span className="inline-block mt-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-md w-fit">
+                          {p.variations.length} {p.variations.length === 1 ? 'Variante' : 'Variantes'}
+                        </span>
+                      )}
                       
                       <div className="flex items-baseline justify-between mt-3 pt-2 border-t border-slate-100 w-full">
                         <div>
@@ -662,10 +698,22 @@ export const PosInterface: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-2">
-                {cart.map((item) => (
-                  <div key={item.product.id} className="bg-white p-3 rounded-xl border border-slate-200/80 flex items-center justify-between gap-3 shadow-xs">
+                {cart.map((item, idx) => (
+                  <div key={`${item.product.id}-${item.variation?.name || 'main'}-${idx}`} className="bg-white p-3 rounded-xl border border-slate-200/80 flex items-center justify-between gap-3 shadow-xs">
                     <div className="flex-1 min-w-0">
                       <h5 className="font-bold text-slate-800 text-sm truncate">{item.product.name}</h5>
+                      {item.variation && (
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-md">
+                            {item.variation.name}
+                          </span>
+                          {item.variation.sku && (
+                            <span className="text-[10px] font-mono text-slate-400">
+                              {item.variation.sku}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <span className="text-xs font-semibold text-primary-600">${item.product.priceUsd.toFixed(2)}</span>
                         <span className="text-[10px] text-slate-400 font-mono">({(item.product.priceUsd * exchangeRate).toFixed(2)} Bs.)</span>
@@ -674,20 +722,20 @@ export const PosInterface: React.FC = () => {
 
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => updateQuantity(item.product.id, -1)}
+                        onClick={() => updateQuantity(item.product.id, -1, item.variation?.name)}
                         className="p-1 hover:bg-slate-100 rounded text-slate-500 cursor-pointer"
                       >
                         <Minus className="h-3.5 w-3.5" />
                       </button>
                       <span className="w-6 text-center font-bold text-sm text-slate-800">{item.quantity}</span>
                       <button
-                        onClick={() => updateQuantity(item.product.id, 1)}
+                        onClick={() => updateQuantity(item.product.id, 1, item.variation?.name)}
                         className="p-1 hover:bg-slate-100 rounded text-slate-500 cursor-pointer"
                       >
                         <Plus className="h-3.5 w-3.5" />
                       </button>
                       <button
-                        onClick={() => removeFromCart(item.product.id)}
+                        onClick={() => removeFromCart(item.product.id, item.variation?.name)}
                         className="p-1 hover:bg-slate-100 text-rose-500 rounded ml-1 cursor-pointer"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -1551,6 +1599,134 @@ export const PosInterface: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Variation Selection Modal (Sally Enterprise UX Standard) */}
+      {variationModalProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-lg max-h-[92vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            {/* Header Fijo */}
+            <div className="flex justify-between items-center px-6 py-4.5 border-b border-slate-100 bg-gradient-to-r from-indigo-50/80 via-white to-indigo-50/30 shrink-0">
+              <div className="flex items-center gap-3.5">
+                <div className="bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-xl p-3 shadow-md shadow-indigo-100 flex items-center justify-center">
+                  <LayoutGrid className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                    Seleccionar Variación
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    {variationModalProduct.name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVariationModalProduct(null)}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Variations List */}
+            <div className="p-6 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
+              <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
+                <span>Variantes Disponibles</span>
+                <span className="font-mono text-slate-600 font-semibold">{variationModalProduct.variations?.length || 0} opciones</span>
+              </div>
+
+              <div className="space-y-2">
+                {/* Opción Producto Base (General) */}
+                <div
+                  onClick={() => addToCart(variationModalProduct, { name: 'Estándar / Base', quantity: variationModalProduct.current_stock ?? 0 })}
+                  className="p-3.5 rounded-xl border border-slate-200/90 hover:border-indigo-500 hover:bg-indigo-50/30 transition-all flex items-center justify-between gap-3 cursor-pointer group bg-white shadow-2xs"
+                >
+                  <div className="flex-1 min-w-0">
+                    <h5 className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                      Producto Base (General)
+                    </h5>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[11px] text-slate-500 font-medium">
+                        Stock Global: <strong className="text-slate-800 font-mono">{variationModalProduct.current_stock ?? 0} un</strong>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="text-right">
+                      <div className="text-sm font-black text-slate-900 font-mono leading-tight">
+                        ${(variationModalProduct.priceUsd ?? 0).toFixed(2)}
+                      </div>
+                      <div className="text-[10px] font-bold text-slate-400 font-mono">
+                        Bs. {((variationModalProduct.priceUsd ?? 0) * exchangeRate).toFixed(2)}
+                      </div>
+                    </div>
+                    <div className="p-2 bg-indigo-50 group-hover:bg-indigo-600 text-indigo-600 group-hover:text-white rounded-xl transition-all">
+                      <Plus className="h-4 w-4" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lista de Variaciones Específicas */}
+                {variationModalProduct.variations?.map((v, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => addToCart(variationModalProduct, v)}
+                    className="p-3.5 rounded-xl border border-slate-200/90 hover:border-indigo-500 hover:bg-indigo-50/30 transition-all flex items-center justify-between gap-3 cursor-pointer group bg-white shadow-2xs"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h5 className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                          {v.name}
+                        </h5>
+                        {v.sku && (
+                          <span className="font-mono text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/60">
+                            {v.sku}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-md font-mono">
+                          Stock: {v.quantity ?? 0} un
+                        </span>
+                        {v.unit_cost !== undefined && v.unit_cost > 0 && (
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            Costo: ${v.unit_cost.toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="text-right">
+                        <div className="text-sm font-black text-slate-900 font-mono leading-tight">
+                          ${(variationModalProduct.priceUsd ?? 0).toFixed(2)}
+                        </div>
+                        <div className="text-[10px] font-bold text-slate-400 font-mono">
+                          Bs. {((variationModalProduct.priceUsd ?? 0) * exchangeRate).toFixed(2)}
+                        </div>
+                      </div>
+                      <div className="p-2 bg-indigo-50 group-hover:bg-indigo-600 text-indigo-600 group-hover:text-white rounded-xl transition-all">
+                        <Plus className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer Fijo */}
+            <div className="flex justify-end items-center px-6 py-4 border-t border-slate-100 bg-slate-50/80 shrink-0">
+              <button
+                type="button"
+                onClick={() => setVariationModalProduct(null)}
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold rounded-xl transition-all text-sm cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}

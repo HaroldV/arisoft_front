@@ -28,6 +28,9 @@ export interface PurchaseOrder {
   is_national?: boolean;
   status: OrderStatus | string;
   expected_date?: string;
+  cancellation_reason?: string;
+  cancelled_at?: string;
+  cancelled_by_user_id?: string;
   subtotal_usd: number;
   global_discount_amount?: number;
   global_surcharge_amount?: number;

@@ -111,7 +111,7 @@ export function BulkPriceUpdate() {
     setSuccess(null);
 
     try {
-      const res = await apiClient.post('/inventory/products/bulk-update-prices', {
+      const res = await apiClient.post('/purchases/products/bulk-update-prices', {
         productIds: selectedProductIds,
         mode,
         value,

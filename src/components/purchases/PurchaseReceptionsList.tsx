@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { 
   Truck, 
   Plus, 
@@ -101,28 +102,40 @@ export function PurchaseReceptionsList() {
   // Items State
   const [formItems, setFormItems] = useState<ReceptionItem[]>([]);
 
-  // Discrepancy State
+  // Discrepancy & Rejection State
   const [hasDiscrepancy, setHasDiscrepancy] = useState(false);
   const [discrepancyReason, setDiscrepancyReason] = useState<string | null>(null);
-  const [isReplacingOrder, setIsReplacingOrder] = useState(false);
-  const [successModalInfo, setSuccessModalInfo] = useState<{
-    title: string;
-    message: string;
-    oldOrderNumber?: string;
-    newOrderNumber?: string;
+  const [isCancellingOrder, setIsCancellingOrder] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectionReasonInput, setRejectionReasonInput] = useState('');
+  const [successCancelledInfo, setSuccessCancelledInfo] = useState<{
+    orderNumber: string;
+    reason: string;
   } | null>(null);
 
-  // Active Modals for Item Details
-  const [showLandedCostModal, setShowLandedCostModal] = useState<boolean>(false);
-  const [landedFreightCost, setLandedFreightCost] = useState<number>(0);
-  const [appliedFreightCost, setAppliedFreightCost] = useState<number>(0);
+  const searchParams = useSearchParams();
+  const preselectedOrderId = searchParams.get('orderId');
+  const isAutoNew = searchParams.get('new') === 'true';
+  const autoImportedRef = useRef(false);
 
   useEffect(() => {
     fetchReceptions();
     fetchAuxData();
   }, []);
 
-  // Real-time Discrepancy Detection
+  // Handle query parameter auto-importing
+  useEffect(() => {
+    if (orders.length > 0 && preselectedOrderId && !autoImportedRef.current) {
+      autoImportedRef.current = true;
+      handleImportOrder(preselectedOrderId);
+      setShowModal(true);
+    } else if (isAutoNew && !autoImportedRef.current) {
+      autoImportedRef.current = true;
+      setShowModal(true);
+    }
+  }, [orders, preselectedOrderId, isAutoNew]);
+
+  // Real-time Discrepancy Detection against Source Purchase Order
   useEffect(() => {
     if (!selectedOrderId) {
       setHasDiscrepancy(false);
@@ -144,13 +157,13 @@ export function PurchaseReceptionsList() {
       const ordItem = selected.items.find((oi: any) => oi.product_id === item.productId);
       if (!ordItem) {
         mismatchFound = true;
-        reason = `El producto ingresado no pertenecía a la Orden de Compra originaria (${selected.order_number || ''}).`;
+        reason = `El producto no corresponde a la Orden de Compra pactada (${selected.order_number || ''}).`;
         break;
       }
 
-      if (Number(item.quantityReceived || 0) > Number(ordItem.quantity_ordered || 0)) {
+      if (Number(item.quantityReceived || 0) !== Number(ordItem.quantity_ordered || 0)) {
         mismatchFound = true;
-        reason = `La cantidad ingresada (${item.quantityReceived}) supera la cantidad pedida (${ordItem.quantity_ordered}) en la Orden ${selected.order_number || ''}.`;
+        reason = `La cantidad recibida (${item.quantityReceived}) difiere de la cantidad pactada (${ordItem.quantity_ordered}) en la Orden ${selected.order_number || ''}.`;
         break;
       }
     }
@@ -159,44 +172,39 @@ export function PurchaseReceptionsList() {
     setDiscrepancyReason(mismatchFound ? reason : null);
   }, [formItems, selectedOrderId, orders]);
 
-  const handleCancelAndReplaceOrder = async () => {
-    if (!selectedOrderId) return;
-    setIsReplacingOrder(true);
+  const handleOpenRejectModal = () => {
+    const defaultReason = discrepancyReason 
+      ? `Rechazado en almacén: ${discrepancyReason}` 
+      : 'Rechazado en almacén por inconsistencias físicas con la Orden de Compra.';
+    setRejectionReasonInput(defaultReason);
+    setShowRejectModal(true);
+  };
+
+  const handleConfirmRejectAndCancelOrder = async () => {
+    if (!selectedOrderId || !rejectionReasonInput.trim()) return;
+    setIsCancellingOrder(true);
     setError(null);
 
     try {
       const selected = orders.find(o => o.id === selectedOrderId);
-      const res = await apiClient.post(`/purchases/orders/${selectedOrderId}/cancel-and-replace`, {
-        cancellationReason: `Anulada por discrepancia detectada durante recepción en almacén. ${discrepancyReason || ''}`,
-        items: formItems.map(i => ({
-          productId: i.productId,
-          model: i.model,
-          warehouseId: i.warehouseId,
-          quantityOrdered: i.quantityReceived,
-          unitCostUsd: i.unitCostUsd,
-          discountPercentage: i.discountPercentage,
-          discountAmount: i.discountAmount,
-          taxRate: i.taxRate,
-          additionalTaxAmount: i.additionalTaxAmount,
-          lineComment: i.lineComment,
-        })),
+      await apiClient.post(`/purchases/orders/${selectedOrderId}/cancel`, {
+        reason: rejectionReasonInput.trim(),
       });
 
-      const newOrder = res.data;
+      setShowRejectModal(false);
+      setShowModal(false);
+      resetForm();
       await fetchAuxData();
-      setSelectedOrderId(newOrder.id);
-      setHasDiscrepancy(false);
-      setDiscrepancyReason(null);
-      setSuccessModalInfo({
-        title: 'Orden de Compra Sustituida',
-        message: 'La Orden de Compra anterior fue anulada fiscalmente por discrepancia. Se ha generado exitosamente la nueva Orden de Compra ajustada a las cantidades reales recibidas en almacén.',
-        oldOrderNumber: selected?.order_number,
-        newOrderNumber: newOrder.order_number,
+      await fetchReceptions();
+
+      setSuccessCancelledInfo({
+        orderNumber: selected?.order_number || 'N/A',
+        reason: rejectionReasonInput.trim(),
       });
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al anular y sustituir la Orden de Compra');
+      setError(err.response?.data?.message || 'Error al anular la Orden de Compra');
     } finally {
-      setIsReplacingOrder(false);
+      setIsCancellingOrder(false);
     }
   };
 
@@ -307,46 +315,6 @@ export function PurchaseReceptionsList() {
     });
   };
 
-  // Landed Cost Proration Algorithm (Alternativa B: Costo Factura + Flete Unit. + Costo Final CPP)
-  const applyLandedCostProration = () => {
-    if (landedFreightCost <= 0 || formItems.length === 0) return;
-
-    let totalValueOfItems = 0;
-    formItems.forEach(i => {
-      totalValueOfItems += i.quantityReceived * i.unitCostUsd;
-    });
-
-    if (totalValueOfItems <= 0) return;
-
-    const prorated = formItems.map(item => {
-      const itemValue = item.quantityReceived * item.unitCostUsd;
-      const proportion = itemValue / totalValueOfItems;
-      const allocatedFreight = landedFreightCost * proportion;
-      const extraPerUnit = item.quantityReceived > 0 ? allocatedFreight / item.quantityReceived : 0;
-      const finalCost = item.unitCostUsd + extraPerUnit;
-
-      return {
-        ...item,
-        landedFreightUnit: Number(extraPerUnit.toFixed(4)),
-        landedCostUsd: Number(finalCost.toFixed(4)),
-      };
-    });
-
-    setFormItems(prorated);
-    setAppliedFreightCost(landedFreightCost);
-    setShowLandedCostModal(false);
-    setLandedFreightCost(0);
-  };
-
-  const removeLandedCostProration = () => {
-    const cleaned = formItems.map(item => ({
-      ...item,
-      landedFreightUnit: 0,
-      landedCostUsd: item.unitCostUsd,
-    }));
-    setFormItems(cleaned);
-    setAppliedFreightCost(0);
-  };
   const [errorFields, setErrorFields] = useState<{ [key: string]: boolean }>({});
 
   const calculateTotals = () => {
@@ -362,7 +330,6 @@ export function PurchaseReceptionsList() {
     });
     return { 
       subtotal, 
-      freightCost: appliedFreightCost,
       totalTax, 
       total: subtotal + totalTax 
     };
@@ -520,9 +487,15 @@ export function PurchaseReceptionsList() {
                     </td>
                     <td className="py-4 px-6 text-slate-500 text-xs">{new Date(r.created_at).toLocaleString()}</td>
                     <td className="py-4 px-6 text-center">
-                      <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-xs font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3 text-emerald-500" /> Procesado (Stock + CPP)
-                      </span>
+                      {r.status === 'REVERSED' ? (
+                        <span className="bg-rose-50 text-rose-700 border border-rose-100 text-xs font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                          <X className="w-3 h-3 text-rose-500" /> Revertida
+                        </span>
+                      ) : (
+                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-xs font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3 text-emerald-500" /> Procesado (Stock + CPP)
+                        </span>
+                      )}
                     </td>
                     <td className="py-4 px-6 text-center">
                       <button
@@ -642,37 +615,27 @@ export function PurchaseReceptionsList() {
 
                 {/* Real-Time Discrepancy Warning Banner */}
                 {hasDiscrepancy && (
-                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-3 animate-in fade-in duration-200">
+                  <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl space-y-3 animate-in fade-in duration-200">
                     <div className="flex items-start gap-3">
-                      <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                      <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
                       <div className="space-y-1">
-                        <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wider">
-                          Discrepancia Detectada con la Orden de Compra Original
+                        <h4 className="text-xs font-bold text-rose-900 uppercase tracking-wider">
+                          Incongruencia Detectada con la Orden de Compra Origen
                         </h4>
-                        <p className="text-xs text-amber-800 leading-relaxed">
-                          {discrepancyReason || 'Los productos o cantidades en este despacho difieren de la Orden de Compra seleccionada.'} Para mantener la integridad fiscal e inventario, te sugerimos anular la orden actual y sustituirla por una nueva ajustada al despacho real.
+                        <p className="text-xs text-rose-800 leading-relaxed">
+                          {discrepancyReason || 'Las cantidades recibidas no coinciden exactamente con la Orden de Compra pactada.'} Almacén no debe alterar costos ni fletes negociados. Debes rechazar el despacho para anular la orden de compra y notificar al equipo de compras para su corrección.
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-amber-200/60">
+                    <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-rose-200/60">
                       <button
                         type="button"
-                        disabled={isReplacingOrder}
-                        onClick={handleCancelAndReplaceOrder}
-                        className="flex items-center gap-2 px-3.5 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-semibold rounded-xl text-xs transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                        onClick={handleOpenRejectModal}
+                        className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-semibold rounded-xl text-xs transition-all shadow-xs cursor-pointer"
                       >
-                        {isReplacingOrder ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            <span>Procesando Sustitución...</span>
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="w-3.5 h-3.5" />
-                            <span>Anular OC Actual y Crear Nueva Ajustada</span>
-                          </>
-                        )}
+                        <X className="w-4 h-4" />
+                        <span>Rechazar Despacho y Anular Orden de Compra</span>
                       </button>
                     </div>
                   </div>
@@ -752,31 +715,7 @@ export function PurchaseReceptionsList() {
               {/* 2. Items Table Section */}
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Productos Físicamente Recibidos</span>
-                    {appliedFreightCost > 0 && (
-                      <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 animate-in fade-in">
-                        <span>Flete Prorrateado: +${appliedFreightCost.toFixed(2)}</span>
-                        <button
-                          type="button"
-                          onClick={removeLandedCostProration}
-                          className="text-amber-900 hover:text-rose-600 font-bold ml-1 cursor-pointer"
-                          title="Quitar prorrateo"
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    )}
-                  </div>
-                  {selectedOrderId && formItems.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowLandedCostModal(true)}
-                      className="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold hover:bg-amber-100 flex items-center gap-1 cursor-pointer transition-colors"
-                    >
-                      <TrendingUp className="w-3.5 h-3.5" /> {appliedFreightCost > 0 ? 'Recalcular Flete' : 'Prorratear Flete'}
-                    </button>
-                  )}
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Verificación Física de Artículos Recibidos</span>
                 </div>
 
                 <div className="overflow-x-auto border border-slate-200 rounded-2xl">
@@ -784,33 +723,23 @@ export function PurchaseReceptionsList() {
                     <thead>
                       <tr className="bg-slate-100 border-b border-slate-200 text-slate-600 uppercase font-semibold">
                         <th className="py-2.5 px-3 w-10 text-center">Reng</th>
-                        <th className="py-2.5 px-3 min-w-[200px]">Artículo / Producto</th>
-                        <th className="py-2.5 px-3 w-24 text-right">Cant Recibida</th>
-                        <th className="py-2.5 px-3 w-28 text-right">Costo Factura ($)</th>
-                        {appliedFreightCost > 0 && (
-                          <>
-                            <th className="py-2.5 px-3 w-24 text-right text-amber-700 bg-amber-50/50">+ Flete Unit. ($)</th>
-                            <th className="py-2.5 px-3 w-28 text-right text-indigo-700 bg-indigo-50/50">Costo CPP ($)</th>
-                          </>
-                        )}
-                        <th className="py-2.5 px-3 w-20 text-right">Pendiente</th>
-                        <th className="py-2.5 px-3 w-32 text-right">Neto Factura ($)</th>
-                        <th className="py-2.5 px-3 w-10 text-center"></th>
+                        <th className="py-2.5 px-3 min-w-[220px]">Artículo / Producto</th>
+                        <th className="py-2.5 px-3 w-28 text-right">Cant. Recibida</th>
+                        <th className="py-2.5 px-3 w-28 text-right">Costo Pactado OC ($)</th>
+                        <th className="py-2.5 px-3 w-32 text-right">Total Renglón ($)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {formItems.map((item, idx) => {
                         const net = item.quantityReceived * item.unitCostUsd;
-                        const freightUnit = item.landedFreightUnit || 0;
-                        const finalCost = item.landedCostUsd || (item.unitCostUsd + freightUnit);
                         const prodObj = products.find(p => p.id === item.productId);
                         const prodName = prodObj?.name || item.lineComment || `Producto #${idx + 1}`;
                         const prodSku = prodObj?.sku;
 
                         return (
                           <tr key={idx} className="hover:bg-slate-50/50">
-                            <td className="py-2 px-3 text-center font-mono font-bold text-slate-500">{idx + 1}</td>
-                            <td className="py-2 px-3">
+                            <td className="py-3 px-3 text-center font-mono font-bold text-slate-500">{idx + 1}</td>
+                            <td className="py-3 px-3">
                               <div className="flex items-center gap-2">
                                 <div className="p-1.5 bg-slate-100 rounded-lg text-slate-600 shrink-0">
                                   <Package className="w-4 h-4" />
@@ -821,49 +750,20 @@ export function PurchaseReceptionsList() {
                                 </div>
                               </div>
                             </td>
-                            <td className="py-2 px-3 text-right">
+                            <td className="py-3 px-3 text-right">
                               <input
                                 type="number"
-                                min="1"
-                                className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-right font-mono"
+                                min="0"
+                                className="w-24 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-right font-mono font-bold"
                                 value={item.quantityReceived}
                                 onChange={(e) => handleUpdateItem(idx, { quantityReceived: Number(e.target.value) })}
                               />
                             </td>
-                            <td className="py-2 px-3 text-right w-28">
-                              <CurrencyInput
-                                value={item.unitCostUsd}
-                                onChange={(val) => handleUpdateItem(idx, { unitCostUsd: Number(val) || 0 })}
-                                size="sm"
-                                decimals={4}
-                                icon={null}
-                                className="w-full text-right font-mono"
-                              />
+                            <td className="py-3 px-3 text-right font-mono font-semibold text-slate-700">
+                              ${Number(item.unitCostUsd || 0).toFixed(2)}
                             </td>
-                            {appliedFreightCost > 0 && (
-                              <>
-                                <td className="py-2 px-3 text-right font-mono text-xs font-bold text-amber-700 bg-amber-50/30">
-                                  +${freightUnit.toFixed(4)}
-                                </td>
-                                <td className="py-2 px-3 text-right font-mono text-xs font-black text-indigo-700 bg-indigo-50/30">
-                                  ${finalCost.toFixed(4)}
-                                </td>
-                              </>
-                            )}
-                            <td className="py-2 px-3 text-right font-mono text-slate-500">
-                              {item.quantityPending || 0}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">
+                            <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
                               ${net.toFixed(2)}
-                            </td>
-                            <td className="py-2 px-3 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveItem(idx)}
-                                className="p-1 text-rose-400 hover:text-rose-600 cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
                             </td>
                           </tr>
                         );
@@ -876,22 +776,16 @@ export function PurchaseReceptionsList() {
               {/* 3. Footer Summary */}
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-slate-100">
                 <div className="text-xs text-slate-500">
-                  <span>Al procesar la nota, se actualizará el stock de forma atómica y se registrará el Costo Promedio Ponderado (CPP).</span>
+                  <span>Al procesar la nota, se dará entrada física al stock heredando los costos y flete pactados en la Orden de Compra.</span>
                 </div>
 
                 <div className="bg-slate-50 px-6 py-3 rounded-2xl border border-slate-200/80 flex items-center gap-6 text-xs font-mono">
                   <div>
-                    <span className="text-slate-500 block">Subtotal Factura:</span>
+                    <span className="text-slate-500 block">Subtotal:</span>
                     <span className="font-bold text-slate-800">${totals.subtotal.toFixed(2)}</span>
                   </div>
-                  {totals.freightCost > 0 && (
-                    <div className="text-amber-700 bg-amber-50/80 border border-amber-200/80 px-2.5 py-1 rounded-xl">
-                      <span className="text-[10px] uppercase font-bold text-amber-600 block">Flete Prorrateado:</span>
-                      <span className="font-bold">+${totals.freightCost.toFixed(2)}</span>
-                    </div>
-                  )}
                   <div>
-                    <span className="text-slate-500 block">IVA Acumulado:</span>
+                    <span className="text-slate-500 block">IVA:</span>
                     <span className="font-bold text-slate-800">${totals.totalTax.toFixed(2)}</span>
                   </div>
                   <div className="text-base font-bold text-emerald-700 border-l border-slate-200 pl-6">
@@ -923,60 +817,23 @@ export function PurchaseReceptionsList() {
         </div>
       )}
 
-      {/* Landed Cost Proration Modal */}
-      {showLandedCostModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-xl w-full max-w-md p-6 space-y-4">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <DollarSign className="w-4 h-4 text-amber-600" /> Prorrateo de Flete / Costo en Destino (CPP)
-              </h4>
-              <button onClick={() => setShowLandedCostModal(false)} className="p-1 text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-500">
-              Ingresa el costo total del flete o transporte en USD para distribuirlo proporcionalmente entre los artículos recibidos. El costo de factura original no se borrará, se mostrarán ambas cifras desglosadas:
-            </p>
-
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Monto Total Flete ($)</label>
-              <CurrencyInput
-                value={landedFreightCost}
-                onChange={(val) => setLandedFreightCost(val)}
-                placeholder="0.00"
-                decimals={2}
-                icon={DollarSign}
-                className="w-full font-mono font-bold"
-              />
-            </div>
-
-            <button
-              onClick={applyLandedCostProration}
-              disabled={landedFreightCost <= 0}
-              className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 disabled:opacity-50 text-white font-semibold text-xs rounded-xl cursor-pointer transition-all shadow-xs"
-            >
-              Calcular Prorrateo y Costo CPP
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Informative Modal for Successful Cancellation & Replacement */}
-      {successModalInfo && (
+      {/* Rejection & Cancellation Reason Modal */}
+      {showRejectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl border border-slate-100 shadow-xl w-full max-w-md overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-emerald-50/50">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-rose-50/50">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-xl">
-                  <CheckCircle className="w-5 h-5" />
+                <div className="p-2 bg-rose-100 border border-rose-200 text-rose-700 rounded-xl">
+                  <X className="w-5 h-5" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-900">{successModalInfo.title}</h3>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Rechazar Despacho en Almacén</h3>
+                  <p className="text-xs text-slate-500">Se anulará la Orden de Compra originaria</p>
+                </div>
               </div>
               <button
                 type="button"
-                onClick={() => setSuccessModalInfo(null)}
+                onClick={() => setShowRejectModal(false)}
                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -984,29 +841,92 @@ export function PurchaseReceptionsList() {
             </div>
 
             <div className="p-6 space-y-4">
-              <p className="text-xs text-slate-600 leading-relaxed">
-                {successModalInfo.message}
+              <div className="p-3.5 bg-rose-50/70 border border-rose-200/70 rounded-xl text-xs text-rose-800 space-y-1">
+                <span className="font-bold block">⚠️ Almacén no altera condiciones de compra:</span>
+                <p>
+                  Al rechazar el despacho, la Orden de Compra quedará en estado <strong>Anulada</strong> con esta justificación, y el equipo de compras será notificado para emitir la corrección.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Motivo o Incongruencia de Rechazo <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={rejectionReasonInput}
+                  onChange={(e) => setRejectionReasonInput(e.target.value)}
+                  placeholder="Detalla las razones del rechazo (ej: llegaron 80 unidades de 100 pactadas, mercancía averiada, etc.)..."
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all resize-none"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowRejectModal(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition-all cursor-pointer text-xs"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isCancellingOrder || !rejectionReasonInput.trim()}
+                onClick={handleConfirmRejectAndCancelOrder}
+                className="flex items-center gap-2 px-5 py-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-semibold rounded-xl transition-all cursor-pointer text-xs shadow-xs disabled:opacity-50"
+              >
+                {isCancellingOrder && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>Confirmar Rechazo y Anulación</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Notification Modal for Rejection & Cancellation */}
+      {successCancelledInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-xl w-full max-w-md overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-rose-50/50">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-rose-100 border border-rose-200 text-rose-700 rounded-xl">
+                  <CheckCircle className="w-5 h-5" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-900">Despacho Rechazado & OC Anulada</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSuccessCancelledInfo(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs text-slate-600 leading-relaxed">
+              <p>
+                La Orden de Compra <strong className="font-mono text-slate-900">{successCancelledInfo.orderNumber}</strong> ha sido marcada como <strong>ANULADA</strong> en el sistema con el registro de auditoría correspondiente.
               </p>
 
-              <div className="grid grid-cols-2 gap-3 p-3.5 bg-slate-50 border border-slate-100 rounded-xl font-mono text-xs">
-                <div>
-                  <span className="text-[10px] text-slate-400 block uppercase font-sans font-semibold mb-0.5">OC Anulada:</span>
-                  <span className="font-bold text-rose-600 line-through">{successModalInfo.oldOrderNumber || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block uppercase font-sans font-semibold mb-0.5">Nueva OC Activa:</span>
-                  <span className="font-bold text-emerald-600">{successModalInfo.newOrderNumber || 'N/A'}</span>
-                </div>
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                <span className="font-bold text-slate-500 uppercase text-[10px] block">Motivo registrado:</span>
+                <p className="text-slate-800 italic">&ldquo;{successCancelledInfo.reason}&rdquo;</p>
               </div>
+
+              <p className="text-slate-500">
+                El equipo de Compras puede consultar el motivo en el módulo de Órdenes de Compra para proceder a emitir la orden ajustada.
+              </p>
             </div>
 
             <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/50 flex justify-end">
               <button
                 type="button"
-                onClick={() => setSuccessModalInfo(null)}
-                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-medium rounded-xl transition-all cursor-pointer text-xs shadow-xs"
+                onClick={() => setSuccessCancelledInfo(null)}
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl transition-all cursor-pointer text-xs shadow-xs"
               >
-                Entendido, Continuar Recepción
+                Entendido
               </button>
             </div>
           </div>

@@ -19,7 +19,6 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
-  Upload,
   Warehouse
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
@@ -47,70 +46,6 @@ export const ProductForm: React.FC = () => {
     category: 'General',
     categoryId: '',
   });
-
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [imageError, setImageError] = useState<string | null>(null);
-
-  const compressAndGetBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          const maxWidth = 800;
-
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', 0.85));
-          } else {
-            resolve(e.target?.result as string);
-          }
-        };
-        img.onerror = () => resolve(e.target?.result as string);
-        img.src = e.target?.result as string;
-      };
-      reader.onerror = () => resolve('');
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const handleFileUpload = async (file: File) => {
-    if (!file) return;
-    const MAX_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB (Estándar óptimo para catálogo ERP/Web)
-    if (file.size > MAX_SIZE_BYTES) {
-      setImageError(`⚠️ El archivo seleccionado (${(file.size / (1024 * 1024)).toFixed(1)} MB) supera el tamaño óptimo permitido de 2 MB.`);
-      return;
-    }
-
-    setImageError(null);
-    setIsUploadingImage(true);
-    try {
-      const base64 = await compressAndGetBase64(file);
-      const res = await apiClient.post('/inventory/products/upload-image', {
-        image_base64: base64,
-        filename: file.name,
-        category_name: formData.category || 'General',
-      });
-      if (res.data?.url) {
-        setFormData((prev) => ({ ...prev, imageUrl: res.data.url }));
-      }
-    } catch (err: any) {
-      setImageError('Error al procesar la imagen.');
-    } finally {
-      setIsUploadingImage(false);
-    }
-  };
 
   const [taxType, setTaxType] = useState('TAXABLE');
   const [isPerishable, setIsPerishable] = useState(false);
@@ -264,7 +199,7 @@ export const ProductForm: React.FC = () => {
   });
 
   // Variations list
-  const [showVariations, setShowVariations] = useState(false);
+  const [showVariations, setShowVariations] = useState(true);
   const [variations, setVariations] = useState<Variation[]>([]);
   const [varForm, setVarForm] = useState({
     name: '',
@@ -493,68 +428,6 @@ export const ProductForm: React.FC = () => {
               ))}
             </div>
           )}
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
-              Imagen del Producto
-            </label>
-            <span className="text-[10px] text-slate-400">Tamaño óptimo: Máximo 2 MB (JPG, PNG, WebP)</span>
-          </div>
-
-          <div className="space-y-2">
-            {imageError && (
-              <div className="p-3 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-between gap-2 text-rose-700 text-xs animate-in fade-in duration-200">
-                <span>{imageError}</span>
-                <button type="button" onClick={() => setImageError(null)} className="text-rose-400 hover:text-rose-600 font-bold">
-                  ✕
-                </button>
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <label className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-xl text-xs font-semibold cursor-pointer transition-all shrink-0">
-                <Upload className="w-4 h-4" />
-                <span>{isUploadingImage ? 'Guardando...' : 'Subir desde mi PC'}</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  disabled={isUploadingImage}
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleFileUpload(file);
-                  }}
-                />
-              </label>
-
-              <input
-                type="text"
-                placeholder="O pega una URL externa (https://...)"
-                className="block w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm placeholder-slate-400 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200 font-mono text-xs"
-                value={formData.imageUrl}
-                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-              />
-
-              {formData.imageUrl && (
-                <div className="w-10 h-10 rounded-xl border border-slate-200 overflow-hidden shrink-0 bg-slate-100 flex items-center justify-center shadow-xs">
-                  <img
-                    src={formData.imageUrl}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                    onError={(e: any) => { e.target.style.display = 'none'; }}
-                  />
-                </div>
-              )}
-            </div>
-
-            {formData.imageUrl && formData.imageUrl.includes('/uploads/tenants/') && (
-              <p className="text-[11px] text-emerald-600 font-mono flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Almacenada en directorio privado de empresa
-              </p>
-            )}
-          </div>
         </div>
 
         <div className="relative" ref={dropdownRef}>
@@ -808,6 +681,12 @@ export const ProductForm: React.FC = () => {
                     className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-white"
                     value={varForm.name}
                     onChange={(e) => setVarForm({ ...varForm, name: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddVariation();
+                      }
+                    }}
                   />
                 </div>
                 <div>
@@ -819,6 +698,12 @@ export const ProductForm: React.FC = () => {
                     className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-white text-right"
                     value={varForm.quantity || ''}
                     onChange={(e) => setVarForm({ ...varForm, quantity: Number(e.target.value) })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddVariation();
+                      }
+                    }}
                   />
                 </div>
                 <div>
@@ -838,15 +723,21 @@ export const ProductForm: React.FC = () => {
                     className="flex-1 p-2 border border-slate-200 rounded-lg text-xs bg-white"
                     value={varForm.sku}
                     onChange={(e) => setVarForm({ ...varForm, sku: e.target.value.toUpperCase() })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddVariation();
+                      }
+                    }}
                   />
                   <button
                     type="button"
                     onClick={handleAddVariation}
                     disabled={!varForm.name.trim()}
-                    className="flex items-center gap-1 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50"
+                    className="flex items-center gap-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50 transition-all shadow-xs"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    Agregar Variación
+                    <span>Agregar Variación</span>
                   </button>
                 </div>
               </div>

@@ -40,9 +40,22 @@ export const PAYMENT_METHODS = {
   DEBIT_BS: 'DEBIT_BS',
   CASH_USD: 'CASH_USD',
   TRANSFER_USD: 'TRANSFER_USD',
+  PAGO_MOVIL: 'PAGO_MOVIL',
+  TRANSFER_BS: 'TRANSFER_BS',
+  ZELLE: 'ZELLE',
 } as const;
 
 export type PaymentMethod = typeof PAYMENT_METHODS[keyof typeof PAYMENT_METHODS];
+
+export const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  [PAYMENT_METHODS.CASH_BS]: 'Efectivo Bs.',
+  [PAYMENT_METHODS.DEBIT_BS]: 'Tarjeta de Débito (Bs.)',
+  [PAYMENT_METHODS.CASH_USD]: 'Efectivo ($)',
+  [PAYMENT_METHODS.TRANSFER_USD]: 'Transferencia ($)',
+  [PAYMENT_METHODS.PAGO_MOVIL]: 'Pago Móvil (Bs.)',
+  [PAYMENT_METHODS.TRANSFER_BS]: 'Transferencia Bs.',
+  [PAYMENT_METHODS.ZELLE]: 'Zelle / Divisas',
+};
 
 export const PAYMENT_TERMS = {
   CONTADO: 'CONTADO',

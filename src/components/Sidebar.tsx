@@ -76,7 +76,7 @@ const menuConfig = [
           { label: 'Órdenes de Compra', icon: FileText, href: '/inventory/purchases/orders', permission: 'purchases:orders' },
           { label: 'Notas de Recepción', icon: Truck, href: '/inventory/purchases/receptions', permission: 'purchases:receptions' },
           { label: 'Registrar Compra', icon: ShoppingBag, href: '/inventory/purchases/new', permission: 'purchases:new' },
-          { label: 'Facturación de Compra', icon: FileSpreadsheet, href: '/inventory/purchases', permission: 'purchases:invoices' },
+          { label: 'Listado de Compras', icon: FileSpreadsheet, href: '/inventory/purchases', permission: 'purchases:invoices' },
           { label: 'Proveedores', icon: Building2, href: '/inventory/providers', permission: 'providers:manage' },
         ]
       },

@@ -11,6 +11,7 @@ import {
   AlertCircle, 
   CheckCircle2, 
   User, 
+  Building2,
   Package, 
   Upload,
   DollarSign,
@@ -20,12 +21,17 @@ import {
   Percent,
   X,
   MapPin,
+  Mail,
+  Phone,
   Calendar,
-  Warehouse
+  Warehouse,
+  CreditCard
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import { SearchableSelect } from '@/components/SearchableSelect';
 import { CurrencyInput } from '@/components/CurrencyInput';
+import { VENEZUELAN_STATES, TAXPAYER_TYPES } from '@/constants/venezuela';
+import { PAYMENT_TERMS, CURRENCIES } from '@/constants/domain-constants';
 
 interface Provider {
   id: string;
@@ -76,6 +82,12 @@ export default function NewPurchasePage() {
   const [selectedProviderId, setSelectedProviderId] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [proofFile, setProofFile] = useState<File | null>(null);
+  const [paymentTerm, setPaymentTerm] = useState<string>(PAYMENT_TERMS.CONTADO);
+  const [currency, setCurrency] = useState<string>(CURRENCIES.USD);
+  const [issueDate, setIssueDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [dueDate, setDueDate] = useState<string>('');
+  const [globalSurchargePercentage, setGlobalSurchargePercentage] = useState(0);
+  const [notes, setNotes] = useState('');
   const [items, setItems] = useState<InvoiceItem[]>([
     { 
       productId: '', 
@@ -92,6 +104,29 @@ export default function NewPurchasePage() {
   const [exchangeRateStr, setExchangeRateStr] = useState('');
   const exchangeRate = parseFloat(exchangeRateStr) || 0;
 
+  // Auto-calculate Due Date based on paymentTerm and issueDate
+  useEffect(() => {
+    if (!issueDate) return;
+    const base = new Date(issueDate);
+    if (isNaN(base.getTime())) return;
+
+    if (paymentTerm === PAYMENT_TERMS.CONTADO) {
+      setDueDate(issueDate);
+    } else if (paymentTerm === PAYMENT_TERMS.CREDITO_7) {
+      base.setDate(base.getDate() + 7);
+      setDueDate(base.toISOString().split('T')[0]);
+    } else if (paymentTerm === PAYMENT_TERMS.CREDITO_15) {
+      base.setDate(base.getDate() + 15);
+      setDueDate(base.toISOString().split('T')[0]);
+    } else if (paymentTerm === PAYMENT_TERMS.CREDITO_30) {
+      base.setDate(base.getDate() + 30);
+      setDueDate(base.toISOString().split('T')[0]);
+    } else {
+      base.setDate(base.getDate() + 30);
+      setDueDate(base.toISOString().split('T')[0]);
+    }
+  }, [paymentTerm, issueDate]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,6 +136,20 @@ export default function NewPurchasePage() {
   const [activeItemIndexForProductCreation, setActiveItemIndexForProductCreation] = useState<number | null>(null);
   const [isSavingProduct, setIsSavingProduct] = useState(false);
   const [productModalError, setProductModalError] = useState<string | null>(null);
+
+  // Quick Inline Provider Creation Modal State
+  const [isQuickProviderModalOpen, setIsQuickProviderModalOpen] = useState(false);
+  const [isSavingProvider, setIsSavingProvider] = useState(false);
+  const [providerModalError, setProviderModalError] = useState<string | null>(null);
+  const [quickProviderName, setQuickProviderName] = useState('');
+  const [quickProviderTaxPrefix, setQuickProviderTaxPrefix] = useState<'V' | 'J' | 'G' | 'E'>('J');
+  const [quickProviderTaxNumber, setQuickProviderTaxNumber] = useState('');
+  const [quickProviderEmail, setQuickProviderEmail] = useState('');
+  const [quickProviderPhone, setQuickProviderPhone] = useState('');
+  const [quickProviderAddress, setQuickProviderAddress] = useState('');
+  const [quickProviderDeliveryAddress, setQuickProviderDeliveryAddress] = useState('');
+  const [quickProviderZoneCode, setQuickProviderZoneCode] = useState('DC');
+  const [quickProviderTaxpayerType, setQuickProviderTaxpayerType] = useState('ORDINARY');
 
   // Quick Product Form Fields
   const [quickProductSku, setQuickProductSku] = useState('');
@@ -243,6 +292,89 @@ export default function NewPurchasePage() {
     }));
   };
 
+  const handleOpenQuickProviderModal = (initialName = '') => {
+    setQuickProviderName(initialName);
+    setQuickProviderTaxPrefix('J');
+    setQuickProviderTaxNumber('');
+    setQuickProviderEmail('');
+    setQuickProviderPhone('');
+    setQuickProviderAddress('');
+    setQuickProviderDeliveryAddress('');
+    setQuickProviderZoneCode('DC');
+    setQuickProviderTaxpayerType('ORDINARY');
+    setProviderModalError(null);
+    setIsQuickProviderModalOpen(true);
+  };
+
+  const handleCloseQuickProviderModal = () => {
+    setIsQuickProviderModalOpen(false);
+  };
+
+  const handleSubmitQuickProvider = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingProvider(true);
+    setProviderModalError(null);
+
+    const cleanTaxNumber = quickProviderTaxNumber.replace(/\D/g, '');
+    const formattedTaxId = cleanTaxNumber ? `${quickProviderTaxPrefix}-${cleanTaxNumber}` : '';
+
+    if (!quickProviderName.trim()) {
+      setProviderModalError('El Nombre o Razón Social es obligatorio.');
+      setIsSavingProvider(false);
+      return;
+    }
+
+    if (!cleanTaxNumber) {
+      setProviderModalError('El número de Cédula o RIF es obligatorio.');
+      setIsSavingProvider(false);
+      return;
+    }
+
+    const payload = {
+      name: quickProviderName.trim(),
+      tax_id: formattedTaxId,
+      email: quickProviderEmail.trim() || undefined,
+      phone: quickProviderPhone.trim() || undefined,
+      address: quickProviderAddress.trim() || undefined,
+      delivery_address: quickProviderDeliveryAddress.trim() || undefined,
+      zone_code: quickProviderZoneCode,
+      taxpayer_type: quickProviderTaxpayerType,
+      is_retention_agent: false,
+      retention_percentage: 75,
+      islr_percentage: 2.0,
+      islr_concept_code: 'SERVICES',
+    };
+
+    try {
+      const res = await apiClient.post('/providers', payload);
+      const createdProvider = res.data;
+
+      // Refresh providers list
+      const providersRes = await apiClient.get('/providers');
+      const updatedProviders = Array.isArray(providersRes.data) ? providersRes.data : [];
+      setProviders(updatedProviders);
+
+      // Automatically select newly created provider
+      if (createdProvider?.id) {
+        setSelectedProviderId(createdProvider.id);
+      }
+
+      handleCloseQuickProviderModal();
+    } catch (err: any) {
+      if (err.response?.data?.message) {
+        setProviderModalError(
+          Array.isArray(err.response.data.message)
+            ? err.response.data.message.join(', ')
+            : err.response.data.message
+        );
+      } else {
+        setProviderModalError('Ocurrió un error al registrar el proveedor.');
+      }
+    } finally {
+      setIsSavingProvider(false);
+    }
+  };
+
   const handleOpenQuickProductModal = (index: number) => {
     setActiveItemIndexForProductCreation(index);
     setQuickProductSku('');
@@ -339,8 +471,16 @@ export default function NewPurchasePage() {
       invoiceNumber: invoiceNumber.trim(),
       supplierName: provider.name,
       providerId: provider.id,
+      supplierRif: provider.tax_id || undefined,
+      paymentTerm,
+      currency,
+      exchangeRate: exchangeRate > 0 ? exchangeRate : undefined,
+      issueDate: issueDate || undefined,
+      dueDate: dueDate || undefined,
       proofFilePath,
       discountPercentage: Number(discountPercentage),
+      globalSurchargePercentage: Number(globalSurchargePercentage),
+      notes: notes.trim() || undefined,
       items: items.map(item => {
         const prodObj = products.find(p => p.id === item.productId);
         const requireBatch = prodObj?.has_batch_control || prodObj?.is_perishable;
@@ -377,8 +517,12 @@ export default function NewPurchasePage() {
     return calculateSubtotal() * (discountPercentage / 100);
   };
 
+  const calculateSurcharge = () => {
+    return calculateSubtotal() * (globalSurchargePercentage / 100);
+  };
+
   const calculateTotal = () => {
-    return calculateSubtotal() - calculateDiscount();
+    return calculateSubtotal() - calculateDiscount() + calculateSurcharge();
   };
 
   if (isLoading) {
@@ -428,47 +572,176 @@ export default function NewPurchasePage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         
         {/* Invoice Header details */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-5">
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Proveedor</label>
-            <SearchableSelect
-              icon={User}
-              value={selectedProviderId}
-              onChange={(val) => setSelectedProviderId(val)}
-              options={providers.map(p => ({
-                value: p.id,
-                label: p.name,
-                sublabel: p.tax_id ? `RIF: ${p.tax_id}` : undefined
-              }))}
-              placeholder="Buscar o seleccionar proveedor..."
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Nro. de Factura / Control</label>
-            <div className="relative">
-              <FileText className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-              <input
-                type="text"
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600">Proveedor <span className="text-rose-500">*</span></label>
+                <button
+                  type="button"
+                  onClick={() => handleOpenQuickProviderModal()}
+                  className="text-xs text-indigo-600 font-bold hover:text-indigo-700 flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Nuevo Proveedor</span>
+                </button>
+              </div>
+              <SearchableSelect
+                icon={Building2}
+                value={selectedProviderId}
+                onChange={(val) => {
+                  const found = providers.find(p => p.id === val);
+                  if (found) {
+                    setSelectedProviderId(found.id);
+                  } else if (val) {
+                    handleOpenQuickProviderModal(val);
+                  } else {
+                    setSelectedProviderId('');
+                  }
+                }}
+                options={providers.map(p => ({
+                  value: p.id,
+                  label: p.name,
+                  sublabel: p.tax_id ? `RIF: ${p.tax_id}` : undefined
+                }))}
+                placeholder="Seleccionar o Escribir Proveedor Nuevo..."
+                allowCustomInput={true}
                 required
-                placeholder="Ej. FACT-0023"
-                className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 font-medium"
-                value={invoiceNumber}
-                onChange={(e) => setInvoiceNumber(e.target.value)}
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Nro. de Factura / Control <span className="text-rose-500">*</span></label>
+              <div className="relative">
+                <FileText className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. FACT-0023"
+                  className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 font-medium bg-white"
+                  value={invoiceNumber}
+                  onChange={(e) => setInvoiceNumber(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Comprobante Físico (PDF/Imagen)</label>
+              <div className="relative">
+                <Upload className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
+                <input
+                  type="file"
+                  accept=".pdf,image/*"
+                  className="block w-full pl-11 pr-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 bg-white"
+                  onChange={(e) => setProofFile(e.target.files ? e.target.files[0] : null)}
+                />
+              </div>
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Comprobante Físico (PDF/Imagen)</label>
-            <div className="relative">
-              <Upload className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
+          {/* Commercial & Financial Conditions Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-slate-100">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Condición de Pago</label>
+              <SearchableSelect
+                icon={CreditCard}
+                value={paymentTerm}
+                onChange={(val) => setPaymentTerm(val)}
+                options={[
+                  { value: PAYMENT_TERMS.CONTADO, label: 'Pago de Contado' },
+                  { value: PAYMENT_TERMS.CREDITO_7, label: 'Crédito 7 Días' },
+                  { value: PAYMENT_TERMS.CREDITO_15, label: 'Crédito 15 Días' },
+                  { value: PAYMENT_TERMS.CREDITO_30, label: 'Crédito 30 Días' },
+                  { value: 'CREDITO_60', label: 'Crédito 60 Días' },
+                ]}
+                placeholder="Seleccionar condición..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Moneda del Comprobante</label>
+              <SearchableSelect
+                icon={DollarSign}
+                value={currency}
+                onChange={(val) => setCurrency(val)}
+                options={[
+                  { value: CURRENCIES.USD, label: 'USD - Dólares ($)' },
+                  { value: CURRENCIES.VES, label: 'VES - Bolívares (Bs)' },
+                ]}
+                placeholder="Moneda..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Fecha de Emisión</label>
+              <div className="relative">
+                <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="date"
+                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                  value={issueDate}
+                  onChange={(e) => setIssueDate(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Fecha de Vencimiento</label>
+              <div className="relative">
+                <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="date"
+                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Surcharges, Exchange Rate and Notes */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Recargo / Flete Global (%)</label>
+              <div className="relative">
+                <Percent className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                  value={globalSurchargePercentage === 0 ? '' : globalSurchargePercentage}
+                  onChange={(e) => setGlobalSurchargePercentage(parseFloat(e.target.value) || 0)}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Tasa de Cambio BCV (Bs/$)</label>
+              <div className="relative">
+                <DollarSign className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="number"
+                  step="0.0001"
+                  min="0"
+                  placeholder="Ej. 52.40"
+                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                  value={exchangeRateStr}
+                  onChange={(e) => setExchangeRateStr(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Notas / Observaciones</label>
               <input
-                type="file"
-                accept=".pdf,image/*"
-                className="block w-full pl-11 pr-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 bg-white"
-                onChange={(e) => setProofFile(e.target.files ? e.target.files[0] : null)}
+                type="text"
+                placeholder="Observaciones de la factura de compra..."
+                className="w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
               />
             </div>
           </div>
@@ -725,6 +998,12 @@ export default function NewPurchasePage() {
                   <span className="font-semibold">-${calculateDiscount().toFixed(2)} USD</span>
                 </div>
               )}
+              {globalSurchargePercentage > 0 && (
+                <div className="flex justify-between items-center text-indigo-600">
+                  <span>Recargo / Flete ({globalSurchargePercentage}%):</span>
+                  <span className="font-semibold">+${calculateSurcharge().toFixed(2)} USD</span>
+                </div>
+              )}
               {exchangeRate > 0 && (
                 <div className="flex justify-between items-center text-indigo-600 border-t border-dashed border-slate-100 pt-1.5 pb-1">
                   <span>Equivalente en Bolívares (Bs.):</span>
@@ -969,6 +1248,180 @@ export default function NewPurchasePage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Quick Express Provider Modal */}
+      {isQuickProviderModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-50 border border-indigo-100 rounded-xl text-indigo-600">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Registrar Nuevo Proveedor</h3>
+                  <p className="text-xs text-slate-500">Se guardará en el catálogo y se asociará a esta factura de compra</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseQuickProviderModal}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitQuickProvider} className="p-6 space-y-4 overflow-y-auto flex-1">
+              {providerModalError && (
+                <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl flex items-center gap-2 text-rose-700 text-xs">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+                  <span>{providerModalError}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Nombre o Razón Social <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Distribuidora Polar C.A."
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
+                    value={quickProviderName}
+                    onChange={(e) => setQuickProviderName(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Cédula / RIF <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <select
+                      className="px-2.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      value={quickProviderTaxPrefix}
+                      onChange={(e) => setQuickProviderTaxPrefix(e.target.value as any)}
+                    >
+                      <option value="J">J-</option>
+                      <option value="V">V-</option>
+                      <option value="G">G-</option>
+                      <option value="E">E-</option>
+                    </select>
+                    <input
+                      type="text"
+                      required
+                      placeholder="123456789"
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      value={quickProviderTaxNumber}
+                      onChange={(e) => setQuickProviderTaxNumber(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Tipo de Contribuyente
+                  </label>
+                  <select
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
+                    value={quickProviderTaxpayerType}
+                    onChange={(e) => setQuickProviderTaxpayerType(e.target.value)}
+                  >
+                    <option value="ORDINARY">Ordinario</option>
+                    <option value="SPECIAL">Especial</option>
+                    <option value="FORMAL">Formal</option>
+                    <option value="EXEMPT">Exento</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Teléfono
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="0414-1234567"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
+                      value={quickProviderPhone}
+                      onChange={(e) => setQuickProviderPhone(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Correo Electrónico
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="email"
+                      placeholder="contacto@proveedor.com"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
+                      value={quickProviderEmail}
+                      onChange={(e) => setQuickProviderEmail(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Estado / Región
+                  </label>
+                  <select
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
+                    value={quickProviderZoneCode}
+                    onChange={(e) => setQuickProviderZoneCode(e.target.value)}
+                  >
+                    {VENEZUELAN_STATES.map((st) => (
+                      <option key={st.code} value={st.code}>
+                        {st.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Dirección Fiscal
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Calle, Edificio, Ciudad..."
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
+                    value={quickProviderAddress}
+                    onChange={(e) => setQuickProviderAddress(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleCloseQuickProviderModal}
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs cursor-pointer transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingProvider}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold rounded-xl text-xs shadow-md shadow-indigo-200 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingProvider && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>Guardar y Seleccionar Proveedor</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

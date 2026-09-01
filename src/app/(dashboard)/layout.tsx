@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import Sidebar from "@/components/Sidebar";
 import SandboxBanner from "@/components/SandboxBanner";
 import { SubscriptionBlockedModal } from "@/components/modals/SubscriptionBlockedModal";
-import { Bell, Wifi, WifiOff, ChevronRight, Home, DollarSign, Euro, Menu } from 'lucide-react';
+import { Bell, Wifi, WifiOff, ChevronRight, Home, DollarSign, Euro, Menu, FileSpreadsheet, Wallet } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import Link from 'next/link';
 import { clsx, type ClassValue } from 'clsx';
@@ -30,6 +30,12 @@ export default function DashboardLayout({
   const [bcvEurRate, setBcvEurRate] = useState<number>(894.49);
   const [currencyMode, setCurrencyMode] = useState<string>('BCV');
   const [manualRate, setManualRate] = useState<number>(780.00);
+
+  // Financial Badges State (CxP & CxC)
+  const [cxpPendingCount, setCxpPendingCount] = useState<number>(0);
+  const [cxpPendingTotal, setCxpPendingTotal] = useState<number>(0);
+  const [cxcPendingCount, setCxcPendingCount] = useState<number>(0);
+  const [cxcPendingTotal, setCxcPendingTotal] = useState<number>(0);
 
   // En pantallas móviles/tablets (< 1024px), inicializar cerrado
   useEffect(() => {
@@ -70,8 +76,8 @@ export default function DashboardLayout({
       '/sales/clients': { label: 'Directorio de Clientes', parent: { label: 'Ventas', href: '/sales' } },
       '/admin/shifts': { label: 'Turnos y Arqueos de Caja', parent: { label: 'Ventas', href: '/pos' } },
 
-      '/inventory/purchases': { label: 'Facturas de Compra', parent: { label: 'Compras', href: '/inventory/purchases' } },
-      '/inventory/purchases/new': { label: 'Registro de Compra Directa', parent: { label: 'Compras', href: '/inventory/purchases' } },
+      '/inventory/purchases': { label: 'Listado de Compras', parent: { label: 'Compras', href: '/inventory/purchases' } },
+      '/inventory/purchases/new': { label: 'Registrar Factura de Compra', parent: { label: 'Compras', href: '/inventory/purchases' } },
       '/inventory/purchases/orders': { label: 'Órdenes de Compra', parent: { label: 'Compras', href: '/inventory/purchases' } },
       '/inventory/purchases/receptions': { label: 'Recepciones de Almacén', parent: { label: 'Compras', href: '/inventory/purchases' } },
       '/inventory/providers': { label: 'Proveedores', parent: { label: 'Compras', href: '/inventory/purchases' } },
@@ -138,21 +144,47 @@ export default function DashboardLayout({
       }
     };
 
+    const fetchBadges = async () => {
+      try {
+        const res = await apiClient.get('/accounts/badges/summary');
+        if (res.data) {
+          if (res.data.cxp) {
+            setCxpPendingCount(Number(res.data.cxp.count || 0));
+            setCxpPendingTotal(Number(res.data.cxp.total_balance_due || 0));
+          }
+          if (res.data.cxc) {
+            setCxcPendingCount(Number(res.data.cxc.count || 0));
+            setCxcPendingTotal(Number(res.data.cxc.total_balance_due || 0));
+          }
+        }
+      } catch (err) {
+        // Silently skip if tenant not selected or banks permission not granted
+      }
+    };
+
     if (user) {
       fetchRates();
+      fetchBadges();
 
       // Re-sincronizar solo cuando el usuario cambia o enfoca la pestaña
       const handleFocus = () => {
         if (document.visibilityState === 'visible') {
           fetchRates();
+          fetchBadges();
         }
       };
       window.addEventListener('focus', handleFocus);
       document.addEventListener('visibilitychange', handleFocus);
 
+      const handleAccountsUpdate = () => {
+        fetchBadges();
+      };
+      window.addEventListener('accounts-updated', handleAccountsUpdate);
+
       return () => {
         window.removeEventListener('focus', handleFocus);
         document.removeEventListener('visibilitychange', handleFocus);
+        window.removeEventListener('accounts-updated', handleAccountsUpdate);
       };
     }
   }, [user]);
@@ -322,35 +354,73 @@ export default function DashboardLayout({
             </nav>
           </div>
 
-          {/* 💱 Monitor Dual de Divisas & Perfil (BCV USD + BCV EUR) */}
+          {/* 💱 Monitor Dual de Divisas & Badges de Tesorería (BCV USD + BCV EUR + CxP + CxC) */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-            <Link 
-              href="/settings/company" 
-              className="flex items-center gap-1.5 select-none group cursor-pointer bg-slate-50 hover:bg-slate-100/80 p-1 rounded-xl border border-slate-200/70 transition-all shadow-2xs"
-              title="Tasas oficiales vigentes del Banco Central de Venezuela (BCV). Clic para configurar."
-            >
-              {/* Badge Tasa BCV USD */}
-              <div className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg bg-white border border-emerald-100 text-emerald-800 shadow-2xs group-hover:border-emerald-200 transition-all">
-                <span className="text-[10px] font-black text-emerald-600">$</span>
-                <span className="font-mono text-xs font-black text-slate-800">
-                  {currencyMode === 'MANUAL' ? manualRate.toFixed(2) : bcvUsdRate.toFixed(2)}
-                </span>
-                <span className="text-[9px] uppercase tracking-tighter text-slate-400 font-bold ml-0.5 hidden md:inline-block">
-                  {currencyMode === 'MANUAL' ? 'Manual' : 'BCV'}
-                </span>
-              </div>
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <Link 
+                href="/settings/company" 
+                className="flex items-center gap-1.5 select-none group cursor-pointer bg-slate-50 hover:bg-slate-100/80 p-1 rounded-xl border border-slate-200/70 transition-all shadow-2xs"
+                title="Tasas oficiales vigentes del Banco Central de Venezuela (BCV). Clic para configurar."
+              >
+                {/* Badge Tasa BCV USD */}
+                <div className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg bg-white border border-emerald-100 text-emerald-800 shadow-2xs group-hover:border-emerald-200 transition-all">
+                  <span className="text-[10px] font-black text-emerald-600">$</span>
+                  <span className="font-mono text-xs font-black text-slate-800">
+                    {currencyMode === 'MANUAL' ? manualRate.toFixed(2) : bcvUsdRate.toFixed(2)}
+                  </span>
+                  <span className="text-[9px] uppercase tracking-tighter text-slate-400 font-bold ml-0.5 hidden md:inline-block">
+                    {currencyMode === 'MANUAL' ? 'Manual' : 'BCV'}
+                  </span>
+                </div>
 
-              {/* Badge Tasa BCV EUR */}
-              <div className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg bg-white border border-blue-100 text-blue-800 shadow-2xs group-hover:border-blue-200 transition-all">
-                <span className="text-[10px] font-black text-blue-600">€</span>
-                <span className="font-mono text-xs font-black text-slate-800">
-                  {bcvEurRate.toFixed(2)}
-                </span>
-                <span className="text-[9px] uppercase tracking-tighter text-slate-400 font-bold ml-0.5 hidden md:inline-block">
-                  BCV
-                </span>
-              </div>
-            </Link>
+                {/* Badge Tasa BCV EUR */}
+                <div className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg bg-white border border-blue-100 text-blue-800 shadow-2xs group-hover:border-blue-200 transition-all">
+                  <span className="text-[10px] font-black text-blue-600">€</span>
+                  <span className="font-mono text-xs font-black text-slate-800">
+                    {bcvEurRate.toFixed(2)}
+                  </span>
+                  <span className="text-[9px] uppercase tracking-tighter text-slate-400 font-bold ml-0.5 hidden md:inline-block">
+                    BCV
+                  </span>
+                </div>
+              </Link>
+
+              {/* 💳 Badge Cuentas por Pagar (CxP) */}
+              <Link
+                href="/accounts/payables"
+                className="hidden sm:flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-rose-50/90 hover:bg-rose-100/80 border border-rose-200 text-rose-700 transition-all shadow-2xs cursor-pointer group"
+                title={`Cuentas por Pagar Pendientes: ${cxpPendingCount} facturas ($${cxpPendingTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-rose-600 group-hover:scale-110 transition-transform" />
+                <div className="flex items-center gap-1 text-[11px] font-bold">
+                  <span className="text-rose-900">CxP:</span>
+                  <span className="px-1.5 py-0.2 bg-rose-200/80 text-rose-900 rounded-full font-mono text-[10px] font-black">
+                    {cxpPendingCount}
+                  </span>
+                  <span className="font-mono text-rose-800 hidden lg:inline">
+                    ${cxpPendingTotal.toFixed(0)}
+                  </span>
+                </div>
+              </Link>
+
+              {/* 📥 Badge Cuentas por Cobrar (CxC) */}
+              <Link
+                href="/accounts/receivables"
+                className="hidden sm:flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-emerald-50/90 hover:bg-emerald-100/80 border border-emerald-200 text-emerald-700 transition-all shadow-2xs cursor-pointer group"
+                title={`Cuentas por Cobrar Pendientes: ${cxcPendingCount} cuentas ($${cxcPendingTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+              >
+                <Wallet className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
+                <div className="flex items-center gap-1 text-[11px] font-bold">
+                  <span className="text-emerald-900">CxC:</span>
+                  <span className="px-1.5 py-0.2 bg-emerald-200/80 text-emerald-900 rounded-full font-mono text-[10px] font-black">
+                    {cxcPendingCount}
+                  </span>
+                  <span className="font-mono text-emerald-800 hidden lg:inline">
+                    ${cxcPendingTotal.toFixed(0)}
+                  </span>
+                </div>
+              </Link>
+            </div>
 
             {/* Offline Alert Badge if connection lost */}
             {!isOnline && (
