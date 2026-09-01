@@ -5,7 +5,6 @@ import {
   Package, 
   X, 
   Layers, 
-  Upload, 
   DollarSign, 
   Percent, 
   Scale, 
@@ -49,7 +48,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
 
   const [editVariations, setEditVariations] = useState<ProductVariation[]>(product.variations ?? []);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [showVariations, setShowVariations] = useState(false);
+  const [showVariations, setShowVariations] = useState(true);
   const [advancedFields, setAdvancedFields] = useState<AdvancedProductFields>({
     expiration_date: product.advanced_fields?.expiration_date ?? '',
     location: product.advanced_fields?.location ?? '',
@@ -68,8 +67,6 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [imageError, setImageError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSuccess, setEditSuccess] = useState(false);
@@ -96,38 +93,6 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
       setFilteredCategories(categories);
     }
     setShowDropdown(true);
-  };
-
-  const handleFileUpload = async (file: File) => {
-    if (!file) return;
-    const MAX_SIZE_BYTES = 2 * 1024 * 1024;
-    if (file.size > MAX_SIZE_BYTES) {
-      setImageError(`⚠️ El archivo supera el tamaño máximo permitido de 2 MB.`);
-      return;
-    }
-
-    setImageError(null);
-    setIsUploadingImage(true);
-    try {
-      const reader = new FileReader();
-      const base64 = await new Promise<string>((resolve) => {
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.readAsDataURL(file);
-      });
-
-      const res = await apiClient.post('/inventory/products/upload-image', {
-        image_base64: base64,
-        filename: file.name,
-        category_name: editForm.category || 'General',
-      });
-      if (res.data?.url) {
-        setEditForm((prev) => ({ ...prev, imageUrl: res.data.url }));
-      }
-    } catch (err) {
-      setImageError('Error al subir la imagen.');
-    } finally {
-      setIsUploadingImage(false);
-    }
   };
 
   const handleAddVariation = () => {
@@ -158,13 +123,13 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
       await apiClient.put(`/inventory/products/${product.id}`, {
         name: editForm.name,
         imageUrl: editForm.imageUrl || undefined,
-        cost_usd: Number(editForm.costUsd),
-        price_usd: Number(editForm.priceUsd),
-        tax_rate: Number(editForm.taxRate),
-        category_id: editForm.categoryId || undefined,
-        unit_of_measure: editForm.unitOfMeasure,
+        costUsd: Number(editForm.costUsd),
+        priceUsd: Number(editForm.priceUsd),
+        taxRate: Number(editForm.taxRate),
+        categoryId: editForm.categoryId || undefined,
+        unitOfMeasure: editForm.unitOfMeasure,
         variations: editVariations,
-        advanced_fields: advancedFields,
+        advancedFields: advancedFields,
       });
 
       setEditSuccess(true);
@@ -291,49 +256,6 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
                 )}
               </div>
 
-              {/* Image Uploader & Preview */}
-              <div className="md:col-span-2 bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 shadow-2xs space-y-3">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Fotografía del Producto
-                </label>
-                <div className="flex flex-col sm:flex-row items-center gap-4">
-                  {editForm.imageUrl ? (
-                    <div className="relative group w-20 h-20 rounded-xl overflow-hidden border border-slate-200 shrink-0 bg-white shadow-2xs">
-                      <img src={editForm.imageUrl} alt="Preview" className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => setEditForm(prev => ({ ...prev, imageUrl: '' }))}
-                        className="absolute inset-0 bg-rose-600/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-xs font-semibold"
-                      >
-                        Quitar
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="w-20 h-20 rounded-xl bg-white border border-dashed border-slate-300 flex items-center justify-center text-slate-400 shrink-0">
-                      <Package className="w-8 h-8" />
-                    </div>
-                  )}
-                  <div className="flex-1 space-y-1.5 text-center sm:text-left">
-                    <div className="flex items-center gap-2">
-                      <label className="inline-flex items-center gap-2 px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl cursor-pointer transition-all shadow-2xs">
-                        <Upload className="w-3.5 h-3.5 text-slate-500" />
-                        <span>Subir Imagen</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            if (e.target.files?.[0]) handleFileUpload(e.target.files[0]);
-                          }}
-                        />
-                      </label>
-                      {isUploadingImage && <Loader2 className="w-4 h-4 text-indigo-600 animate-spin" />}
-                    </div>
-                    {imageError && <p className="text-xs text-rose-600">{imageError}</p>}
-                  </div>
-                </div>
-              </div>
-
               {/* Cost, Price, VAT */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
@@ -420,38 +342,92 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
 
               {showVariations && (
                 <div className="space-y-3 pt-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <input
-                      type="text"
-                      placeholder="Nombre (ej. 500g)"
-                      className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs flex-1"
-                      value={varForm.name}
-                      onChange={(e) => setVarForm({ ...varForm, name: e.target.value })}
-                    />
-                    <input
-                      type="number"
-                      placeholder="Cant."
-                      className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs w-20"
-                      value={varForm.quantity || ''}
-                      onChange={(e) => setVarForm({ ...varForm, quantity: parseInt(e.target.value) || 0 })}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddVariation}
-                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl cursor-pointer"
-                    >
-                      Agregar
-                    </button>
-                  </div>
-
-                  {editVariations.map((v, i) => (
-                    <div key={i} className="flex items-center justify-between p-2 bg-white rounded-xl border border-slate-100 text-xs">
-                      <span className="font-semibold text-slate-800">{v.name} ({v.quantity} un)</span>
-                      <button type="button" onClick={() => handleRemoveVariation(i)} className="text-rose-500 hover:text-rose-700">
-                        <Trash2 className="w-3.5 h-3.5" />
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 bg-white p-3 rounded-xl border border-slate-200">
+                    <div className="sm:col-span-5">
+                      <input
+                        type="text"
+                        placeholder="Nombre variación (ej. 500g, Azul)"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
+                        value={varForm.name}
+                        onChange={(e) => setVarForm({ ...varForm, name: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddVariation();
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <input
+                        type="number"
+                        placeholder="Stock"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono"
+                        value={varForm.quantity || ''}
+                        onChange={(e) => setVarForm({ ...varForm, quantity: parseInt(e.target.value) || 0 })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddVariation();
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="sm:col-span-3">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Costo ($)"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800"
+                        value={varForm.unit_cost || ''}
+                        onChange={(e) => setVarForm({ ...varForm, unit_cost: parseFloat(e.target.value) || 0 })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddVariation();
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <button
+                        type="button"
+                        onClick={handleAddVariation}
+                        disabled={!varForm.name.trim()}
+                        className="w-full h-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold rounded-xl cursor-pointer transition-all flex items-center justify-center gap-1 shadow-xs"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Agregar</span>
                       </button>
                     </div>
-                  ))}
+                  </div>
+
+                  {editVariations.length > 0 && (
+                    <div className="space-y-1.5">
+                      {editVariations.map((v, i) => (
+                        <div key={i} className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-200 text-xs shadow-2xs">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900">{v.name}</span>
+                            <span className="font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded text-[11px]">{v.quantity} un.</span>
+                            {v.unit_cost !== undefined && v.unit_cost !== null && (
+                              <span className="font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded text-[11px]">
+                                Costo: ${Number(v.unit_cost).toFixed(2)}
+                              </span>
+                            )}
+                          </div>
+                          <button 
+                            type="button" 
+                            onClick={() => handleRemoveVariation(i)} 
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            title="Eliminar variación"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

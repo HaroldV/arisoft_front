@@ -1,15 +1,20 @@
 import React from 'react';
-import { Loader2, FileText, Eye } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Loader2, FileText, Eye, X, Truck } from 'lucide-react';
 import { ORDER_STATUS } from '@/constants/domain-constants';
+import { ActionTooltip } from '@/components/ActionTooltip';
 import { PurchaseOrder } from '../types';
 
 interface PurchaseOrdersTableProps {
   orders: PurchaseOrder[];
   isLoading: boolean;
   onViewOrder: (order: PurchaseOrder) => void;
+  onCancelOrder?: (order: PurchaseOrder) => void;
 }
 
-export function PurchaseOrdersTable({ orders, isLoading, onViewOrder }: PurchaseOrdersTableProps) {
+export function PurchaseOrdersTable({ orders, isLoading, onViewOrder, onCancelOrder }: PurchaseOrdersTableProps) {
+  const router = useRouter();
+
   if (isLoading) {
     return (
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-20 flex flex-col items-center justify-center space-y-3">
@@ -66,14 +71,18 @@ export function PurchaseOrdersTable({ orders, isLoading, onViewOrder }: Purchase
                 <td className="py-4 px-6 text-center">
                   <span
                     className={`text-xs font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 ${
-                      o.status === ORDER_STATUS.COMPLETED
+                      o.status === 'CANCELLED'
+                        ? 'bg-rose-50 text-rose-700 border border-rose-100'
+                        : o.status === ORDER_STATUS.COMPLETED
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
                         : o.status === ORDER_STATUS.SENT
                         ? 'bg-blue-50 text-blue-700 border border-blue-100'
                         : 'bg-slate-100 text-slate-600 border border-slate-200'
                     }`}
                   >
-                    {o.status === ORDER_STATUS.SENT
+                    {o.status === 'CANCELLED'
+                      ? 'Anulada'
+                      : o.status === ORDER_STATUS.SENT
                       ? 'Sin Procesar'
                       : o.status === ORDER_STATUS.COMPLETED
                       ? 'Procesado'
@@ -81,15 +90,47 @@ export function PurchaseOrdersTable({ orders, isLoading, onViewOrder }: Purchase
                   </span>
                 </td>
                 <td className="py-4 px-6 text-center">
-                  <button
-                    type="button"
-                    onClick={() => onViewOrder(o)}
-                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all duration-200 cursor-pointer inline-flex items-center gap-1 text-xs font-bold"
-                    title="Ver detalle de la orden"
-                  >
-                    <Eye className="w-4 h-4" />
-                    <span>Ver</span>
-                  </button>
+                  <div className="flex items-center justify-center gap-1">
+                    {/* Action: Ver Detalle */}
+                    <ActionTooltip content="Ver detalle de la orden">
+                      <button
+                        type="button"
+                        onClick={() => onViewOrder(o)}
+                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all duration-200 cursor-pointer"
+                        aria-label="Ver detalle"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </ActionTooltip>
+
+                    {/* Action: Procesar Recepción */}
+                    {o.status !== 'CANCELLED' && o.status !== ORDER_STATUS.COMPLETED && (
+                      <ActionTooltip content="Procesar recepción de mercancía">
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/inventory/purchases/receptions?orderId=${o.id}&new=true`)}
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all duration-200 cursor-pointer"
+                          aria-label="Procesar recepción"
+                        >
+                          <Truck className="w-4 h-4" />
+                        </button>
+                      </ActionTooltip>
+                    )}
+
+                    {/* Action: Anular Orden */}
+                    {o.status !== 'CANCELLED' && o.status !== ORDER_STATUS.COMPLETED && onCancelOrder && (
+                      <ActionTooltip content="Anular orden de compra">
+                        <button
+                          type="button"
+                          onClick={() => onCancelOrder(o)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all duration-200 cursor-pointer"
+                          aria-label="Anular orden"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </ActionTooltip>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

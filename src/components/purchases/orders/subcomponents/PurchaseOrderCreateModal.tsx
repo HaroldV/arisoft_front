@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { ShoppingBag, X, AlertCircle, Plus, Trash2, Loader2, Building2, CreditCard, DollarSign, Package } from 'lucide-react';
+import { ShoppingBag, X, AlertCircle, Plus, Trash2, Loader2, Building2, CreditCard, DollarSign, Package, Mail, Phone } from 'lucide-react';
 import { PAYMENT_TERMS, CURRENCIES, PRODUCT_TAX_TYPES } from '@/constants/domain-constants';
+import { VENEZUELAN_STATES } from '@/constants/venezuela';
 import { CurrencyInput } from '@/components/CurrencyInput';
 import { SearchableSelect } from '@/components/SearchableSelect';
+import apiClient from '@/infrastructure/api/api-client';
 import { OrderItem, ProviderOption, ProductOption, WarehouseOption } from '../types';
 
 interface PurchaseOrderCreateModalProps {
@@ -12,6 +14,7 @@ interface PurchaseOrderCreateModalProps {
   products: ProductOption[];
   warehouses: WarehouseOption[];
   onSubmit: (payload: any) => Promise<void>;
+  onProviderCreated?: (newProvider: ProviderOption) => void;
 }
 
 export function PurchaseOrderCreateModal({
@@ -21,6 +24,7 @@ export function PurchaseOrderCreateModal({
   products,
   warehouses,
   onSubmit,
+  onProviderCreated,
 }: PurchaseOrderCreateModalProps) {
   // Form State
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
@@ -37,6 +41,108 @@ export function PurchaseOrderCreateModal({
   const [errorFields, setErrorFields] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Quick Inline Provider Creation Modal State
+  const [isQuickProviderModalOpen, setIsQuickProviderModalOpen] = useState(false);
+  const [isSavingProvider, setIsSavingProvider] = useState(false);
+  const [providerModalError, setProviderModalError] = useState<string | null>(null);
+  const [quickProviderName, setQuickProviderName] = useState('');
+  const [quickProviderTaxPrefix, setQuickProviderTaxPrefix] = useState<'V' | 'J' | 'G' | 'E'>('J');
+  const [quickProviderTaxNumber, setQuickProviderTaxNumber] = useState('');
+  const [quickProviderEmail, setQuickProviderEmail] = useState('');
+  const [quickProviderPhone, setQuickProviderPhone] = useState('');
+  const [quickProviderAddress, setQuickProviderAddress] = useState('');
+  const [quickProviderDeliveryAddress, setQuickProviderDeliveryAddress] = useState('');
+  const [quickProviderZoneCode, setQuickProviderZoneCode] = useState('DC');
+  const [quickProviderTaxpayerType, setQuickProviderTaxpayerType] = useState('ORDINARY');
+
+  const handleOpenQuickProviderModal = (initialName = '') => {
+    setQuickProviderName(initialName);
+    setQuickProviderTaxPrefix('J');
+    setQuickProviderTaxNumber('');
+    setQuickProviderEmail('');
+    setQuickProviderPhone('');
+    setQuickProviderAddress('');
+    setQuickProviderDeliveryAddress('');
+    setQuickProviderZoneCode('DC');
+    setQuickProviderTaxpayerType('ORDINARY');
+    setProviderModalError(null);
+    setIsQuickProviderModalOpen(true);
+  };
+
+  const handleCloseQuickProviderModal = () => {
+    setIsQuickProviderModalOpen(false);
+  };
+
+  const handleSubmitQuickProvider = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingProvider(true);
+    setProviderModalError(null);
+
+    const cleanTaxNumber = quickProviderTaxNumber.replace(/\D/g, '');
+    const formattedTaxId = cleanTaxNumber ? `${quickProviderTaxPrefix}-${cleanTaxNumber}` : '';
+
+    if (!quickProviderName.trim()) {
+      setProviderModalError('El Nombre o Razón Social es obligatorio.');
+      setIsSavingProvider(false);
+      return;
+    }
+
+    if (!cleanTaxNumber) {
+      setProviderModalError('El número de Cédula o RIF es obligatorio.');
+      setIsSavingProvider(false);
+      return;
+    }
+
+    const payload = {
+      name: quickProviderName.trim(),
+      tax_id: formattedTaxId,
+      email: quickProviderEmail.trim() || undefined,
+      phone: quickProviderPhone.trim() || undefined,
+      address: quickProviderAddress.trim() || undefined,
+      delivery_address: quickProviderDeliveryAddress.trim() || undefined,
+      zone_code: quickProviderZoneCode,
+      taxpayer_type: quickProviderTaxpayerType,
+      is_retention_agent: false,
+      retention_percentage: 75,
+      islr_percentage: 2.0,
+      islr_concept_code: 'SERVICES',
+    };
+
+    try {
+      const res = await apiClient.post('/providers', payload);
+      const createdProvider = res.data;
+
+      const newProvOpt: ProviderOption = {
+        id: createdProvider.id,
+        name: createdProvider.name,
+        rif: createdProvider.tax_id || createdProvider.rif || formattedTaxId,
+      };
+
+      if (onProviderCreated) {
+        onProviderCreated(newProvOpt);
+      }
+
+      // Automatically select in this modal
+      setSelectedSupplierId(createdProvider.id);
+      setFormSupplierName(createdProvider.name);
+      setFormSupplierRif(newProvOpt.rif || '');
+
+      handleCloseQuickProviderModal();
+    } catch (err: any) {
+      if (err.response?.data?.message) {
+        setProviderModalError(
+          Array.isArray(err.response.data.message)
+            ? err.response.data.message.join(', ')
+            : err.response.data.message
+        );
+      } else {
+        setProviderModalError('Ocurrió un error al registrar el proveedor.');
+      }
+    } finally {
+      setIsSavingProvider(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -232,7 +338,17 @@ export function PurchaseOrderCreateModal({
           {/* 1. Header Fields Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-slate-50 border border-slate-200/80 rounded-2xl">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Seleccionar o Escribir Proveedor Nuevo</label>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">Proveedor <span className="text-rose-500">*</span></label>
+                <button
+                  type="button"
+                  onClick={() => handleOpenQuickProviderModal()}
+                  className="text-xs text-indigo-600 font-bold hover:text-indigo-700 flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Nuevo Proveedor</span>
+                </button>
+              </div>
               <SearchableSelect
                 icon={Building2}
                 value={selectedSupplierId}
@@ -242,9 +358,11 @@ export function PurchaseOrderCreateModal({
                     setSelectedSupplierId(p.id);
                     setFormSupplierName(p.name);
                     setFormSupplierRif(p.rif || '');
+                  } else if (val) {
+                    handleOpenQuickProviderModal(val);
                   } else {
                     setSelectedSupplierId('');
-                    setFormSupplierName(val);
+                    setFormSupplierName('');
                     setFormSupplierRif('');
                   }
                   if (errorFields['formSupplierName'] || errorFields['formSupplierRif']) {
@@ -256,7 +374,7 @@ export function PurchaseOrderCreateModal({
                   label: p.name,
                   sublabel: p.rif ? `RIF: ${p.rif}` : undefined,
                 }))}
-                placeholder="Buscar o redactar nuevo proveedor..."
+                placeholder="Seleccionar o Escribir Proveedor Nuevo..."
                 allowCustomInput={true}
               />
             </div>
@@ -520,22 +638,29 @@ export function PurchaseOrderCreateModal({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Descuento Global (%)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono"
+                  <CurrencyInput
                     value={globalDiscountPct}
-                    onChange={(e) => setGlobalDiscountPct(Number(e.target.value))}
+                    onChange={(val) => setGlobalDiscountPct(Number(val) || 0)}
+                    size="sm"
+                    placeholder="0.00"
+                    currencyPrefix="%"
+                    icon={null}
+                    decimals={2}
+                    min={0}
+                    max={100}
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Recargo / Flete Global (%)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono"
+                  <CurrencyInput
                     value={globalSurchargePct}
-                    onChange={(e) => setGlobalSurchargePct(Number(e.target.value))}
+                    onChange={(val) => setGlobalSurchargePct(Number(val) || 0)}
+                    size="sm"
+                    placeholder="0.00"
+                    currencyPrefix="%"
+                    icon={null}
+                    decimals={2}
+                    min={0}
                   />
                 </div>
               </div>
@@ -588,6 +713,180 @@ export function PurchaseOrderCreateModal({
           </div>
         </form>
       </div>
+
+      {/* Quick Express Provider Modal */}
+      {isQuickProviderModalOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-50 border border-indigo-100 rounded-xl text-indigo-600">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Registrar Nuevo Proveedor</h3>
+                  <p className="text-xs text-slate-500">Se guardará en el catálogo y se asociará a esta orden de compra</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseQuickProviderModal}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitQuickProvider} className="p-6 space-y-4 overflow-y-auto flex-1">
+              {providerModalError && (
+                <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl flex items-center gap-2 text-rose-700 text-xs">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+                  <span>{providerModalError}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Nombre o Razón Social <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Distribuidora Polar C.A."
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
+                    value={quickProviderName}
+                    onChange={(e) => setQuickProviderName(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Cédula / RIF <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <select
+                      className="px-2.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      value={quickProviderTaxPrefix}
+                      onChange={(e) => setQuickProviderTaxPrefix(e.target.value as any)}
+                    >
+                      <option value="J">J-</option>
+                      <option value="V">V-</option>
+                      <option value="G">G-</option>
+                      <option value="E">E-</option>
+                    </select>
+                    <input
+                      type="text"
+                      required
+                      placeholder="123456789"
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      value={quickProviderTaxNumber}
+                      onChange={(e) => setQuickProviderTaxNumber(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Tipo de Contribuyente
+                  </label>
+                  <select
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
+                    value={quickProviderTaxpayerType}
+                    onChange={(e) => setQuickProviderTaxpayerType(e.target.value)}
+                  >
+                    <option value="ORDINARY">Ordinario</option>
+                    <option value="SPECIAL">Especial</option>
+                    <option value="FORMAL">Formal</option>
+                    <option value="EXEMPT">Exento</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Teléfono
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="0414-1234567"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
+                      value={quickProviderPhone}
+                      onChange={(e) => setQuickProviderPhone(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Correo Electrónico
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="email"
+                      placeholder="contacto@proveedor.com"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
+                      value={quickProviderEmail}
+                      onChange={(e) => setQuickProviderEmail(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Estado / Región
+                  </label>
+                  <select
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
+                    value={quickProviderZoneCode}
+                    onChange={(e) => setQuickProviderZoneCode(e.target.value)}
+                  >
+                    {VENEZUELAN_STATES.map((st) => (
+                      <option key={st.code} value={st.code}>
+                        {st.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Dirección Fiscal
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Av., Calle, Edificio..."
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
+                    value={quickProviderAddress}
+                    onChange={(e) => setQuickProviderAddress(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 -mx-6 -mb-6 flex justify-end gap-3 rounded-b-2xl">
+                <button
+                  type="button"
+                  onClick={handleCloseQuickProviderModal}
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl text-xs cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingProvider}
+                  className="flex items-center gap-1.5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-medium rounded-xl text-xs cursor-pointer shadow-xs disabled:opacity-50"
+                >
+                  {isSavingProvider && <Loader2 className="animate-spin h-3.5 w-3.5" />}
+                  Guardar Proveedor
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

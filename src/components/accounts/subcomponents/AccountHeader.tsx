@@ -7,6 +7,7 @@ import { ACCOUNT_TYPES, AccountType } from '@/constants/domain-constants';
 interface AccountHeaderProps {
   activeTab: AccountType;
   setActiveTab: (tab: AccountType) => void;
+  hideTabs?: boolean;
   onOpenCreateModal: () => void;
   onOpenImportModal: () => void;
 }
@@ -14,6 +15,7 @@ interface AccountHeaderProps {
 export function AccountHeader({
   activeTab,
   setActiveTab,
+  hideTabs = false,
   onOpenCreateModal,
   onOpenImportModal,
 }: AccountHeaderProps) {
@@ -36,30 +38,32 @@ export function AccountHeader({
       </div>
 
       <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-        <div className="inline-flex p-1 bg-slate-100/80 rounded-xl border border-slate-200/60">
-          <button
-            onClick={() => setActiveTab(ACCOUNT_TYPES.PAYABLE)}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeTab === ACCOUNT_TYPES.PAYABLE
-                ? 'bg-white text-rose-700 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <ArrowUpRight className="w-3.5 h-3.5" />
-            <span>Por Pagar (CxP)</span>
-          </button>
-          <button
-            onClick={() => setActiveTab(ACCOUNT_TYPES.RECEIVABLE)}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeTab === ACCOUNT_TYPES.RECEIVABLE
-                ? 'bg-white text-emerald-700 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <ArrowDownLeft className="w-3.5 h-3.5" />
-            <span>Por Cobrar (CxC)</span>
-          </button>
-        </div>
+        {!hideTabs && (
+          <div className="inline-flex p-1 bg-slate-100/80 rounded-xl border border-slate-200/60">
+            <button
+              onClick={() => setActiveTab(ACCOUNT_TYPES.PAYABLE)}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === ACCOUNT_TYPES.PAYABLE
+                  ? 'bg-white text-rose-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <ArrowUpRight className="w-3.5 h-3.5" />
+              <span>Por Pagar (CxP)</span>
+            </button>
+            <button
+              onClick={() => setActiveTab(ACCOUNT_TYPES.RECEIVABLE)}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === ACCOUNT_TYPES.RECEIVABLE
+                  ? 'bg-white text-emerald-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <ArrowDownLeft className="w-3.5 h-3.5" />
+              <span>Por Cobrar (CxC)</span>
+            </button>
+          </div>
+        )}
 
         <button
           onClick={onOpenCreateModal}

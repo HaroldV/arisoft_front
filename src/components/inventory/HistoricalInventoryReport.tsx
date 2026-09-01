@@ -43,7 +43,10 @@ const MOCK_SNAPSHOTS: SnapshotItem[] = [
   { id: '6', snapshot_date: '2026-06-30', product_name: 'Marcador Permanente Negro (Caja)', sku: 'MRC-PER-01', category_name: 'Escolar', quantity_on_hand: 190, unit_cost_usd: 4.00, unit_price_usd: 6.50, exchange_rate: 36.50, total_cost_usd: 760.00, total_cost_bs: 27740.00, total_price_usd: 1235.00, total_price_bs: 45077.50, created_by_user_name: 'Juana Pérez' },
 ];
 
+import { PurchasesAuditTab } from './PurchasesAuditTab';
+
 export default function HistoricalInventoryReport() {
+  const [activeTab, setActiveTab] = useState<'VALUATION' | 'PURCHASES_AUDIT'>('VALUATION');
   const [items, setItems] = useState<SnapshotItem[]>(MOCK_SNAPSHOTS);
   const [search, setSearch] = useState('');
   const [startDate, setStartDate] = useState('2026-06-01');
@@ -127,34 +130,68 @@ export default function HistoricalInventoryReport() {
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight text-slate-900">
-              Valuación de Inventario
+              {activeTab === 'VALUATION' ? 'Valuación de Inventario' : 'Auditoría de Compras y Cancelaciones'}
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Auditoría histórica de existencias, valuación a costo y precio de venta en USD y Bolívares
+              {activeTab === 'VALUATION'
+                ? 'Auditoría histórica de existencias, valuación a costo y precio de venta en USD y Bolívares'
+                : 'Control y justificaciones de órdenes de compra anuladas y recepciones de mercancía revertidas'}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <button
-            onClick={handleTriggerSnapshot}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition-all text-sm cursor-pointer"
-          >
-            <RefreshCw className="w-4 h-4 text-slate-500" />
-            Actualizar Foto de Hoy
-          </button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {/* Tabs Selector */}
+          <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1">
+            <button
+              onClick={() => setActiveTab('VALUATION')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'VALUATION'
+                  ? 'bg-white text-indigo-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Valuación
+            </button>
+            <button
+              onClick={() => setActiveTab('PURCHASES_AUDIT')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'PURCHASES_AUDIT'
+                  ? 'bg-white text-indigo-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Cancelaciones / Reversiones
+            </button>
+          </div>
 
-          <button
-            onClick={handleExportCSV}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl shadow-sm transition-all text-sm cursor-pointer"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            Exportar Excel (.csv)
-          </button>
+          {activeTab === 'VALUATION' && (
+            <>
+              <button
+                onClick={handleTriggerSnapshot}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition-all text-xs cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
+                <span>Foto de Hoy</span>
+              </button>
+
+              <button
+                onClick={handleExportCSV}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl shadow-sm transition-all text-xs cursor-pointer"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Excel (.csv)</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Filter Bar: Date Range Picker & Exchange Rate Input */}
+      {activeTab === 'PURCHASES_AUDIT' ? (
+        <PurchasesAuditTab />
+      ) : (
+        <>
+          {/* Filter Bar: Date Range Picker & Exchange Rate Input */}
       <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
           <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600">
@@ -336,6 +373,8 @@ export default function HistoricalInventoryReport() {
           </table>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }

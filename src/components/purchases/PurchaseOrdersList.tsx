@@ -8,6 +8,7 @@ import { PurchaseOrdersFilterBar } from './orders/subcomponents/PurchaseOrdersFi
 import { PurchaseOrdersTable } from './orders/subcomponents/PurchaseOrdersTable';
 import { PurchaseOrderDetailModal } from './orders/subcomponents/PurchaseOrderDetailModal';
 import { PurchaseOrderCreateModal } from './orders/subcomponents/PurchaseOrderCreateModal';
+import { PurchaseOrderCancelModal } from './orders/subcomponents/PurchaseOrderCancelModal';
 
 export function PurchaseOrdersList() {
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
@@ -15,6 +16,7 @@ export function PurchaseOrdersList() {
   const [search, setSearch] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedViewOrder, setSelectedViewOrder] = useState<PurchaseOrder | null>(null);
+  const [selectedCancelOrder, setSelectedCancelOrder] = useState<PurchaseOrder | null>(null);
 
   // Aux Data
   const [providers, setProviders] = useState<ProviderOption[]>([]);
@@ -74,6 +76,11 @@ export function PurchaseOrdersList() {
     await fetchAuxData();
   };
 
+  const handleConfirmCancelOrder = async (orderId: string, reason: string) => {
+    await apiClient.post(`/purchases/orders/${orderId}/cancel`, { reason });
+    await fetchOrders();
+  };
+
   const filteredOrders = orders.filter(
     (o) =>
       o.order_number.toLowerCase().includes(search.toLowerCase()) ||
@@ -93,6 +100,7 @@ export function PurchaseOrdersList() {
         orders={filteredOrders}
         isLoading={isLoading}
         onViewOrder={(order) => setSelectedViewOrder(order)}
+        onCancelOrder={(order) => setSelectedCancelOrder(order)}
       />
 
       {/* Create Order Modal */}
@@ -103,6 +111,9 @@ export function PurchaseOrdersList() {
         products={products}
         warehouses={warehouses}
         onSubmit={handleCreateOrder}
+        onProviderCreated={(newProv) => {
+          setProviders(prev => [newProv, ...prev]);
+        }}
       />
 
       {/* View Order Detail Modal */}
@@ -110,6 +121,14 @@ export function PurchaseOrdersList() {
         order={selectedViewOrder}
         products={products}
         onClose={() => setSelectedViewOrder(null)}
+      />
+
+      {/* Cancel Order Modal */}
+      <PurchaseOrderCancelModal
+        order={selectedCancelOrder}
+        isOpen={Boolean(selectedCancelOrder)}
+        onClose={() => setSelectedCancelOrder(null)}
+        onConfirmCancel={handleConfirmCancelOrder}
       />
     </div>
   );

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { X, History, Wallet } from 'lucide-react';
-import { ACCOUNT_TYPES, AccountType } from '@/constants/domain-constants';
+import { ACCOUNT_TYPES, AccountType, PAYMENT_METHOD_LABELS } from '@/constants/domain-constants';
 import { AccountItem } from '../types';
 
 interface AccountHistoryModalProps {
@@ -70,8 +70,8 @@ export function AccountHistoryModal({
                         {p.paid_at ? new Date(p.paid_at).toLocaleString() : 'Reciente'}
                       </td>
                       <td className="py-3 px-4">
-                        <span className="font-semibold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md text-[11px]">
-                          {p.payment_method}
+                        <span className="font-semibold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-md text-[11px] inline-block">
+                          {PAYMENT_METHOD_LABELS[p.payment_method] || p.payment_method}
                         </span>
                       </td>
                       <td className="py-3 px-4 font-mono text-slate-600 text-xs">

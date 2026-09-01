@@ -250,7 +250,7 @@ export default function ReceivablesPayables({ forcedTab }: ReceivablesPayablesPr
     try {
       const targetEndpoint = activeTab === ACCOUNT_TYPES.PAYABLE
         ? `/accounts/payables/${selectedAccount.id}/payments`
-        : `/accounts/receivables-payables/${selectedAccount.id}/payments`;
+        : `/accounts/receivables/${selectedAccount.id}/payments`;
 
       await apiClient.post(targetEndpoint, {
         payment_method: payMethod,
@@ -326,6 +326,7 @@ export default function ReceivablesPayables({ forcedTab }: ReceivablesPayablesPr
       <AccountHeader
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        hideTabs={Boolean(forcedTab)}
         onOpenCreateModal={() => setIsCreateModalOpen(true)}
         onOpenImportModal={() => setIsImportModalOpen(true)}
       />
