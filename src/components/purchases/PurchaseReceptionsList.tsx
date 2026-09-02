@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { 
   Truck, 
   Plus, 
@@ -22,7 +22,9 @@ import {
   Eye,
   FileText,
   Building2,
-  Package
+  Package,
+  CreditCard,
+  ExternalLink
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import { SearchableSelect } from '@/components/SearchableSelect';
@@ -71,6 +73,7 @@ interface ReceptionNote {
 }
 
 export function PurchaseReceptionsList() {
+  const router = useRouter();
   const [receptions, setReceptions] = useState<ReceptionNote[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -498,15 +501,26 @@ export function PurchaseReceptionsList() {
                       )}
                     </td>
                     <td className="py-4 px-6 text-center">
-                      <button
-                        type="button"
-                        onClick={() => setViewDetailModal(r)}
-                        className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all duration-200 cursor-pointer inline-flex items-center gap-1 text-xs font-bold"
-                        title="Ver detalle de la recepción"
-                      >
-                        <Eye className="w-4 h-4" />
-                        <span>Ver</span>
-                      </button>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setViewDetailModal(r)}
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all duration-200 cursor-pointer inline-flex items-center gap-1 text-xs font-bold"
+                          title="Ver detalle de la recepción"
+                        >
+                          <Eye className="w-4 h-4" />
+                          <span>Ver</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/accounts/receivables-payables?type=PAYABLE&search=${encodeURIComponent(r.supplier_name)}`)}
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all duration-200 cursor-pointer inline-flex items-center gap-1 text-xs font-bold"
+                          title="Gestionar pago en Cuentas por Pagar (CXP)"
+                        >
+                          <CreditCard className="w-4 h-4" />
+                          <span>CXP</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1078,7 +1092,19 @@ export function PurchaseReceptionsList() {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-end px-6 py-4 border-t border-slate-100 bg-slate-50/50 shrink-0">
+            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/50 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  const supplier = viewDetailModal.supplier_name;
+                  setViewDetailModal(null);
+                  router.push(`/accounts/receivables-payables?type=PAYABLE&search=${encodeURIComponent(supplier)}`);
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-semibold rounded-xl transition-all cursor-pointer text-xs"
+              >
+                <CreditCard className="w-4 h-4" />
+                <span>Gestionar Pago en Cuentas por Pagar (CXP)</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setViewDetailModal(null)}

@@ -21,7 +21,7 @@ export const PurchaseInvoicesHeader: React.FC<PurchaseInvoicesHeaderProps> = ({
         </div>
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900">
-            Listado de Compras
+            Listado de Facturas de Compras
           </h1>
           <p className="text-xs text-slate-500 font-medium">
             Libro de compras, documentos fiscales recibidos y control de liquidación en Cuentas por Pagar (CXP)
