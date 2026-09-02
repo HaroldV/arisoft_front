@@ -75,8 +75,8 @@ const menuConfig = [
         children: [
           { label: 'Órdenes de Compra', icon: FileText, href: '/inventory/purchases/orders', permission: 'purchases:orders' },
           { label: 'Notas de Recepción', icon: Truck, href: '/inventory/purchases/receptions', permission: 'purchases:receptions' },
-          { label: 'Registrar Compra', icon: ShoppingBag, href: '/inventory/purchases/new', permission: 'purchases:new' },
-          { label: 'Listado de Compras', icon: FileSpreadsheet, href: '/inventory/purchases', permission: 'purchases:invoices' },
+          { label: 'Compra Directa', icon: ShoppingBag, href: '/inventory/purchases/new', permission: 'purchases:new' },
+          { label: 'Listado de Facturas de Compras', icon: FileSpreadsheet, href: '/inventory/purchases', permission: 'purchases:invoices' },
           { label: 'Proveedores', icon: Building2, href: '/inventory/providers', permission: 'providers:manage' },
         ]
       },
@@ -258,7 +258,7 @@ export default function Sidebar({ isOpen = false, onClose, onToggle }: SidebarPr
     <>
       {/* Backdrop oscuro para tablets y móviles */}
       {isOpen && (
-        <div 
+        <div
           onClick={onClose}
           className="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-xs transition-opacity lg:hidden"
           aria-hidden="true"
@@ -277,7 +277,7 @@ export default function Sidebar({ isOpen = false, onClose, onToggle }: SidebarPr
         </button>
       )}
 
-      <aside 
+      <aside
         className={cn(
           "fixed left-0 top-0 z-50 h-screen w-72 max-w-[85vw] lg:w-64 bg-[#071D33] text-slate-300 border-r border-[#0B2C4D]/80 transition-transform duration-300 ease-in-out flex flex-col shadow-2xl",
           isOpen ? "translate-x-0" : "-translate-x-full"
@@ -309,117 +309,117 @@ export default function Sidebar({ isOpen = false, onClose, onToggle }: SidebarPr
           </button>
         </div>
 
-      <div className="flex-1 overflow-y-auto py-4 px-3.5 space-y-4 min-h-0 custom-scrollbar">
-        {filteredMenu.map((group: any) => (
-          <div key={group.title} className="space-y-1.5">
-            <h3 className="px-2.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
-              {group.title}
-            </h3>
-            <div className="space-y-1">
-              {group.items.map((item: any) => (
-                <div key={item.label}>
-                  {item.children ? (
-                    <div>
-                      <button
-                        onClick={() => toggleMenu(item.label)}
+        <div className="flex-1 overflow-y-auto py-4 px-3.5 space-y-4 min-h-0 custom-scrollbar">
+          {filteredMenu.map((group: any) => (
+            <div key={group.title} className="space-y-1.5">
+              <h3 className="px-2.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                {group.title}
+              </h3>
+              <div className="space-y-1">
+                {group.items.map((item: any) => (
+                  <div key={item.label}>
+                    {item.children ? (
+                      <div>
+                        <button
+                          onClick={() => toggleMenu(item.label)}
+                          className={cn(
+                            "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs font-semibold transition-all duration-200 ease-in-out hover:bg-[#0B2C4D] hover:text-white cursor-pointer",
+                            openMenus.includes(item.label) ? "bg-[#0B2C4D] text-white shadow-xs" : "text-slate-300"
+                          )}
+                        >
+                          <div className="flex items-center">
+                            <item.icon className={cn(
+                              "mr-2.5 h-4 w-4 transition-colors",
+                              openMenus.includes(item.label) ? "text-emerald-400" : "text-slate-400"
+                            )} />
+                            <span>{item.label}</span>
+                          </div>
+                          <ChevronDown className={cn(
+                            "h-3.5 w-3.5 text-slate-400 transition-transform duration-200",
+                            openMenus.includes(item.label) && "rotate-180 text-emerald-400"
+                          )} />
+                        </button>
+                        <div className={cn(
+                          "mt-1 space-y-0.5 overflow-hidden transition-all duration-300 ease-in-out pl-4",
+                          openMenus.includes(item.label) ? "max-h-[500px] opacity-100 py-1" : "max-h-0 opacity-0"
+                        )}>
+                          {item.children.map((sub: any) => {
+                            const isSubActive = pathname === sub.href;
+                            return (
+                              <Link
+                                key={sub.label}
+                                href={sub.href}
+                                onClick={(e) => handleRestrictedNavigation(e, sub.label, sub.href)}
+                                className={cn(
+                                  "flex items-center rounded-lg px-2.5 py-2 text-xs font-medium transition-all duration-200 ease-in-out hover:translate-x-0.5 group relative",
+                                  isSubActive
+                                    ? "text-emerald-300 bg-[#0B2C4D] font-bold shadow-xs border-l-2 border-emerald-400"
+                                    : "text-slate-400 hover:text-white hover:bg-[#0B2C4D]/60"
+                                )}
+                              >
+                                {sub.icon && (
+                                  <sub.icon className={cn(
+                                    "mr-2 h-3.5 w-3.5 shrink-0 transition-colors",
+                                    isSubActive ? "text-emerald-400" : "text-slate-400 group-hover:text-emerald-300"
+                                  )} />
+                                )}
+                                <span>{sub.label}</span>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <Link
+                        href={item.href}
+                        onClick={(e) => handleRestrictedNavigation(e, item.label, item.href)}
                         className={cn(
-                          "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs font-semibold transition-all duration-200 ease-in-out hover:bg-[#0B2C4D] hover:text-white cursor-pointer",
-                          openMenus.includes(item.label) ? "bg-[#0B2C4D] text-white shadow-xs" : "text-slate-300"
+                          "flex items-center rounded-xl px-3 py-2.5 text-xs font-semibold transition-all duration-200 ease-in-out hover:bg-[#0B2C4D] hover:text-white hover:translate-x-0.5 group",
+                          pathname === item.href
+                            ? "bg-[#0B2C4D] text-emerald-300 font-bold shadow-xs border-l-2 border-emerald-400"
+                            : "text-slate-300"
                         )}
                       >
-                        <div className="flex items-center">
-                          <item.icon className={cn(
-                            "mr-2.5 h-4 w-4 transition-colors",
-                            openMenus.includes(item.label) ? "text-emerald-400" : "text-slate-400"
-                          )} />
-                          <span>{item.label}</span>
-                        </div>
-                        <ChevronDown className={cn(
-                          "h-3.5 w-3.5 text-slate-400 transition-transform duration-200",
-                          openMenus.includes(item.label) && "rotate-180 text-emerald-400"
+                        <item.icon className={cn(
+                          "mr-2.5 h-4 w-4 transition-colors",
+                          pathname === item.href ? "text-emerald-400" : "text-slate-400 group-hover:text-emerald-300"
                         )} />
-                      </button>
-                      <div className={cn(
-                        "mt-1 space-y-0.5 overflow-hidden transition-all duration-300 ease-in-out pl-4",
-                        openMenus.includes(item.label) ? "max-h-[500px] opacity-100 py-1" : "max-h-0 opacity-0"
-                      )}>
-                        {item.children.map((sub: any) => {
-                          const isSubActive = pathname === sub.href;
-                          return (
-                            <Link
-                              key={sub.label}
-                              href={sub.href}
-                              onClick={(e) => handleRestrictedNavigation(e, sub.label, sub.href)}
-                              className={cn(
-                                "flex items-center rounded-lg px-2.5 py-2 text-xs font-medium transition-all duration-200 ease-in-out hover:translate-x-0.5 group relative",
-                                isSubActive
-                                  ? "text-emerald-300 bg-[#0B2C4D] font-bold shadow-xs border-l-2 border-emerald-400"
-                                  : "text-slate-400 hover:text-white hover:bg-[#0B2C4D]/60"
-                              )}
-                            >
-                              {sub.icon && (
-                                <sub.icon className={cn(
-                                  "mr-2 h-3.5 w-3.5 shrink-0 transition-colors",
-                                  isSubActive ? "text-emerald-400" : "text-slate-400 group-hover:text-emerald-300"
-                                )} />
-                              )}
-                              <span>{sub.label}</span>
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : (
-                    <Link
-                      href={item.href}
-                      onClick={(e) => handleRestrictedNavigation(e, item.label, item.href)}
-                      className={cn(
-                        "flex items-center rounded-xl px-3 py-2.5 text-xs font-semibold transition-all duration-200 ease-in-out hover:bg-[#0B2C4D] hover:text-white hover:translate-x-0.5 group",
-                        pathname === item.href
-                          ? "bg-[#0B2C4D] text-emerald-300 font-bold shadow-xs border-l-2 border-emerald-400"
-                          : "text-slate-300"
-                      )}
-                    >
-                      <item.icon className={cn(
-                        "mr-2.5 h-4 w-4 transition-colors",
-                        pathname === item.href ? "text-emerald-400" : "text-slate-400 group-hover:text-emerald-300"
-                      )} />
-                      <span>{item.label}</span>
-                    </Link>
-                  )}
-                </div>
-              ))}
+                        <span>{item.label}</span>
+                      </Link>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="p-3.5 border-t border-[#0B2C4D] bg-[#051627] shrink-0">
-        <div className="flex items-center px-1 mb-3">
-          <div className="p-1 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 mr-2.5">
-            <UserCircle className="h-6 w-6" />
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-xs font-bold text-white truncate w-36">{user?.full_name || 'Cargando...'}</span>
-            <span className="text-[10px] text-emerald-400 uppercase font-black tracking-wider">{user?.role || 'User'}</span>
-          </div>
+          ))}
         </div>
 
-        <button
-          onClick={logout}
-          className="flex w-full items-center justify-center rounded-xl bg-[#0B2C4D]/60 hover:bg-rose-950/40 hover:border-rose-900/60 px-3 py-2 text-xs font-bold text-rose-300 hover:text-rose-200 transition-all duration-200 border border-[#0B2C4D] cursor-pointer"
-        >
-          <LogOut className="mr-2 h-3.5 w-3.5" />
-          Cerrar Sesión
-        </button>
-      </div>
+        <div className="p-3.5 border-t border-[#0B2C4D] bg-[#051627] shrink-0">
+          <div className="flex items-center px-1 mb-3">
+            <div className="p-1 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 mr-2.5">
+              <UserCircle className="h-6 w-6" />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-bold text-white truncate w-36">{user?.full_name || 'Cargando...'}</span>
+              <span className="text-[10px] text-emerald-400 uppercase font-black tracking-wider">{user?.role || 'User'}</span>
+            </div>
+          </div>
 
-      <SubscriptionBlockedModal
-        isOpen={isBlockedModalOpen}
-        onClose={() => setIsBlockedModalOpen(false)}
-        targetSection={blockedSectionName}
-      />
-    </aside>
+          <button
+            onClick={logout}
+            className="flex w-full items-center justify-center rounded-xl bg-[#0B2C4D]/60 hover:bg-rose-950/40 hover:border-rose-900/60 px-3 py-2 text-xs font-bold text-rose-300 hover:text-rose-200 transition-all duration-200 border border-[#0B2C4D] cursor-pointer"
+          >
+            <LogOut className="mr-2 h-3.5 w-3.5" />
+            Cerrar Sesión
+          </button>
+        </div>
+
+        <SubscriptionBlockedModal
+          isOpen={isBlockedModalOpen}
+          onClose={() => setIsBlockedModalOpen(false)}
+          targetSection={blockedSectionName}
+        />
+      </aside>
     </>
   );
 }
