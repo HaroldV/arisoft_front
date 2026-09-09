@@ -125,6 +125,12 @@ export const SAAS_PLAN_NAMES: Record<SaasPlanCode | string, string> = {
   [SAAS_PLAN_CODES.CORPORATIVO]: 'Corporativo',
 };
 
+export const SAAS_PLAN_TIER_ORDER: Record<string, number> = {
+  [SAAS_PLAN_CODES.EMPRENDEDOR]: 1,
+  [SAAS_PLAN_CODES.COMERCIAL_PRO]: 2,
+  [SAAS_PLAN_CODES.CORPORATIVO]: 3,
+};
+
 export const SYSTEM_MODULES = {
   POS: 'POS',
   SALES: 'SALES',
