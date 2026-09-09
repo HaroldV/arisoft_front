@@ -50,10 +50,10 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
         setDisplayValue('');
       } else {
         const num = Number(value);
-        setDisplayValue(num === 0 ? '' : num.toString());
+        setDisplayValue(num === 0 ? '' : num.toFixed(decimals));
       }
     }
-  }, [value]);
+  }, [value, decimals]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;

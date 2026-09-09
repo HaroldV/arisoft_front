@@ -19,11 +19,13 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
-  Warehouse
+  Warehouse,
+  QrCode
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import { SearchableSelect } from '@/components/SearchableSelect';
 import { CurrencyInput } from '@/components/CurrencyInput';
+import { BarcodeScannerModal } from './subcomponents/BarcodeScannerModal';
 import Link from 'next/link';
 
 interface Variation {
@@ -34,6 +36,7 @@ interface Variation {
 }
 
 export const ProductForm: React.FC = () => {
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [formData, setFormData] = useState({
     sku: '',
     name: '',
@@ -143,6 +146,191 @@ export const ProductForm: React.FC = () => {
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
+
+  const [isLookingUpBarcode, setIsLookingUpBarcode] = useState(false);
+
+  const handleScanBarcodeOrQr = async (decodedText: string) => {
+    const raw = decodedText.trim();
+    if (!raw) return;
+
+    // Check if the QR code is a JSON object payload with product data
+    try {
+      if (raw.startsWith('{') && raw.endsWith('}')) {
+        const parsed = JSON.parse(raw);
+        setFormData(prev => ({
+          ...prev,
+          sku: (parsed.sku || parsed.code || prev.sku).toUpperCase(),
+          name: parsed.name || parsed.description || prev.name,
+          costUsd: parsed.costUsd !== undefined ? Number(parsed.costUsd) : (parsed.cost !== undefined ? Number(parsed.cost) : prev.costUsd),
+          priceUsd: parsed.priceUsd !== undefined ? Number(parsed.priceUsd) : (parsed.price !== undefined ? Number(parsed.price) : prev.priceUsd),
+          taxRate: parsed.taxRate !== undefined ? Number(parsed.taxRate) : prev.taxRate,
+          unitOfMeasure: parsed.unitOfMeasure || parsed.unit || prev.unitOfMeasure,
+          category: parsed.category || prev.category,
+        }));
+        return;
+      }
+    } catch (_) {}
+
+    // Otherwise treated as a standard Barcode / SKU
+    const scannedSku = raw.toUpperCase();
+    
+    // Check if this SKU matches an existing product in local catalog
+    const existingMatch = existingProducts.find(
+      p => (p.sku && p.sku.toUpperCase() === scannedSku) || (p.name && p.name.toUpperCase() === scannedSku)
+    );
+
+    if (existingMatch) {
+      setFormData(prev => ({
+        ...prev,
+        sku: scannedSku,
+        name: existingMatch.name || prev.name,
+        category: existingMatch.category || prev.category,
+        costUsd: existingMatch.costUsd !== undefined ? existingMatch.costUsd : prev.costUsd,
+        priceUsd: existingMatch.priceUsd !== undefined ? existingMatch.priceUsd : prev.priceUsd,
+      }));
+      return;
+    }
+
+    // Set SKU immediately
+    setFormData(prev => ({
+      ...prev,
+      sku: scannedSku,
+    }));
+
+    // If it looks like a standard EAN / UPC Barcode (8 to 14 digits), query public barcode registry for product name and details
+    if (/^\d{8,14}$/.test(scannedSku)) {
+      setIsLookingUpBarcode(true);
+      try {
+        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${scannedSku}.json`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 1 && data.product) {
+            const prod = data.product;
+            // Get strictly the clean product name without unwanted extra appended tags
+            const rawName = prod.product_name_es || prod.product_name || prod.generic_name_es || prod.generic_name || '';
+            const cleanName = rawName.trim();
+
+            // Category translation map (English -> Spanish)
+            const CATEGORY_TRANSLATIONS: Record<string, string> = {
+              'groceries': 'Víveres y Abarrotes',
+              'sauces': 'Salsas y Aderezos',
+              'mayonnaises': 'Salsas y Aderezos',
+              'condiments': 'Condimentos y Especias',
+              'dairies': 'Lácteos',
+              'dairy': 'Lácteos',
+              'cheeses': 'Quesos y Lácteos',
+              'milks': 'Lácteos y Leches',
+              'beverages': 'Bebidas',
+              'snacks': 'Snacks y Golosinas',
+              'sweet snacks': 'Dulces y Galletas',
+              'salty snacks': 'Snacks Salados',
+              'biscuits': 'Galletas',
+              'cookies': 'Galletas',
+              'cereals and potatoes': 'Cereales y Granos',
+              'cereals and their products': 'Cereales y Harinas',
+              'flours': 'Harinas y Masas',
+              'corn flours': 'Harina de Maíz',
+              'pastas': 'Pastas',
+              'fats': 'Grasas y Aceites',
+              'vegetable oils': 'Aceites Vegetales',
+              'spreads': 'Untables y Mantequillas',
+              'canned foods': 'Enlatados y Conservas',
+              'meats': 'Carnes y Embutidos',
+              'frozen foods': 'Congelados',
+              'cleaning': 'Limpieza y Hogar',
+              'household': 'Limpieza del Hogar',
+              'hygiene': 'Cuidado Personal',
+              'personal care': 'Cuidado Personal',
+            };
+
+            // Extract category and translate
+            let finalCategory = '';
+            const rawCatTags = prod.categories_tags || [];
+            for (const tag of rawCatTags) {
+              const cleanTag = tag.replace(/^.*?:/, '').replace(/-/g, ' ').toLowerCase().trim();
+              if (CATEGORY_TRANSLATIONS[cleanTag]) {
+                finalCategory = CATEGORY_TRANSLATIONS[cleanTag];
+                break;
+              }
+            }
+
+            if (!finalCategory && prod.categories) {
+              const firstCat = prod.categories.split(',')[0]?.trim().toLowerCase();
+              if (firstCat && CATEGORY_TRANSLATIONS[firstCat]) {
+                finalCategory = CATEGORY_TRANSLATIONS[firstCat];
+              }
+            }
+
+            if (!finalCategory) {
+              finalCategory = 'Víveres y Abarrotes';
+            }
+
+            setFormData(prev => ({
+              ...prev,
+              name: cleanName || prev.name,
+              category: finalCategory || prev.category,
+              imageUrl: prod.image_url || prev.imageUrl,
+            }));
+          }
+        }
+      } catch (e) {
+        console.warn('Could not query Open Food Facts for barcode:', e);
+      } finally {
+        setIsLookingUpBarcode(false);
+      }
+    }
+  };
+
+  // Global Barcode / QR hardware scanner listener (HID keyboard wedge)
+  const barcodeBufferRef = useRef<string>('');
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // If user presses Enter, evaluate what has been scanned/buffered
+      if (e.key === 'Enter') {
+        if (barcodeBufferRef.current.trim().length >= 2) {
+          const scannedCode = barcodeBufferRef.current.trim();
+          handleScanBarcodeOrQr(scannedCode);
+          barcodeBufferRef.current = '';
+          e.preventDefault();
+        }
+        return;
+      }
+
+      // Collect printable characters
+      if (e.key.length === 1) {
+        barcodeBufferRef.current += e.key;
+
+        // Reset buffer if no new keystroke arrives within 250ms
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        timeoutRef.current = setTimeout(() => {
+          barcodeBufferRef.current = '';
+        }, 250);
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown, true);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown, true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [existingProducts]);
+
+  const handleSkuKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleScanBarcodeOrQr(formData.sku);
+    }
+  };
+
+  const handleSkuChange = (val: string) => {
+    setFormData(prev => ({ ...prev, sku: val.toUpperCase() }));
+    // If the input receives a JSON string or a full barcode pasted/scanned
+    if (val.trim().startsWith('{') && val.trim().endsWith('}')) {
+      handleScanBarcodeOrQr(val);
+    }
+  };
 
   const handleProductNameChange = (val: string) => {
     setFormData(prev => ({ ...prev, name: val }));
@@ -368,17 +556,38 @@ export const ProductForm: React.FC = () => {
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">SKU (Código Único)</label>
+          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+            SKU (Código Único / Barra)
+          </label>
           <div className="relative">
             <Tag className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
             <input
               type="text"
               required
-              placeholder="Ej. HAR-PAN-01"
-              className="block w-full pl-11 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm placeholder-slate-400 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200"
+              placeholder="Ej. HAR-PAN-01 o escanea el código"
+              className="block w-full pl-11 pr-11 py-2.5 border border-slate-200 rounded-xl text-sm placeholder-slate-400 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200"
               value={formData.sku}
-              onChange={(e) => setFormData({ ...formData, sku: e.target.value.toUpperCase() })}
+              onChange={(e) => handleSkuChange(e.target.value)}
+              onKeyDown={handleSkuKeyDown}
+              onPaste={(e) => {
+                const pastedText = e.clipboardData.getData('text');
+                if (pastedText && pastedText.trim()) {
+                  setTimeout(() => handleScanBarcodeOrQr(pastedText), 50);
+                }
+              }}
             />
+            <button
+              type="button"
+              onClick={() => setIsScannerOpen(true)}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer"
+              title="Abrir lector de cámara"
+            >
+              {isLookingUpBarcode ? (
+                <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+              ) : (
+                <QrCode className="w-4 h-4" />
+              )}
+            </button>
           </div>
         </div>
 
@@ -875,6 +1084,13 @@ export const ProductForm: React.FC = () => {
           </button>
         </div>
       </form>
+
+      {/* Barcode / QR Scanner Modal */}
+      <BarcodeScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScanSuccess={handleScanBarcodeOrQr}
+      />
     </div>
   );
 };

@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { Package, ArrowUpDown, ArrowUp, ArrowDown, Edit2, Trash2, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Package, ArrowUpDown, ArrowUp, ArrowDown, Edit2, Trash2, CheckCircle, XCircle, AlertTriangle, ArrowRightLeft } from 'lucide-react';
 import { ActionTooltip } from '@/components/ActionTooltip';
 import { InventoryProduct, SortField, SortOrder } from '../types/stock.types';
 
@@ -13,6 +13,7 @@ interface StockTableProps {
   onToggleSort: (field: SortField) => void;
   onEdit: (product: InventoryProduct) => void;
   onDelete: (productId: string) => void;
+  onBulkTransfer?: (selectedProducts: InventoryProduct[]) => void;
 }
 
 export const StockTable: React.FC<StockTableProps> = ({
@@ -23,7 +24,30 @@ export const StockTable: React.FC<StockTableProps> = ({
   onToggleSort,
   onEdit,
   onDelete,
+  onBulkTransfer,
 }) => {
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const handleToggleSelectAll = () => {
+    if (selectedIds.size === products.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(products.map((p) => p.id)));
+    }
+  };
+
+  const handleToggleSelectOne = (id: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setSelectedIds(next);
+  };
+
+  const selectedProducts = products.filter((p) => selectedIds.has(p.id));
+
   const getStockBadge = (stock: number) => {
     if (stock > 10) {
       return (
@@ -60,15 +84,45 @@ export const StockTable: React.FC<StockTableProps> = ({
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden space-y-0">
+      {/* Bulk Action Header Bar */}
+      {selectedIds.size > 0 && onBulkTransfer && (
+        <div className="bg-indigo-50/80 border-b border-indigo-100 p-3.5 px-6 flex items-center justify-between animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="flex items-center gap-2 text-xs font-bold text-indigo-900">
+            <span className="bg-indigo-600 text-white rounded-md px-2 py-0.5 text-[11px] font-mono">
+              {selectedIds.size}
+            </span>
+            <span>producto(s) seleccionado(s)</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => onBulkTransfer(selectedProducts)}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-indigo-200 cursor-pointer active:scale-98"
+          >
+            <ArrowRightLeft className="w-3.5 h-3.5" />
+            <span>Trasladar a Almacén</span>
+          </button>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-left">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              {/* Checkbox Header */}
+              <th className="py-4 pl-6 pr-2 w-10">
+                <input
+                  type="checkbox"
+                  checked={products.length > 0 && selectedIds.size === products.length}
+                  onChange={handleToggleSelectAll}
+                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                />
+              </th>
+
               {/* SKU Header */}
               <th 
                 onClick={() => onToggleSort('sku')}
-                className="py-4 px-6 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                className="py-4 px-4 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
               >
                 <div className="flex items-center gap-1.5">
                   <span>SKU</span>
@@ -164,8 +218,19 @@ export const StockTable: React.FC<StockTableProps> = ({
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
             {products.map((product) => (
-              <tr key={product.id} className="hover:bg-slate-50/50 transition-colors">
-                <td className="py-4 px-6 font-mono text-xs font-semibold text-slate-600">
+              <tr 
+                key={product.id} 
+                className={`transition-colors ${selectedIds.has(product.id) ? 'bg-indigo-50/40' : 'hover:bg-slate-50/50'}`}
+              >
+                <td className="py-4 pl-6 pr-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(product.id)}
+                    onChange={() => handleToggleSelectOne(product.id)}
+                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                  />
+                </td>
+                <td className="py-4 px-4 font-mono text-xs font-semibold text-slate-600">
                   <span className="bg-slate-100/90 border border-slate-200/70 px-2.5 py-1 rounded-md">
                     {product.sku}
                   </span>
@@ -222,3 +287,4 @@ export const StockTable: React.FC<StockTableProps> = ({
     </div>
   );
 };
+

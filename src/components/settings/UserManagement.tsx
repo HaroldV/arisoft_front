@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, Search, Edit2, Shield, CheckCircle2, XCircle, X, Key, AlertTriangle, AlertCircle, Percent, 
-  ShoppingCart, Package, Landmark, Settings, UserPlus, FileText, ShoppingBag, Users, BarChart3 
+  ShoppingCart, Package, Landmark, Settings, UserPlus, FileText, ShoppingBag, Users, BarChart3, Building2 
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import { useAuth } from '@/context/AuthContext';
@@ -35,12 +35,21 @@ const getModuleIcon = (mod: string) => {
   }
 };
 
+interface BranchOption {
+  id: string;
+  name: string;
+  code: string;
+  is_main?: boolean;
+}
+
 interface UserItem {
   id: string;
   full_name: string;
   email: string;
   role: string;
   role_id: string | null;
+  branch_id?: string | null;
+  branch?: BranchOption | null;
   creator_id: string | null;
   allowed_modules: string[] | string;
   allowed_permissions: string[] | string;
@@ -151,6 +160,7 @@ export default function UserManagement() {
   const [activeTab, setActiveTab] = useState<'users' | 'roles'>('users');
   const [users, setUsers] = useState<UserItem[]>([]);
   const [roles, setRoles] = useState<RoleItem[]>([]);
+  const [branches, setBranches] = useState<BranchOption[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -180,6 +190,7 @@ export default function UserManagement() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('CASHIER');
   const [roleId, setRoleId] = useState<string | null>(null);
+  const [branchId, setBranchId] = useState<string>('');
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
@@ -214,6 +225,16 @@ export default function UserManagement() {
     }
   };
 
+  // Fetch branches
+  const fetchBranches = async () => {
+    try {
+      const response = await apiClient.get('/settings/branches');
+      setBranches(response.data || []);
+    } catch (err: any) {
+      console.error('Error fetching branches:', err);
+    }
+  };
+
   // Subscription plan code state
   const [currentPlanCode, setCurrentPlanCode] = useState<SaasPlanCode>(SAAS_PLAN_CODES.EMPRENDEDOR);
 
@@ -234,6 +255,7 @@ export default function UserManagement() {
   useEffect(() => {
     fetchUsers();
     fetchRoles();
+    fetchBranches();
     fetchSubscriptionStatus();
   }, []);
 
@@ -280,6 +302,7 @@ export default function UserManagement() {
     setFullName('');
     setEmail('');
     setPassword('');
+    setBranchId(branches[0]?.id || '');
     // Pick the first role from roles list if available, or fallback to CASHIER
     const defaultRole = roles.find(r => r.name === 'CASHIER') || roles[0];
     if (defaultRole) {
@@ -305,6 +328,7 @@ export default function UserManagement() {
     setPassword('');
     setRole(user.role);
     setRoleId(user.role_id);
+    setBranchId(user.branch_id || '');
     
     // Parse allowed_modules array
     const mods = typeof user.allowed_modules === 'string'
@@ -378,6 +402,7 @@ export default function UserManagement() {
       email,
       role,
       role_id: roleId,
+      branch_id: branchId || null,
       allowed_modules: selectedModules,
       allowed_permissions: selectedPermissions,
       ...(password ? { password } : {}),
@@ -667,6 +692,7 @@ export default function UserManagement() {
                     <tr className="border-b border-slate-100 bg-slate-50/50 text-xs font-semibold uppercase tracking-wider text-slate-500">
                       <th className="px-6 py-4">Usuario</th>
                       <th className="px-6 py-4">Rol</th>
+                      <th className="px-6 py-4">Sucursal</th>
                       <th className="px-6 py-4">Permisos Clave</th>
                       <th className="px-6 py-4">Jerarquía / Creador</th>
                       <th className="px-6 py-4">Estado</th>
@@ -698,6 +724,16 @@ export default function UserManagement() {
                             )}>
                               {u.role}
                             </span>
+                          </td>
+                          <td className="px-6 py-4 text-xs font-semibold">
+                            {u.branch ? (
+                              <div className="flex items-center gap-1.5 text-indigo-700 font-bold bg-indigo-50/80 px-2.5 py-1 rounded-xl border border-indigo-100 w-fit">
+                                <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                                <span>{u.branch.name}</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 text-xs">Acceso Global</span>
+                            )}
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex flex-wrap gap-1 max-w-[320px]">
@@ -983,6 +1019,31 @@ export default function UserManagement() {
                     </div>
                   )}
                 </div>
+
+                {/* Sucursal Asignada (STORY-18.2) */}
+                {!(modalMode === 'edit' && selectedUser?.id === currentUser?.id) && (
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Sucursal / Sede Asignada</span>
+                    </label>
+                    <select
+                      value={branchId}
+                      onChange={e => setBranchId(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-semibold"
+                    >
+                      <option value="">-- Sin Sucursal Asignada (Acceso Global / Central) --</option>
+                      {branches.map(b => (
+                        <option key={b.id} value={b.id}>
+                          {b.name} ({b.code}){b.is_main ? ' - Sede Principal' : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Si el usuario ingresa al Punto de Venta (POS), solo visualizará las existencias del almacén de esta sucursal.
+                    </p>
+                  </div>
+                )}
 
                 {/* Templates / Presets Buttons */}
                 {!(modalMode === 'edit' && selectedUser?.id === currentUser?.id) && (

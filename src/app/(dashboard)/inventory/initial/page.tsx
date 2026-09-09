@@ -8,8 +8,9 @@ import {
   Download, 
   CheckCircle, 
   XCircle, 
-  Loader2,
-  AlertCircle
+  Loader2, 
+  AlertCircle,
+  Warehouse
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 
@@ -18,6 +19,8 @@ export default function InitialInventoryPage() {
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [warehouses, setWarehouses] = useState<{ id: string; name: string; type?: string }[]>([]);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
   const [uploadResult, setUploadResult] = useState<{
     success: boolean;
     message: string;
@@ -26,6 +29,22 @@ export default function InitialInventoryPage() {
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    const loadWarehouses = async () => {
+      try {
+        const res = await apiClient.get('/inventory/warehouse-locations');
+        const list = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+        setWarehouses(list);
+        if (list.length > 0) {
+          setSelectedWarehouseId(list[0].id);
+        }
+      } catch (e) {
+        console.error('Error fetching warehouses for bulk upload:', e);
+      }
+    };
+    loadWarehouses();
+  }, []);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -76,6 +95,9 @@ export default function InitialInventoryPage() {
 
     const formData = new FormData();
     formData.append('file', file);
+    if (selectedWarehouseId) {
+      formData.append('warehouseLocationId', selectedWarehouseId);
+    }
 
     try {
       const response = await apiClient.post('/inventory/products/bulk', formData, {
@@ -161,6 +183,38 @@ export default function InitialInventoryPage() {
                   <Download className="h-4 w-4" />
                   Descargar Plantilla CSV
                 </a>
+              </div>
+
+              {/* Warehouse Selector for Bulk Stock Assignment */}
+              <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <Warehouse className="w-4 h-4 text-primary-600" />
+                      <span>Almacén Destino para Stock Inicial</span>
+                    </label>
+                    <p className="text-[11px] text-slate-500">
+                      Las existencias iniciales del archivo CSV se registrarán en este almacén (a menos que el CSV contenga la columna <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800 font-mono">warehouseCode</code>).
+                    </p>
+                  </div>
+                  <div className="sm:w-72">
+                    <select
+                      value={selectedWarehouseId}
+                      onChange={(e) => setSelectedWarehouseId(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 cursor-pointer shadow-2xs"
+                    >
+                      {warehouses.length === 0 ? (
+                        <option value="">Cargando almacenes...</option>
+                      ) : (
+                        warehouses.map((w) => (
+                          <option key={w.id} value={w.id}>
+                            {w.name} {w.type ? `(${w.type})` : ''}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+                </div>
               </div>
 
               {/* Drag & Drop Area */}

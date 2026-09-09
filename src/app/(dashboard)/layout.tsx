@@ -139,6 +139,21 @@ export default function DashboardLayout({
         if (settings.manualRate) {
           setManualRate(Number(settings.manualRate));
         }
+
+        const usdR = bcvRes?.data?.USD?.rate ? Number(bcvRes.data.USD.rate) : (bcvRes?.data?.rate ? Number(bcvRes.data.rate) : undefined);
+        const eurR = bcvRes?.data?.EUR?.rate ? Number(bcvRes.data.EUR.rate) : undefined;
+        if (typeof window !== 'undefined' && usdR) {
+          window.dispatchEvent(
+            new CustomEvent('exchange-rate-updated', {
+              detail: {
+                usdRate: usdR,
+                eurRate: eurR,
+                manualRate: settings.manualRate ? Number(settings.manualRate) : undefined,
+                mode: settings.currencyMode || 'BCV_USD',
+              },
+            })
+          );
+        }
       } catch (err) {
         console.error('Error fetching exchange rates for layout:', err);
       }
