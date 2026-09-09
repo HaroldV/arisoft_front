@@ -198,6 +198,7 @@ export const ALL_MODULE_GROUPS = [
       { key: 'company:manage', label: 'Perfil de Empresa', desc: 'Configuración de datos de la empresa y logo' },
       { key: 'fiscal:manage', label: 'Configuración Fiscal', desc: 'Timbres fiscales, retenciones e imprenta digital' },
       { key: 'users:manage', label: 'Usuarios y Roles', desc: 'Administración de usuarios, cajeros y roles internos' },
+      { key: 'branches:manage', label: 'Sucursales & Tiendas', desc: 'Gestión de sucursales físicas y asignación de almacenes' },
     ]
   },
 ];

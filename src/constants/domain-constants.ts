@@ -180,6 +180,9 @@ export const PLAN_DEFAULT_PERMISSIONS: Record<SaasPlanCode, string[]> = {
     // 3. Módulo Control de Inventario (INVENTORY)
     'inventory:create',
     'inventory:stock',
+    'inventory:view',
+    'inventory:write',
+    'inventory:adjust',
     'inventory:warehouse',
     'inventory:categories',
     // 4. Módulo Cuentas (BANKS)
@@ -188,6 +191,7 @@ export const PLAN_DEFAULT_PERMISSIONS: Record<SaasPlanCode, string[]> = {
     'company:manage',
     'fiscal:manage',
     'users:manage',
+    'branches:manage',
   ],
   [SAAS_PLAN_CODES.COMERCIAL_PRO]: [
     'pos:create',
@@ -200,9 +204,13 @@ export const PLAN_DEFAULT_PERMISSIONS: Record<SaasPlanCode, string[]> = {
     'purchases:orders',
     'purchases:receptions',
     'purchases:invoices',
+    'purchases:new',
     'providers:manage',
     'inventory:create',
     'inventory:stock',
+    'inventory:view',
+    'inventory:write',
+    'inventory:adjust',
     'inventory:bulk_prices',
     'inventory:valuation',
     'inventory:warehouse',
@@ -216,6 +224,7 @@ export const PLAN_DEFAULT_PERMISSIONS: Record<SaasPlanCode, string[]> = {
     'company:manage',
     'fiscal:manage',
     'users:manage',
+    'branches:manage',
   ],
   [SAAS_PLAN_CODES.CORPORATIVO]: [
     'pos:create',
@@ -228,9 +237,13 @@ export const PLAN_DEFAULT_PERMISSIONS: Record<SaasPlanCode, string[]> = {
     'purchases:orders',
     'purchases:receptions',
     'purchases:invoices',
+    'purchases:new',
     'providers:manage',
     'inventory:create',
     'inventory:stock',
+    'inventory:view',
+    'inventory:write',
+    'inventory:adjust',
     'inventory:bulk_prices',
     'inventory:valuation',
     'inventory:warehouse',
@@ -245,7 +258,14 @@ export const PLAN_DEFAULT_PERMISSIONS: Record<SaasPlanCode, string[]> = {
     'company:manage',
     'fiscal:manage',
     'users:manage',
+    'branches:manage',
   ],
+};
+
+export const SAAS_PLAN_LIMITS: Record<string, { USERS: number; PRODUCTS: number; BRANCHES: number }> = {
+  EMPRENDEDOR: { USERS: 2, PRODUCTS: 500, BRANCHES: 1 },
+  COMERCIAL_PRO: { USERS: 5, PRODUCTS: 5000, BRANCHES: 3 },
+  CORPORATIVO: { USERS: 50, PRODUCTS: 999999, BRANCHES: 999 },
 };
 
 export const SAAS_ADDON_PRICING: Record<string, number> = {

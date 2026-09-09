@@ -1,12 +1,14 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Plus, AlertCircle, X, Loader2, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { useStockData } from '@/components/inventory/hooks/useStockData';
 import { StockFilterBar } from '@/components/inventory/subcomponents/StockFilterBar';
 import { StockTable } from '@/components/inventory/subcomponents/StockTable';
 import { ProductEditModal } from '@/components/inventory/subcomponents/ProductEditModal';
+import { BulkTransferModal } from '@/components/inventory/subcomponents/BulkTransferModal';
+import { InventoryProduct } from '@/components/inventory/types/stock.types';
 
 export default function StockPage() {
   const {
@@ -25,6 +27,9 @@ export default function StockPage() {
     taxFilter,
     sortField,
     sortOrder,
+    warehouses,
+    selectedWarehouse,
+    setSelectedWarehouse,
     isLoading,
     error,
     setError,
@@ -38,6 +43,8 @@ export default function StockPage() {
     handleDeleteConfirm,
     fetchProducts,
   } = useStockData();
+
+  const [transferProducts, setTransferProducts] = useState<InventoryProduct[] | null>(null);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -79,6 +86,9 @@ export default function StockPage() {
         selectedCategory={selectedCategory}
         setSelectedCategory={setSelectedCategory}
         uniqueCategories={uniqueCategories}
+        warehouses={warehouses}
+        selectedWarehouse={selectedWarehouse}
+        setSelectedWarehouse={setSelectedWarehouse}
         stockFilter={stockFilter}
         setStockFilter={setStockFilter}
         taxFilter={taxFilter}
@@ -104,6 +114,20 @@ export default function StockPage() {
           onToggleSort={handleToggleSort}
           onEdit={(product) => setEditingProduct(product)}
           onDelete={(id) => setDeletingId(id)}
+          onBulkTransfer={(prods) => setTransferProducts(prods)}
+        />
+      )}
+
+      {/* Bulk Warehouse Transfer Modal */}
+      {transferProducts && (
+        <BulkTransferModal
+          products={transferProducts}
+          warehouses={warehouses}
+          onClose={() => setTransferProducts(null)}
+          onSuccess={() => {
+            setTransferProducts(null);
+            fetchProducts(search, selectedWarehouse);
+          }}
         />
       )}
 
@@ -113,7 +137,7 @@ export default function StockPage() {
           product={editingProduct}
           categories={categories}
           onClose={() => setEditingProduct(null)}
-          onSuccess={() => fetchProducts(search)}
+          onSuccess={() => fetchProducts(search, selectedWarehouse)}
         />
       )}
 

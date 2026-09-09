@@ -102,6 +102,7 @@ const menuConfig = [
         tenantOnly: true,
         children: [
           { label: 'Cuentas Bancarias', icon: Building, href: '/accounts/banks', permission: 'banks:accounts' },
+          { label: 'Cierres de Caja & Arqueos', icon: Clock, href: '/accounts/cash-shifts', roles: ['OWNER', 'MANAGER'], permission: 'banks:accounts' },
           { label: 'Cuentas por Cobrar (CxC)', icon: Wallet, href: '/accounts/receivables', permission: 'accounts:receivables' },
           { label: 'Cuentas por Pagar (CxP)', icon: FileSpreadsheet, href: '/accounts/payables', permission: 'accounts:payables' },
           { label: 'Historial', icon: History, href: '/accounts/history', permission: 'accounts:history' },
@@ -119,6 +120,7 @@ const menuConfig = [
         tenantOnly: true,
         children: [
           { label: 'Perfil de Empresa', icon: Building2, href: '/settings/company', roles: ['OWNER', 'MANAGER'], permission: 'company:manage' },
+          { label: 'Sucursales & Tiendas', icon: Building2, href: '/settings/branches', roles: ['OWNER'], permission: 'branches:manage' },
           { label: 'Configuración Fiscal', icon: Receipt, href: '/settings/fiscal', roles: ['OWNER', 'MANAGER'], permission: 'fiscal:manage' },
           { label: 'Usuarios y Roles', icon: Users, href: '/settings/users', roles: ['OWNER', 'MANAGER'], permission: 'users:manage' },
           { label: 'Seguridad', icon: UserCircle, href: '/settings/security', roles: ['OWNER', 'MANAGER', 'CASHIER', 'WAREHOUSE_KEEPER'] },
@@ -235,8 +237,8 @@ export default function Sidebar({ isOpen = false, onClose, onToggle }: SidebarPr
             if (child.roles && !child.roles.includes(user?.role) && user?.role !== 'OWNER') {
               return false;
             }
-            // Si el subelemento exige un permiso específico, debe estar contenido en los permisos asignados a la sesión del usuario (incluso para OWNER)
-            if (child.permission && !user?.permissions?.includes(child.permission)) {
+            // Si el subelemento exige un permiso específico, debe estar contenido en los permisos asignados a la sesión del usuario (salvo OWNER que tiene acceso total)
+            if (child.permission && !user?.permissions?.includes(child.permission) && user?.role !== 'OWNER') {
               return false;
             }
           }

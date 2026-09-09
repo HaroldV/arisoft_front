@@ -12,6 +12,17 @@ interface User {
   tenant_id: string;
   tenant_status?: string;
   plan_is_active?: boolean;
+  branch_id?: string | null;
+  branch?: {
+    id: string;
+    name: string;
+    code: string;
+    default_warehouse_id?: string;
+    default_warehouse?: {
+      id: string;
+      name: string;
+    };
+  } | null;
   enabled_modules: string[];
   permissions?: string[];
   trial_days_left: number;

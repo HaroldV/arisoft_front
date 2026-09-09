@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, X, Filter, RotateCcw, ChevronDown, Check, Layers } from 'lucide-react';
+import { Search, X, Filter, RotateCcw, ChevronDown, Check, Layers, Building2 } from 'lucide-react';
 import { STOCK_LEVEL_FILTERS, StockLevelFilter } from '@/constants/domain-constants';
 import { SearchFieldScope, SortField, SortOrder } from '../types/stock.types';
 
@@ -13,6 +13,9 @@ interface StockFilterBarProps {
   selectedCategory: string;
   setSelectedCategory: (val: string) => void;
   uniqueCategories: string[];
+  warehouses?: { id: string; name: string; type?: string }[];
+  selectedWarehouse?: string;
+  setSelectedWarehouse?: (val: string) => void;
   stockFilter: StockLevelFilter;
   setStockFilter: (val: StockLevelFilter) => void;
   taxFilter: string;
@@ -31,6 +34,9 @@ export const StockFilterBar: React.FC<StockFilterBarProps> = ({
   selectedCategory,
   setSelectedCategory,
   uniqueCategories,
+  warehouses = [],
+  selectedWarehouse = 'ALL',
+  setSelectedWarehouse,
   stockFilter,
   setStockFilter,
   taxFilter,
@@ -42,9 +48,11 @@ export const StockFilterBar: React.FC<StockFilterBarProps> = ({
 }) => {
   const [scopeDropdownOpen, setScopeDropdownOpen] = useState(false);
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const [warehouseDropdownOpen, setWarehouseDropdownOpen] = useState(false);
 
   const scopeDropdownRef = useRef<HTMLDivElement>(null);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
+  const warehouseDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns on click outside
   useEffect(() => {
@@ -55,6 +63,9 @@ export const StockFilterBar: React.FC<StockFilterBarProps> = ({
       if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) {
         setCategoryDropdownOpen(false);
       }
+      if (warehouseDropdownRef.current && !warehouseDropdownRef.current.contains(e.target as Node)) {
+        setWarehouseDropdownOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -63,6 +74,7 @@ export const StockFilterBar: React.FC<StockFilterBarProps> = ({
   const isFiltered = 
     Boolean(search) || 
     selectedCategory !== 'ALL' || 
+    selectedWarehouse !== 'ALL' ||
     stockFilter !== STOCK_LEVEL_FILTERS.ALL || 
     taxFilter !== 'ALL' || 
     sortField !== 'name' || 
@@ -73,6 +85,8 @@ export const StockFilterBar: React.FC<StockFilterBarProps> = ({
     SKU: 'Solo SKU',
     NAME: 'Solo Nombre',
   };
+
+  const selectedWarehouseObj = warehouses.find(w => w.id === selectedWarehouse);
 
   return (
     <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-4">
@@ -147,9 +161,73 @@ export const StockFilterBar: React.FC<StockFilterBarProps> = ({
           </div>
         </div>
 
-        {/* Custom Category Dropdown & Reset */}
-        <div className="flex items-center gap-3">
-          <div className="relative shrink-0 min-w-[220px]" ref={categoryDropdownRef}>
+        {/* Custom Category Dropdown, Warehouse Dropdown & Reset */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Warehouse Dropdown */}
+          {warehouses.length > 0 && setSelectedWarehouse && (
+            <div className="relative shrink-0 min-w-[200px]" ref={warehouseDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setWarehouseDropdownOpen(!warehouseDropdownOpen)}
+                className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-50/80 hover:bg-white border border-slate-200/80 hover:border-indigo-300 rounded-2xl text-xs font-bold text-slate-700 transition-all cursor-pointer shadow-2xs select-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <Building2 className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span className="truncate">
+                    {selectedWarehouse === 'ALL'
+                      ? 'Todos los Almacenes'
+                      : (selectedWarehouseObj?.name || 'Almacén')}
+                  </span>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-2 ${warehouseDropdownOpen ? 'rotate-180 text-indigo-600' : ''}`} />
+              </button>
+
+              {warehouseDropdownOpen && (
+                <div className="absolute z-50 right-0 top-full mt-2 w-64 bg-white border border-slate-100 rounded-2xl shadow-xl shadow-slate-900/10 p-1.5 max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in zoom-in-95 duration-150">
+                  <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Filtrar por Almacén:
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedWarehouse('ALL');
+                      setWarehouseDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
+                      selectedWarehouse === 'ALL'
+                        ? 'bg-indigo-50 text-indigo-700 font-bold'
+                        : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>🏢 Todos los Almacenes</span>
+                    {selectedWarehouse === 'ALL' && <Check className="w-3.5 h-3.5 text-indigo-600" />}
+                  </button>
+
+                  {warehouses.map((wh) => (
+                    <button
+                      key={wh.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedWarehouse(wh.id);
+                        setWarehouseDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
+                        selectedWarehouse === wh.id
+                          ? 'bg-indigo-50 text-indigo-700 font-bold'
+                          : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                      }`}
+                    >
+                      <span className="truncate">{wh.name}</span>
+                      {selectedWarehouse === wh.id && <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0 ml-2" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Category Dropdown */}
+          <div className="relative shrink-0 min-w-[200px]" ref={categoryDropdownRef}>
             <button
               type="button"
               onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)}

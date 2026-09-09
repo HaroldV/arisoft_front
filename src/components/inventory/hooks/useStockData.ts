@@ -16,6 +16,9 @@ export function useStockData() {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
+  const [warehouses, setWarehouses] = useState<{ id: string; name: string; type?: string }[]>([]);
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>('ALL');
+
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,13 +27,15 @@ export function useStockData() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const fetchProducts = useCallback(async (query = '') => {
+  const fetchProducts = useCallback(async (query = '', warehouseId = 'ALL') => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await apiClient.get('/inventory/products', {
-        params: query ? { name: query } : {}
-      });
+      const params: any = {};
+      if (query) params.name = query;
+      if (warehouseId && warehouseId !== 'ALL') params.warehouse_id = warehouseId;
+
+      const response = await apiClient.get('/inventory/products', { params });
       const productList: InventoryProduct[] = Array.isArray(response.data) 
         ? response.data 
         : (response.data?.items || []);
@@ -52,17 +57,28 @@ export function useStockData() {
     }
   }, []);
 
+  const fetchWarehouses = useCallback(async () => {
+    try {
+      const response = await apiClient.get('/inventory/warehouse-locations');
+      const list = Array.isArray(response.data) ? response.data : (response.data?.items || []);
+      setWarehouses(list);
+    } catch (err) {
+      console.error('Error fetching warehouses:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchCategories();
-  }, [fetchCategories]);
+    fetchWarehouses();
+  }, [fetchCategories, fetchWarehouses]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      fetchProducts(search);
+      fetchProducts(search, selectedWarehouse);
     }, 400);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [search, fetchProducts]);
+  }, [search, selectedWarehouse, fetchProducts]);
 
   const handleToggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -77,6 +93,7 @@ export function useStockData() {
     setSearch('');
     setSearchField('ALL');
     setSelectedCategory('ALL');
+    setSelectedWarehouse('ALL');
     setStockFilter(STOCK_LEVEL_FILTERS.ALL);
     setTaxFilter('ALL');
     setSortField('name');
@@ -175,6 +192,9 @@ export function useStockData() {
     setTaxFilter,
     sortField,
     sortOrder,
+    warehouses,
+    selectedWarehouse,
+    setSelectedWarehouse,
     isLoading,
     error,
     setError,
