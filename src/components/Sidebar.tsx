@@ -299,7 +299,7 @@ export default function Sidebar({ isOpen = false, onClose, onToggle }: SidebarPr
 
         <div className="flex h-16 items-center justify-between px-4 bg-white border-b border-slate-200 shrink-0 shadow-xs">
           <Link href="/" onClick={onClose} className="flex items-center justify-center">
-            <img src="/logo.png" alt="Arivsoft Solutions Logo" className="h-9 w-auto object-contain max-w-[160px]" />
+            <img src="/ariv-logo.png" alt="Arivsoft Solutions Logo" className="h-8 w-auto object-contain max-w-[160px]" />
           </Link>
           {/* Botón cerrar para tablets y móviles */}
           <button
