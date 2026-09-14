@@ -162,8 +162,11 @@ export default function BankAccountsPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await apiClient.get('/bank-accounts');
-      const data = Array.isArray(response.data) ? response.data : [];
+      const [accRes] = await Promise.all([
+        apiClient.get('/bank-accounts'),
+        fetchRates()
+      ]);
+      const data = Array.isArray(accRes.data) ? accRes.data : [];
       setAccounts(data);
       if (data.length > 0) {
         setSelectedAccountId(data[0].id);
@@ -194,7 +197,6 @@ export default function BankAccountsPage() {
   };
 
   useEffect(() => {
-    fetchRates();
     fetchAccounts();
   }, []);
 
