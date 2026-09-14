@@ -39,23 +39,60 @@ export const PAYMENT_METHODS = {
   CASH_BS: 'CASH_BS',
   DEBIT_BS: 'DEBIT_BS',
   CASH_USD: 'CASH_USD',
+  CASH_VES: 'CASH_VES',
   TRANSFER_USD: 'TRANSFER_USD',
   PAGO_MOVIL: 'PAGO_MOVIL',
   TRANSFER_BS: 'TRANSFER_BS',
+  TRANSFERENCIA: 'TRANSFERENCIA',
+  TARJETA_DEBITO: 'TARJETA_DEBITO',
+  TARJETA_CREDITO: 'TARJETA_CREDITO',
   ZELLE: 'ZELLE',
+  BINANCE: 'BINANCE',
+  CHANGE_USD: 'CHANGE_USD',
+  CHANGE_VES: 'CHANGE_VES',
 } as const;
 
 export type PaymentMethod = typeof PAYMENT_METHODS[keyof typeof PAYMENT_METHODS];
 
 export const PAYMENT_METHOD_LABELS: Record<string, string> = {
   [PAYMENT_METHODS.CASH_BS]: 'Efectivo Bs.',
+  [PAYMENT_METHODS.CASH_VES]: 'Efectivo en Bolívares (VES)',
   [PAYMENT_METHODS.DEBIT_BS]: 'Tarjeta de Débito (Bs.)',
-  [PAYMENT_METHODS.CASH_USD]: 'Efectivo ($)',
-  [PAYMENT_METHODS.TRANSFER_USD]: 'Transferencia ($)',
-  [PAYMENT_METHODS.PAGO_MOVIL]: 'Pago Móvil (Bs.)',
+  [PAYMENT_METHODS.CASH_USD]: 'Efectivo en Dólares ($)',
+  [PAYMENT_METHODS.TRANSFER_USD]: 'Transferencia en Dólares ($)',
+  [PAYMENT_METHODS.PAGO_MOVIL]: 'Pago Móvil (VES)',
   [PAYMENT_METHODS.TRANSFER_BS]: 'Transferencia Bs.',
-  [PAYMENT_METHODS.ZELLE]: 'Zelle / Divisas',
+  [PAYMENT_METHODS.TRANSFERENCIA]: 'Transferencia Bancaria',
+  [PAYMENT_METHODS.TARJETA_DEBITO]: 'Tarjeta de Débito (VES)',
+  [PAYMENT_METHODS.TARJETA_CREDITO]: 'Tarjeta de Crédito (USD)',
+  [PAYMENT_METHODS.ZELLE]: 'Zelle (USD)',
+  [PAYMENT_METHODS.BINANCE]: 'Binance Pay (USDT)',
+  [PAYMENT_METHODS.CHANGE_USD]: 'Vuelto Entregado (USD)',
+  [PAYMENT_METHODS.CHANGE_VES]: 'Vuelto Entregado (VES)',
 };
+
+/**
+ * Returns a human-friendly formatted label for any raw payment method string
+ */
+export function formatPaymentMethod(method?: string): string {
+  if (!method) return 'Método no especificado';
+  if (PAYMENT_METHOD_LABELS[method]) return PAYMENT_METHOD_LABELS[method];
+  
+  const m = method.toUpperCase();
+  if (m === 'CHANGE_USD') return 'Vuelto Entregado ($)';
+  if (m === 'CHANGE_VES') return 'Vuelto Entregado (Bs.)';
+  if (m === 'CASH_USD') return 'Efectivo ($)';
+  if (m === 'CASH_VES') return 'Efectivo (Bs.)';
+  if (m === 'PAGO_MOVIL') return 'Pago Móvil (Bs.)';
+  if (m === 'TRANSFERENCIA' || m === 'TRANSFER_BS') return 'Transferencia (Bs.)';
+  if (m === 'TRANSFER_USD') return 'Transferencia ($)';
+  if (m === 'TARJETA_DEBITO' || m === 'DEBIT_BS') return 'Tarjeta de Débito';
+  if (m === 'TARJETA_CREDITO') return 'Tarjeta de Crédito';
+  if (m === 'ZELLE') return 'Zelle';
+  if (m === 'BINANCE') return 'Binance Pay';
+  
+  return method;
+}
 
 export const PAYMENT_TERMS = {
   CONTADO: 'CONTADO',

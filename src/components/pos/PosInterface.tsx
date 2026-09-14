@@ -150,12 +150,26 @@ export const PosInterface: React.FC = () => {
   const [declaredCashVes, setDeclaredCashVes] = useState(0.00);
   const [isClosingShift, setIsClosingShift] = useState(false);
 
-  // Split payments states
+  // Split payments & Treasury Accounts states
+  interface BankAccountOption {
+    id: string;
+    name: string;
+    bank_name: string;
+    account_type: string;
+    currency: 'USD' | 'VES';
+    current_balance: number;
+    account_number?: string;
+  }
+  const [bankAccounts, setBankAccounts] = useState<BankAccountOption[]>([]);
+
   interface SalePaymentLine {
     paymentMethod: string;
+    bankAccountId?: string;
     amountOriginal: number;
     currency: string;
     transactionReference?: string;
+    lastFourDigits?: string;
+    senderIdentifier?: string;
   }
   const [paymentLines, setPaymentLines] = useState<SalePaymentLine[]>([
     { paymentMethod: 'CASH_USD', amountOriginal: 0.00, currency: 'USD' }
@@ -178,15 +192,19 @@ export const PosInterface: React.FC = () => {
 
       const productParams = activeWhId && activeWhId !== 'ALL' ? { warehouse_id: activeWhId } : {};
 
-      const [productsRes, clientsRes, rangesRes, profileRes, activeShiftRes, warehousesRes, bcvRes] = await Promise.all([
+      const [productsRes, clientsRes, rangesRes, profileRes, activeShiftRes, warehousesRes, bcvRes, bankAccountsRes] = await Promise.all([
         apiClient.get('/inventory/products', { params: productParams }).catch((err) => { console.error('Products fetch error:', err); return { data: [] }; }),
         apiClient.get('/clients').catch((err) => { console.error('Clients fetch error:', err); return { data: [] }; }),
         apiClient.get('/tenant/fiscal-ranges').catch((err) => { console.error('Ranges fetch error:', err); return { data: [] }; }),
         apiClient.get('/tenant/profile').catch(() => null),
         apiClient.get('/pos/shifts/active').catch((err) => { console.error('Active shift check error:', err); return { data: { active: false } }; }),
         apiClient.get('/inventory/warehouse-locations').catch((err) => { console.error('Warehouses fetch error:', err); return { data: [] }; }),
-        apiClient.get('/auth/bcv/rate').catch(() => ({ data: null }))
+        apiClient.get('/auth/bcv/rate').catch(() => ({ data: null })),
+        apiClient.get('/bank-accounts').catch((err) => { console.error('Bank accounts fetch error:', err); return { data: [] }; })
       ]);
+
+      const rawAccounts = Array.isArray(bankAccountsRes.data) ? bankAccountsRes.data : [];
+      setBankAccounts(rawAccounts);
 
       const rawProductList = Array.isArray(productsRes.data) ? productsRes.data : (productsRes.data?.items || []);
       const productList: Product[] = rawProductList.map((p: any) => ({
@@ -612,8 +630,14 @@ export const PosInterface: React.FC = () => {
       setIdentifyClientFound(null);
 
       // Open checkout payment confirmation
+      const defaultAccount = bankAccounts.find(a => a.currency === 'USD') || bankAccounts[0];
       setPaymentLines([
-        { paymentMethod: 'CASH_USD', amountOriginal: totalUsd, currency: 'USD' }
+        {
+          paymentMethod: defaultAccount ? defaultAccount.name : 'CASH_USD',
+          bankAccountId: defaultAccount ? defaultAccount.id : undefined,
+          amountOriginal: totalUsd,
+          currency: defaultAccount ? defaultAccount.currency : 'USD',
+        }
       ]);
       setIsConfirmModalOpen(true);
     } catch (err: any) {
@@ -630,8 +654,14 @@ export const PosInterface: React.FC = () => {
 
     // If client is already selected, proceed directly to payment confirmation
     if (selectedClientId) {
+      const defaultAccount = bankAccounts.find(a => a.currency === 'USD') || bankAccounts[0];
       setPaymentLines([
-        { paymentMethod: 'CASH_USD', amountOriginal: totalUsd, currency: 'USD' }
+        {
+          paymentMethod: defaultAccount ? defaultAccount.name : 'CASH_USD',
+          bankAccountId: defaultAccount ? defaultAccount.id : undefined,
+          amountOriginal: totalUsd,
+          currency: defaultAccount ? defaultAccount.currency : 'USD',
+        }
       ]);
       setIsConfirmModalOpen(true);
       return;
@@ -689,22 +719,50 @@ export const PosInterface: React.FC = () => {
       return;
     }
 
-    // Validate electronic payment lines contain a reference
+    // Validate payment lines: accounts and required metadata
     for (let i = 0; i < paymentLines.length; i++) {
       const line = paymentLines[i];
-      const isElectronic = ['PAGO_MOVIL', 'TRANSFERENCIA', 'TARJETA_DEBITO', 'TARJETA_CREDITO'].includes(line.paymentMethod);
-      if (isElectronic && !line.transactionReference?.trim()) {
-        setError(`El pago #${i + 1} (${line.paymentMethod}) requiere una referencia de transacción.`);
+      const account = bankAccounts.find(a => a.id === line.bankAccountId);
+
+      // If registered accounts exist, enforce account selection
+      if (bankAccounts.length > 0 && !line.bankAccountId) {
+        setError(`El pago #${i + 1} debe tener una cuenta financiera receptora seleccionada.`);
         setIsSubmittingSale(false);
         return;
+      }
+
+      const methodUpper = (line.paymentMethod || '').toUpperCase();
+      const isZelleOrBinance = methodUpper.includes('ZELLE') || methodUpper.includes('BINANCE');
+      const isBanking = ['PAGO_MOVIL', 'TRANSFERENCIA', 'TARJETA_DEBITO', 'TARJETA_CREDITO'].some(m => methodUpper.includes(m));
+
+      if (isZelleOrBinance) {
+        if (!line.senderIdentifier?.trim()) {
+          setError(`El pago #${i + 1} (${line.paymentMethod}) requiere el correo, alias o ID del emisor.`);
+          setIsSubmittingSale(false);
+          return;
+        }
+        if (!line.transactionReference?.trim()) {
+          setError(`El pago #${i + 1} (${line.paymentMethod}) requiere el número de confirmación o referencia.`);
+          setIsSubmittingSale(false);
+          return;
+        }
+      } else if (isBanking) {
+        if (!line.lastFourDigits?.trim() || line.lastFourDigits.trim().length < 4) {
+          setError(`El pago #${i + 1} (${line.paymentMethod}) requiere los 4 últimos dígitos de la referencia.`);
+          setIsSubmittingSale(false);
+          return;
+        }
       }
     }
 
     const payments = paymentLines.map(line => ({
       paymentMethod: line.paymentMethod,
+      bankAccountId: line.bankAccountId || undefined,
       amountOriginal: Number(line.amountOriginal || 0),
       currency: line.currency,
-      transactionReference: line.transactionReference || undefined,
+      transactionReference: line.transactionReference?.trim() || line.lastFourDigits?.trim() || undefined,
+      lastFourDigits: line.lastFourDigits?.trim() || undefined,
+      senderIdentifier: line.senderIdentifier?.trim() || undefined,
     }));
 
     const change = remainingUsd < -0.01 ? {
@@ -1974,7 +2032,12 @@ export const PosInterface: React.FC = () => {
 
                     <div className="space-y-3">
                       {paymentLines.map((line, idx) => {
-                        const isElectronic = ['PAGO_MOVIL', 'TRANSFERENCIA', 'TARJETA_DEBITO', 'TARJETA_CREDITO'].includes(line.paymentMethod);
+                        const selectedAcc = bankAccounts.find(a => a.id === line.bankAccountId);
+                        const methodUpper = (line.paymentMethod || selectedAcc?.name || '').toUpperCase();
+                        const isZelleOrBinance = methodUpper.includes('ZELLE') || methodUpper.includes('BINANCE');
+                        const isCash = selectedAcc?.account_type === 'EFECTIVO' || methodUpper.includes('CASH') || methodUpper.includes('EFECTIVO');
+                        const isBanking = !isCash && !isZelleOrBinance;
+
                         return (
                           <div key={idx} className="bg-slate-50 p-4 border border-slate-200/80 rounded-2xl space-y-3 animate-in fade-in duration-150">
                             <div className="flex items-center justify-between">
@@ -1990,40 +2053,74 @@ export const PosInterface: React.FC = () => {
                               )}
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <div>
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Método</label>
-                                <select
-                                  className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
-                                  value={line.paymentMethod}
-                                  onChange={(e) => {
-                                    const nextMethod = e.target.value;
-                                    const nextCurrency = nextMethod.endsWith('VES') || nextMethod === 'PAGO_MOVIL' || nextMethod === 'TARJETA_DEBITO' ? 'VES' : 'USD';
-                                    const prevCurrency = line.currency;
-                                    
-                                    let newAmount = line.amountOriginal;
-                                    // Automatic exact conversion between currencies when user switches payment method
-                                    if (prevCurrency === 'USD' && nextCurrency === 'VES') {
-                                      newAmount = Number((line.amountOriginal * exchangeRate).toFixed(2));
-                                    } else if (prevCurrency === 'VES' && nextCurrency === 'USD') {
-                                      newAmount = Number((line.amountOriginal / exchangeRate).toFixed(2));
-                                    }
-
-                                    setPaymentLines(paymentLines.map((l, i) => i === idx ? { 
-                                      ...l, 
-                                      paymentMethod: nextMethod, 
-                                      currency: nextCurrency,
-                                      amountOriginal: newAmount
-                                    } : l));
-                                  }}
-                                >
-                                  <option value="CASH_USD">💵 Efectivo en Dólares (USD)</option>
-                                  <option value="CASH_VES">💵 Efectivo en Bolívares (VES)</option>
-                                  <option value="PAGO_MOVIL">📱 Pago Móvil (VES)</option>
-                                  <option value="TRANSFERENCIA">🏦 Transferencia Bancaria</option>
-                                  <option value="TARJETA_DEBITO">💳 Tarjeta de Débito (VES)</option>
-                                  <option value="TARJETA_CREDITO">💳 Tarjeta de Crédito (USD)</option>
-                                </select>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                                  Cuenta Receptora / Método <span className="text-rose-500">*</span>
+                                </label>
+                                {bankAccounts.length > 0 ? (
+                                  <select
+                                    className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
+                                    value={line.bankAccountId || ''}
+                                    onChange={(e) => {
+                                      const accId = e.target.value;
+                                      const acc = bankAccounts.find(a => a.id === accId);
+                                      if (acc) {
+                                        const nextCurrency = acc.currency;
+                                        const prevCurrency = line.currency;
+                                        let newAmount = line.amountOriginal;
+                                        if (prevCurrency === 'USD' && nextCurrency === 'VES') {
+                                          newAmount = Number((line.amountOriginal * exchangeRate).toFixed(2));
+                                        } else if (prevCurrency === 'VES' && nextCurrency === 'USD') {
+                                          newAmount = Number((line.amountOriginal / exchangeRate).toFixed(2));
+                                        }
+                                        setPaymentLines(paymentLines.map((l, i) => i === idx ? {
+                                          ...l,
+                                          bankAccountId: acc.id,
+                                          paymentMethod: `${acc.name} (${acc.bank_name})`,
+                                          currency: acc.currency,
+                                          amountOriginal: newAmount,
+                                        } : l));
+                                      }
+                                    }}
+                                  >
+                                    <option value="">-- Seleccione Cuenta Receptora --</option>
+                                    {bankAccounts.map((acc) => (
+                                      <option key={acc.id} value={acc.id}>
+                                        {acc.currency === 'USD' ? '💵' : '🇻🇪'} {acc.name} • {acc.bank_name} ({acc.currency})
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <select
+                                    className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
+                                    value={line.paymentMethod}
+                                    onChange={(e) => {
+                                      const nextMethod = e.target.value;
+                                      const nextCurrency = nextMethod.endsWith('VES') || nextMethod === 'PAGO_MOVIL' || nextMethod === 'TARJETA_DEBITO' ? 'VES' : 'USD';
+                                      const prevCurrency = line.currency;
+                                      let newAmount = line.amountOriginal;
+                                      if (prevCurrency === 'USD' && nextCurrency === 'VES') {
+                                        newAmount = Number((line.amountOriginal * exchangeRate).toFixed(2));
+                                      } else if (prevCurrency === 'VES' && nextCurrency === 'USD') {
+                                        newAmount = Number((line.amountOriginal / exchangeRate).toFixed(2));
+                                      }
+                                      setPaymentLines(paymentLines.map((l, i) => i === idx ? { 
+                                        ...l, 
+                                        paymentMethod: nextMethod, 
+                                        currency: nextCurrency,
+                                        amountOriginal: newAmount
+                                      } : l));
+                                    }}
+                                  >
+                                    <option value="CASH_USD">💵 Efectivo en Dólares (USD)</option>
+                                    <option value="CASH_VES">💵 Efectivo en Bolívares (VES)</option>
+                                    <option value="PAGO_MOVIL">📱 Pago Móvil (VES)</option>
+                                    <option value="TRANSFERENCIA">🏦 Transferencia Bancaria</option>
+                                    <option value="TARJETA_DEBITO">💳 Tarjeta de Débito (VES)</option>
+                                    <option value="TARJETA_CREDITO">💳 Tarjeta de Crédito (USD)</option>
+                                  </select>
+                                )}
                               </div>
 
                               <div>
@@ -2040,18 +2137,68 @@ export const PosInterface: React.FC = () => {
                               </div>
                             </div>
 
-                            {isElectronic && (
+                            {/* Conditional inputs according to Account Type & Method */}
+                            {isBanking && (
                               <div>
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Referencia de Transacción <span className="text-rose-500">*</span></label>
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                    Últimos 4 Dígitos de la Referencia <span className="text-rose-500">*</span>
+                                  </label>
+                                  {line.lastFourDigits && line.lastFourDigits.trim().length >= 4 ? (
+                                    <span className="text-[10px] font-bold text-emerald-600 font-mono">✅ Válido (4 dígitos)</span>
+                                  ) : (
+                                    <span className="text-[10px] font-bold text-rose-500 font-mono">⚠️ Requerido (mín. 4)</span>
+                                  )}
+                                </div>
                                 <input
                                   type="text"
-                                  placeholder="Ej: 987654 (Últimos dígitos de la transacción)"
-                                  className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold"
-                                  value={line.transactionReference || ''}
+                                  maxLength={10}
+                                  required
+                                  placeholder="Ej: 4512"
+                                  className={`w-full p-2 bg-white border rounded-xl text-xs font-mono focus:outline-none focus:ring-2 font-bold tracking-widest transition-all ${
+                                    line.lastFourDigits && line.lastFourDigits.trim().length >= 4
+                                      ? 'border-emerald-300 focus:ring-emerald-400'
+                                      : 'border-rose-300 focus:ring-rose-400 bg-rose-50/20'
+                                  }`}
+                                  value={line.lastFourDigits || ''}
                                   onChange={(e) => {
-                                    setPaymentLines(paymentLines.map((l, i) => i === idx ? { ...l, transactionReference: e.target.value } : l));
+                                    const val = e.target.value.replace(/[^0-9a-zA-Z]/g, '');
+                                    setPaymentLines(paymentLines.map((l, i) => i === idx ? { ...l, lastFourDigits: val, transactionReference: val } : l));
                                   }}
                                 />
+                              </div>
+                            )}
+
+                            {isZelleOrBinance && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                                    {methodUpper.includes('BINANCE') ? 'Binance ID / Alias Emisor' : 'Correo / Alias Emisor (Zelle)'} <span className="text-rose-500">*</span>
+                                  </label>
+                                  <input
+                                    type="text"
+                                    placeholder={methodUpper.includes('BINANCE') ? 'Ej: 38921092 o @usuario' : 'Ej: nombre@email.com o Carlos M.'}
+                                    className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold"
+                                    value={line.senderIdentifier || ''}
+                                    onChange={(e) => {
+                                      setPaymentLines(paymentLines.map((l, i) => i === idx ? { ...l, senderIdentifier: e.target.value } : l));
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                                    Nro. Confirmación / Ref <span className="text-rose-500">*</span>
+                                  </label>
+                                  <input
+                                    type="text"
+                                    placeholder="Ej: CONF-982341 o TxID"
+                                    className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold"
+                                    value={line.transactionReference || ''}
+                                    onChange={(e) => {
+                                      setPaymentLines(paymentLines.map((l, i) => i === idx ? { ...l, transactionReference: e.target.value } : l));
+                                    }}
+                                  />
+                                </div>
                               </div>
                             )}
                           </div>

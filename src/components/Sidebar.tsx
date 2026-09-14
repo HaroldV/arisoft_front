@@ -35,7 +35,8 @@ import {
   BarChart3,
   Crown,
   Clock,
-  CreditCard
+  CreditCard,
+  BookOpen
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -102,6 +103,7 @@ const menuConfig = [
         tenantOnly: true,
         children: [
           { label: 'Cuentas Bancarias', icon: Building, href: '/accounts/banks', permission: 'banks:accounts' },
+          { label: 'Libro Mayor', icon: BookOpen, href: '/accounts/ledger', permission: 'banks:accounts' },
           { label: 'Cierres de Caja & Arqueos', icon: Clock, href: '/accounts/cash-shifts', roles: ['OWNER', 'MANAGER'], permission: 'banks:accounts' },
           { label: 'Cuentas por Cobrar (CxC)', icon: Wallet, href: '/accounts/receivables', permission: 'accounts:receivables' },
           { label: 'Cuentas por Pagar (CxP)', icon: FileSpreadsheet, href: '/accounts/payables', permission: 'accounts:payables' },
