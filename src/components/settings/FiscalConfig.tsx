@@ -70,7 +70,7 @@ export const FiscalConfig: React.FC = () => {
     } else {
       setFormType('INVOICE');
       setFormStart(1);
-      setFormEnd(999999);
+      setFormEnd(99999999); // Rango Corporativo SENIAT 8 dígitos (hasta 99.999.999)
       setFormCurrent(0);
       setFormAuth('');
     }
@@ -78,8 +78,20 @@ export const FiscalConfig: React.FC = () => {
     setIsOpen(true);
   };
 
+  const handleApplyPreset = (endNum: number) => {
+    setFormEnd(endNum);
+  };
+
   const handleCloseModal = () => {
     setIsOpen(false);
+  };
+
+  const handleStartNumberChange = (newStart: number) => {
+    setFormStart(newStart);
+    // Si el actual consumido quedó por debajo del nuevo inicio, sincronizarlo al punto previo (newStart - 1)
+    if (formCurrent < newStart - 1) {
+      setFormCurrent(newStart > 0 ? newStart - 1 : 0);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -87,14 +99,28 @@ export const FiscalConfig: React.FC = () => {
     setModalError(null);
     setIsSaving(true);
 
+    if (formStart <= 0) {
+      setModalError('El folio inicial debe ser mayor a cero.');
+      setIsSaving(false);
+      return;
+    }
+
     if (formStart >= formEnd) {
       setModalError('El número inicial debe ser estrictamente menor que el número final.');
       setIsSaving(false);
       return;
     }
 
-    if (formCurrent < 0 || formCurrent < formStart - 1) {
-      setModalError(`El número actual no puede ser menor al inicio del rango menos uno (${formStart - 1}).`);
+    if (formCurrent < formStart - 1) {
+      setModalError(
+        `El número actual consumido (${formCurrent.toLocaleString()}) no puede ser menor a ${ (formStart - 1).toLocaleString() } (inicio del rango menos uno). Si no has emitido ninguna factura de este rango, escribe ${ (formStart - 1).toLocaleString() }.`
+      );
+      setIsSaving(false);
+      return;
+    }
+
+    if (formCurrent > formEnd) {
+      setModalError(`El número actual consumido no puede superar el folio final (${formEnd.toLocaleString()}).`);
       setIsSaving(false);
       return;
     }
@@ -347,15 +373,18 @@ export const FiscalConfig: React.FC = () => {
                     min="1"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-right"
                     value={formStart}
-                    onChange={(e) => setFormStart(Number(e.target.value))}
+                    onChange={(e) => handleStartNumberChange(Number(e.target.value))}
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Folio Final *</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">Folio Final *</label>
+                  </div>
                   <input
                     type="number"
                     required
                     min="1"
+                    max="999999999"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-right"
                     value={formEnd}
                     onChange={(e) => setFormEnd(Number(e.target.value))}
@@ -363,8 +392,49 @@ export const FiscalConfig: React.FC = () => {
                 </div>
               </div>
 
+              {/* Presets rápidos para rangos de folios */}
+              <div className="space-y-1.5 bg-slate-50/80 p-2.5 rounded-xl border border-slate-100">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                  Capacidad de Facturación Rápida:
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleApplyPreset(100000)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${formEnd === 100000 ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+                  >
+                    100K (Pyme)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyPreset(1000000)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${formEnd === 1000000 ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+                  >
+                    1M (Mediana Empresa)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyPreset(99999999)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${formEnd === 99999999 ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+                  >
+                    100M (Corporativo 8D)
+                  </button>
+                </div>
+              </div>
+
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Número Actual Consumido *</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Número Actual Consumido *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setFormCurrent(formStart > 0 ? formStart - 1 : 0)}
+                    className="text-[10px] text-indigo-600 hover:underline font-bold cursor-pointer"
+                  >
+                    Iniciar en {formStart > 0 ? formStart - 1 : 0} (Sin emitir aún)
+                  </button>
+                </div>
                 <input
                   type="number"
                   required
@@ -373,8 +443,8 @@ export const FiscalConfig: React.FC = () => {
                   value={formCurrent}
                   onChange={(e) => setFormCurrent(Number(e.target.value))}
                 />
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Establece cuál es el último folio que fue emitido. Las nuevas emisiones empezarán a partir de #{formCurrent + 1}.
+                <p className="text-[10px] text-slate-500 mt-1">
+                  💡 <strong>Próxima emisión:</strong> Se generará la factura <span className="font-mono font-bold text-slate-800">#{formCurrent + 1}</span>.
                 </p>
               </div>
             </div>

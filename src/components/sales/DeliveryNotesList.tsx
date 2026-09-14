@@ -15,11 +15,15 @@ import {
   CreditCard,
   Building2,
   DollarSign,
-  Calendar
+  Euro,
+  Calendar,
+  Layers,
+  ArrowRightLeft
 } from 'lucide-react';
 
 import apiClient from '@/infrastructure/api/api-client';
 import { ActionTooltip } from '@/components/ActionTooltip';
+import { CurrencyInput } from '@/components/CurrencyInput';
 
 interface DeliveryNoteItem {
   id?: string;
@@ -83,6 +87,40 @@ export default function DeliveryNotesList() {
   const [controlNumber, setControlNumber] = useState<string>('00-00104');
   const [isBilling, setIsBilling] = useState(false);
 
+  // BCV Official Live Rates
+  const [bcvUsdRate, setBcvUsdRate] = useState<number>(36.5);
+  const [bcvEurRate, setBcvEurRate] = useState<number>(39.8);
+  const [currencyMode, setCurrencyMode] = useState<string>('BCV_USD');
+  const [manualTenantRate, setManualTenantRate] = useState<number>(36.5);
+
+  const fetchLiveRates = async () => {
+    try {
+      const [bcvRes, profileRes] = await Promise.allSettled([
+        apiClient.get('/auth/bcv/rate'),
+        apiClient.get('/tenant/profile')
+      ]);
+
+      let usd = 36.5;
+      let eur = 39.8;
+      if (bcvRes.status === 'fulfilled' && bcvRes.value?.data) {
+        const d = bcvRes.value.data;
+        if (d.USD?.rate) usd = Number(d.USD.rate);
+        else if (d.rate) usd = Number(d.rate);
+        if (d.EUR?.rate) eur = Number(d.EUR.rate);
+        setBcvUsdRate(usd);
+        setBcvEurRate(eur);
+      }
+
+      if (profileRes.status === 'fulfilled' && profileRes.value?.data?.settings) {
+        const settings = profileRes.value.data.settings;
+        if (settings.currencyMode) setCurrencyMode(settings.currencyMode);
+        if (settings.manualRate) setManualTenantRate(Number(settings.manualRate));
+      }
+    } catch (err) {
+      console.error('Error fetching live rates in DeliveryNotesList:', err);
+    }
+  };
+
   const fetchDeliveries = async () => {
     setIsLoading(true);
     try {
@@ -97,6 +135,26 @@ export default function DeliveryNotesList() {
 
   React.useEffect(() => {
     fetchDeliveries();
+    fetchLiveRates();
+  }, []);
+
+  // Listen to global exchange rate updates dispatched from top bar
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const handleRateUpdate = (e: Event) => {
+        const customEvent = e as CustomEvent;
+        if (customEvent.detail) {
+          if (typeof customEvent.detail.usdRate === 'number') setBcvUsdRate(customEvent.detail.usdRate);
+          if (typeof customEvent.detail.eurRate === 'number') setBcvEurRate(customEvent.detail.eurRate);
+          if (typeof customEvent.detail.manualRate === 'number') setManualTenantRate(customEvent.detail.manualRate);
+          if (customEvent.detail.mode) setCurrencyMode(customEvent.detail.mode);
+        }
+      };
+      window.addEventListener('exchange-rate-updated', handleRateUpdate);
+      return () => {
+        window.removeEventListener('exchange-rate-updated', handleRateUpdate);
+      };
+    }
   }, []);
 
   const showToast = (msg: string) => {
@@ -122,7 +180,15 @@ export default function DeliveryNotesList() {
     setSelectedDeliveryForInvoice(doc);
     setSelectedPaymentMethod(doc.payment_method || 'CASH_USD');
     setCreditDays(30);
-    setAppliedExchangeRate(Number(doc.exchange_rate || 36.5));
+    
+    // Asignar tasa activa por defecto: si el sistema tiene tasa BCV vigente, utilizarla prioritariamente
+    const effectiveRate = currencyMode === 'BCV_EUR' 
+      ? bcvEurRate 
+      : currencyMode === 'MANUAL' 
+        ? manualTenantRate 
+        : (bcvUsdRate || Number(doc.exchange_rate) || 36.5);
+
+    setAppliedExchangeRate(effectiveRate);
     const randomNum = Math.floor(100 + Math.random() * 900);
     setInvoiceNumber(`FACT-2026-0${randomNum}`);
     setControlNumber(`00-0${randomNum}`);
@@ -659,26 +725,65 @@ export default function DeliveryNotesList() {
                   </div>
                 )}
 
-                {/* Selector de Tasa de Cambio Aplicada */}
-                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex items-center justify-between gap-4 text-xs shadow-2xs">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
-                      Tasa de Cambio Oficial Aplicada (Bs. / USD ó EUR)
-                    </label>
-                    <p className="text-xs text-slate-500 font-medium mt-0.5">
-                      Modifique si aplica Tasa BCV Euro u Oficial del Día
-                    </p>
+                {/* Selector de Tasa de Cambio Aplicada (Sally Enterprise UX Standard) */}
+                <div className="bg-slate-50/90 border border-slate-200/80 rounded-2xl p-4.5 space-y-3.5 shadow-2xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <ArrowRightLeft className="w-4 h-4 text-indigo-600" />
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                          Tasa de Cambio Oficial Aplicada
+                        </label>
+                      </div>
+                      <p className="text-xs text-slate-500 font-medium mt-0.5">
+                        Selecciona o ingresa la tasa oficial del BCV o la tasa convenida del día
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <div className="w-36">
+                        <CurrencyInput
+                          value={appliedExchangeRate}
+                          onChange={(val) => setAppliedExchangeRate(val || 1)}
+                          currencyPrefix="Bs."
+                          placeholder="0.00"
+                          decimals={2}
+                          className="bg-white border-slate-200 text-slate-800 font-mono font-black text-right text-sm shadow-2xs"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-slate-600">Bs.</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="1"
-                      value={appliedExchangeRate}
-                      onChange={(e) => setAppliedExchangeRate(Number(e.target.value || 1))}
-                      className="w-24 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-mono font-black text-right text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                    />
+
+                  {/* Botones de selección rápida de Tasa BCV Oficial */}
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/60">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Tasas Oficiales Vigentes:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setAppliedExchangeRate(bcvUsdRate)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                        Math.abs(appliedExchangeRate - bcvUsdRate) < 0.001
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300 ring-2 ring-emerald-500/20 shadow-2xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                      }`}
+                    >
+                      <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>BCV USD: <strong className="font-mono">{bcvUsdRate.toFixed(2)}</strong></span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setAppliedExchangeRate(bcvEurRate)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                        Math.abs(appliedExchangeRate - bcvEurRate) < 0.001
+                          ? 'bg-blue-50 text-blue-800 border-blue-300 ring-2 ring-blue-500/20 shadow-2xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                      }`}
+                    >
+                      <Euro className="w-3.5 h-3.5 text-blue-600" />
+                      <span>BCV EUR: <strong className="font-mono">{bcvEurRate.toFixed(2)}</strong></span>
+                    </button>
                   </div>
                 </div>
 
