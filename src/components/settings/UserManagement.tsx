@@ -40,6 +40,11 @@ interface BranchOption {
   name: string;
   code: string;
   is_main?: boolean;
+  default_warehouse_id?: string | null;
+  default_warehouse?: {
+    id: string;
+    name: string;
+  } | null;
 }
 
 interface UserItem {
@@ -727,9 +732,17 @@ export default function UserManagement() {
                           </td>
                           <td className="px-6 py-4 text-xs font-semibold">
                             {u.branch ? (
-                              <div className="flex items-center gap-1.5 text-indigo-700 font-bold bg-indigo-50/80 px-2.5 py-1 rounded-xl border border-indigo-100 w-fit">
-                                <Building2 className="w-3.5 h-3.5 text-indigo-600" />
-                                <span>{u.branch.name}</span>
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-1.5 text-indigo-700 font-bold bg-indigo-50/80 px-2.5 py-1 rounded-xl border border-indigo-100 w-fit">
+                                  <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                                  <span>{u.branch.name}</span>
+                                </div>
+                                {u.branch.default_warehouse?.name && (
+                                  <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1 pl-1">
+                                    <Package className="w-3 h-3 text-slate-400 shrink-0" />
+                                    <span>Almacén: <strong className="text-slate-700 font-semibold">{u.branch.default_warehouse.name}</strong></span>
+                                  </span>
+                                )}
                               </div>
                             ) : (
                               <span className="text-slate-400 text-xs">Acceso Global</span>
@@ -1035,12 +1048,12 @@ export default function UserManagement() {
                       <option value="">-- Sin Sucursal Asignada (Acceso Global / Central) --</option>
                       {branches.map(b => (
                         <option key={b.id} value={b.id}>
-                          {b.name} ({b.code}){b.is_main ? ' - Sede Principal' : ''}
+                          🏢 {b.name} ({b.code}){b.is_main ? ' ★ Sede Principal' : ''} — 📦 Almacén: {b.default_warehouse?.name || 'Sin almacén vinculado'}
                         </option>
                       ))}
                     </select>
                     <p className="text-[11px] text-slate-500 mt-1">
-                      Si el usuario ingresa al Punto de Venta (POS), solo visualizará las existencias del almacén de esta sucursal.
+                      Si el usuario ingresa al Punto de Venta (POS), operará directamente con el stock del almacén vinculado a esta sede.
                     </p>
                   </div>
                 )}

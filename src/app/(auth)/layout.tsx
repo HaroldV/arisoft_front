@@ -1,5 +1,6 @@
 import React from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { Layers, TrendingUp, MessageSquareQuote } from 'lucide-react';
 
 export default function AuthLayout({
@@ -9,7 +10,7 @@ export default function AuthLayout({
 }) {
   return (
     <div className="min-h-screen w-full flex flex-col lg:flex-row bg-white text-slate-900 overflow-x-hidden">
-      {/* 🚀 BANNER IZQUIERDO: Estilo Ejecutivo Dark Navy Blue (Inspirado en Porto Academic UI) */}
+      {/* 🚀 BANNER IZQUIERDO: Estilo Ejecutivo Dark Navy Blue */}
       <div className="w-full lg:w-1/2 bg-[#090D16] text-white p-8 lg:p-16 flex flex-col justify-between relative overflow-hidden min-h-[480px] lg:min-h-screen shrink-0">
         
         {/* Grilla sutil de fondo (CSS Grid overlay) */}
@@ -24,10 +25,19 @@ export default function AuthLayout({
 
         {/* Header con Logo Arivsoft */}
         <div className="relative z-10">
-          <div className="inline-flex items-center gap-3 bg-white px-4 py-2 rounded-2xl shadow-md">
-            <Image src="/logo.png" alt="Arivsoft Solutions Logo" width={120} height={32} className="h-8 w-auto object-contain" priority />
-            <span className="text-xs font-bold uppercase tracking-widest text-slate-500 border-l border-slate-200 pl-3">ERP ARI</span>
-          </div>
+          <Link href="/" className="inline-flex items-center gap-3 bg-white px-4 py-2.5 rounded-2xl shadow-lg hover:shadow-xl transition-all border border-slate-100 group">
+            <Image 
+              src="/ariv-logo.png" 
+              alt="Arivsoft Solutions Logo" 
+              width={160} 
+              height={38} 
+              className="h-8 sm:h-9 w-auto object-contain" 
+              priority 
+            />
+            <span className="text-xs font-black uppercase tracking-widest text-indigo-900 border-l border-slate-200 pl-3 group-hover:text-indigo-600 transition-colors">
+              ERP ARI
+            </span>
+          </Link>
         </div>
 
         {/* Hero Text Contextual ERP */}

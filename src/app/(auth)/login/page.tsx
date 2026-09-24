@@ -2,6 +2,7 @@
 
 import React, { useState, Suspense, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Mail, Lock, ArrowRight, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -62,6 +63,23 @@ function LoginContent() {
 
   return (
     <div className="space-y-6">
+      {/* Mobile Brand Logo Header */}
+      <div className="lg:hidden flex items-center justify-center pb-2">
+        <div className="inline-flex items-center gap-3 bg-slate-50 border border-slate-200/80 px-4 py-2 rounded-2xl shadow-2xs">
+          <Image 
+            src="/ariv-logo.png" 
+            alt="Arivsoft Solutions Logo" 
+            width={140} 
+            height={34} 
+            className="h-7 w-auto object-contain" 
+            priority 
+          />
+          <span className="text-xs font-black uppercase tracking-widest text-indigo-900 border-l border-slate-200 pl-3">
+            ERP ARI
+          </span>
+        </div>
+      </div>
+
       {/* Header del Formulario */}
       <div>
         <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">

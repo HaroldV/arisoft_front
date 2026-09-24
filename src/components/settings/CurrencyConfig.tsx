@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '@/infrastructure/api/api-client';
-import { Loader2, DollarSign, Euro, Sliders, CheckCircle2, AlertCircle, Info } from 'lucide-react';
+import { Loader2, DollarSign, Euro, Sliders, CheckCircle2, AlertCircle, Info, RefreshCw } from 'lucide-react';
+import { CurrencyInput } from '@/components/CurrencyInput';
 
 /**
  * CurrencyConfig Component
@@ -13,64 +14,85 @@ import { Loader2, DollarSign, Euro, Sliders, CheckCircle2, AlertCircle, Info } f
 export const CurrencyConfig: React.FC = () => {
   const [baseCurrency, setBaseCurrency] = useState<'VES' | 'USD'>('USD');
   const [rateMode, setRateMode] = useState<'BCV_USD' | 'BCV_EUR' | 'MANUAL'>('BCV_USD');
-  const [manualRate, setManualRate] = useState<string>('780.00');
+  const [manualRate, setManualRate] = useState<number>(36.5);
 
-  const [bcvUsdRate, setBcvUsdRate] = useState<number>(772.54);
-  const [bcvEurRate, setBcvEurRate] = useState<number>(894.49);
+  const [bcvUsdRate, setBcvUsdRate] = useState<number>(36.5);
+  const [bcvEurRate, setBcvEurRate] = useState<number>(39.8);
   const [bcvValueDate, setBcvValueDate] = useState<string>('');
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshingRates, setIsRefreshingRates] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchConfigAndRates = async () => {
-      setIsLoading(true);
-      try {
-        // 1. Obtener perfil de la empresa
-        const profileRes = await apiClient.get('/tenant/profile');
-        const settings = profileRes.data?.settings || {};
-        
-        setBaseCurrency(settings.baseCurrency || 'USD');
+  const fetchConfigAndRates = async (silent = false) => {
+    if (!silent) setIsLoading(true);
+    else setIsRefreshingRates(true);
+    try {
+      // 1. Obtener perfil de la empresa
+      const profileRes = await apiClient.get('/tenant/profile');
+      const settings = profileRes.data?.settings || {};
+      
+      setBaseCurrency(settings.baseCurrency || 'USD');
 
-        // Mapear modo configurado
-        if (settings.isAutomatic === false || settings.currencyMode === 'MANUAL') {
-          setRateMode('MANUAL');
-        } else if (settings.officialCurrency === 'EUR') {
-          setRateMode('BCV_EUR');
-        } else {
-          setRateMode('BCV_USD');
-        }
-
-        if (settings.manualRate) {
-          setManualRate(settings.manualRate.toString());
-        }
-
-        // 2. Obtener tasas maestras vigentes
-        const ratesRes = await apiClient.get('/admin/bcv/rate');
-        if (ratesRes.data) {
-          if (ratesRes.data.USD?.rate) setBcvUsdRate(Number(ratesRes.data.USD.rate));
-          else if (ratesRes.data.rate) setBcvUsdRate(Number(ratesRes.data.rate));
-
-          if (ratesRes.data.EUR?.rate) setBcvEurRate(Number(ratesRes.data.EUR.rate));
-          if (ratesRes.data.value_date) setBcvValueDate(ratesRes.data.value_date);
-        }
-      } catch (err: any) {
-        console.error('Error fetching currency config:', err);
-      } finally {
-        setIsLoading(false);
+      // Mapear modo configurado
+      if (settings.isAutomatic === false || settings.currencyMode === 'MANUAL') {
+        setRateMode('MANUAL');
+      } else if (settings.officialCurrency === 'EUR') {
+        setRateMode('BCV_EUR');
+      } else {
+        setRateMode('BCV_USD');
       }
-    };
 
+      if (settings.manualRate) {
+        setManualRate(Number(settings.manualRate));
+      }
+
+      // 2. Obtener tasas maestras vigentes desde el endpoint accesible para todos los roles de Tenant
+      const ratesRes = await apiClient.get('/auth/bcv/rate');
+      if (ratesRes.data) {
+        if (ratesRes.data.USD?.rate) setBcvUsdRate(Number(ratesRes.data.USD.rate));
+        else if (ratesRes.data.rate) setBcvUsdRate(Number(ratesRes.data.rate));
+
+        if (ratesRes.data.EUR?.rate) setBcvEurRate(Number(ratesRes.data.EUR.rate));
+        if (ratesRes.data.value_date) setBcvValueDate(ratesRes.data.value_date);
+      }
+    } catch (err: any) {
+      console.error('Error fetching currency config:', err);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshingRates(false);
+    }
+  };
+
+  useEffect(() => {
     fetchConfigAndRates();
+  }, []);
+
+  // Escuchar eventos globales de sincronización de tasa
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const handleRateUpdate = (e: Event) => {
+        const customEvent = e as CustomEvent;
+        if (customEvent.detail) {
+          if (typeof customEvent.detail.usdRate === 'number') setBcvUsdRate(customEvent.detail.usdRate);
+          if (typeof customEvent.detail.eurRate === 'number') setBcvEurRate(customEvent.detail.eurRate);
+          if (typeof customEvent.detail.manualRate === 'number') setManualRate(customEvent.detail.manualRate);
+          if (customEvent.detail.mode) setRateMode(customEvent.detail.mode);
+        }
+      };
+      window.addEventListener('exchange-rate-updated', handleRateUpdate);
+      return () => {
+        window.removeEventListener('exchange-rate-updated', handleRateUpdate);
+      };
+    }
   }, []);
 
   const getEffectiveRate = (): number => {
     if (rateMode === 'BCV_USD') return bcvUsdRate;
     if (rateMode === 'BCV_EUR') return bcvEurRate;
-    const parsed = parseFloat(manualRate.replace(',', '.'));
-    return isNaN(parsed) || parsed <= 0 ? 780.00 : parsed;
+    return manualRate > 0 ? manualRate : 36.5;
   };
 
   const handleSave = async () => {
@@ -78,9 +100,9 @@ export const CurrencyConfig: React.FC = () => {
     setSuccessMessage(null);
     setErrorMessage(null);
 
-    const manualVal = parseFloat(manualRate.replace(',', '.'));
+    const manualVal = Number(manualRate);
     if (rateMode === 'MANUAL' && (isNaN(manualVal) || manualVal <= 0)) {
-      setErrorMessage('Por favor introduce una tasa manual válida mayor a 0 (ej. 780.00).');
+      setErrorMessage('Por favor introduce una tasa manual válida mayor a 0 (ej. 36.50).');
       setIsSaving(false);
       return;
     }
@@ -95,7 +117,7 @@ export const CurrencyConfig: React.FC = () => {
         isAutomatic: isAuto,
         currencyMode: rateMode,
         officialCurrency,
-        manualRate: manualVal || 780.00,
+        manualRate: manualVal || 36.50,
         exchangeRate: effectiveRate,
       },
     };
@@ -109,6 +131,9 @@ export const CurrencyConfig: React.FC = () => {
           new CustomEvent('exchange-rate-updated', {
             detail: {
               rate: effectiveRate,
+              usdRate: bcvUsdRate,
+              eurRate: bcvEurRate,
+              manualRate: manualVal,
               mode: rateMode,
               officialCurrency,
             },
@@ -163,11 +188,22 @@ export const CurrencyConfig: React.FC = () => {
               Tasa Activa para Precios en Bolívares (Bs.)
             </span>
           </div>
-          {bcvValueDate && (
-            <span className="text-[11px] font-medium text-slate-400">
-              Fecha Valor: {bcvValueDate}
-            </span>
-          )}
+          <div className="flex items-center gap-2.5">
+            {bcvValueDate && (
+              <span className="text-[11px] font-medium text-slate-400">
+                Fecha Valor: {bcvValueDate}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => fetchConfigAndRates(true)}
+              disabled={isRefreshingRates}
+              className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-300 transition-all cursor-pointer shadow-2xs"
+              title="Actualizar tasas de cambio en vivo desde el BCV"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingRates ? 'animate-spin text-indigo-600' : ''}`} />
+            </button>
+          </div>
         </div>
 
         <div className="flex items-baseline gap-2">
@@ -261,7 +297,7 @@ export const CurrencyConfig: React.FC = () => {
             </div>
             <div>
               <div className="font-mono font-black text-lg text-slate-900">
-                Bs. {parseFloat(manualRate) ? parseFloat(manualRate).toFixed(2) : '---'}
+                Bs. {manualRate > 0 ? manualRate.toFixed(2) : '---'}
               </div>
               <p className="text-[11px] text-slate-400 mt-0.5">Tasa fija definida por usted, sin cambios automáticos.</p>
             </div>
@@ -275,16 +311,14 @@ export const CurrencyConfig: React.FC = () => {
           <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
             Monto de su Tasa Personalizada (Bs. / USD) *
           </label>
-          <div className="relative max-w-sm">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-sm text-slate-400">
-              Bs.
-            </span>
-            <input
-              type="text"
-              placeholder="Ej. 780.00"
+          <div className="max-w-sm">
+            <CurrencyInput
               value={manualRate}
-              onChange={(e) => setManualRate(e.target.value)}
-              className="w-full pl-12 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 font-mono font-bold text-base focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+              onChange={(val) => setManualRate(val || 0)}
+              currencyPrefix="Bs."
+              placeholder="0.00"
+              decimals={2}
+              className="bg-white border-slate-200 text-slate-900 font-mono font-bold text-base"
             />
           </div>
           <p className="text-[11px] text-slate-500">
