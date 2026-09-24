@@ -589,8 +589,14 @@ export const PosInterface: React.FC = () => {
   const handleSelectIdentifiedClientAndProceed = (client: Client) => {
     setSelectedClientId(client.id);
     setIsIdentifyModalOpen(false);
+    setError(null);
     setPaymentLines([
-      { paymentMethod: 'CASH_USD', amountOriginal: totalUsd, currency: 'USD' }
+      {
+        paymentMethod: '',
+        bankAccountId: '',
+        amountOriginal: totalUsd,
+        currency: 'USD',
+      }
     ]);
     setIsConfirmModalOpen(true);
   };
@@ -629,14 +635,14 @@ export const PosInterface: React.FC = () => {
       setIdentifyDocNumber('');
       setIdentifyClientFound(null);
 
-      // Open checkout payment confirmation
-      const defaultAccount = bankAccounts.find(a => a.currency === 'USD') || bankAccounts[0];
+      // Open checkout payment confirmation with neutral unselected payment line
+      setError(null);
       setPaymentLines([
         {
-          paymentMethod: defaultAccount ? defaultAccount.name : 'CASH_USD',
-          bankAccountId: defaultAccount ? defaultAccount.id : undefined,
+          paymentMethod: '',
+          bankAccountId: '',
           amountOriginal: totalUsd,
-          currency: defaultAccount ? defaultAccount.currency : 'USD',
+          currency: 'USD',
         }
       ]);
       setIsConfirmModalOpen(true);
@@ -652,15 +658,14 @@ export const PosInterface: React.FC = () => {
     if (cart.length === 0) return;
     setError(null);
 
-    // If client is already selected, proceed directly to payment confirmation
+    // If client is already selected, proceed directly to payment confirmation with neutral payment line
     if (selectedClientId) {
-      const defaultAccount = bankAccounts.find(a => a.currency === 'USD') || bankAccounts[0];
       setPaymentLines([
         {
-          paymentMethod: defaultAccount ? defaultAccount.name : 'CASH_USD',
-          bankAccountId: defaultAccount ? defaultAccount.id : undefined,
+          paymentMethod: '',
+          bankAccountId: '',
           amountOriginal: totalUsd,
-          currency: defaultAccount ? defaultAccount.currency : 'USD',
+          currency: 'USD',
         }
       ]);
       setIsConfirmModalOpen(true);
@@ -731,24 +736,26 @@ export const PosInterface: React.FC = () => {
         return;
       }
 
-      const methodUpper = (line.paymentMethod || '').toUpperCase();
+      const methodUpper = (line.paymentMethod || account?.name || '').toUpperCase();
       const isZelleOrBinance = methodUpper.includes('ZELLE') || methodUpper.includes('BINANCE');
-      const isBanking = ['PAGO_MOVIL', 'TRANSFERENCIA', 'TARJETA_DEBITO', 'TARJETA_CREDITO'].some(m => methodUpper.includes(m));
+      const isCash = account?.account_type === 'EFECTIVO' || methodUpper.includes('CASH') || methodUpper.includes('EFECTIVO');
+      const isBanking = !isCash && !isZelleOrBinance;
 
       if (isZelleOrBinance) {
         if (!line.senderIdentifier?.trim()) {
-          setError(`El pago #${i + 1} (${line.paymentMethod}) requiere el correo, alias o ID del emisor.`);
+          setError(`El pago #${i + 1} (${line.paymentMethod || account?.name}) requiere el correo, alias o ID del emisor.`);
           setIsSubmittingSale(false);
           return;
         }
         if (!line.transactionReference?.trim()) {
-          setError(`El pago #${i + 1} (${line.paymentMethod}) requiere el número de confirmación o referencia.`);
+          setError(`El pago #${i + 1} (${line.paymentMethod || account?.name}) requiere el número de confirmación o referencia.`);
           setIsSubmittingSale(false);
           return;
         }
       } else if (isBanking) {
-        if (!line.lastFourDigits?.trim() || line.lastFourDigits.trim().length < 4) {
-          setError(`El pago #${i + 1} (${line.paymentMethod}) requiere los 4 últimos dígitos de la referencia.`);
+        const ref = line.lastFourDigits?.trim() || line.transactionReference?.trim() || '';
+        if (ref.length < 4) {
+          setError(`El pago #${i + 1} (${line.paymentMethod || account?.name}) requiere los 4 últimos dígitos de la referencia.`);
           setIsSubmittingSale(false);
           return;
         }
@@ -1885,6 +1892,8 @@ export const PosInterface: React.FC = () => {
       {isConfirmModalOpen && (() => {
         const goesNegative = cart.some(item => item.product.current_stock - item.quantity < 0);
         const selectedClient = clients.find(c => c.id === selectedClientId);
+        const { paidUsd } = getTotalsFromLines();
+        const remainingUsd = totalUsd - paidUsd;
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
@@ -2019,7 +2028,8 @@ export const PosInterface: React.FC = () => {
                           const { paidUsd } = getTotalsFromLines();
                           const remaining = Math.max(0, Number((totalUsd - paidUsd).toFixed(2)));
                           setPaymentLines([...paymentLines, {
-                            paymentMethod: 'CASH_USD',
+                            paymentMethod: '',
+                            bankAccountId: '',
                             amountOriginal: remaining,
                             currency: 'USD'
                           }]);
@@ -2029,6 +2039,77 @@ export const PosInterface: React.FC = () => {
                         <Plus className="h-3.5 w-3.5" /> Agregar Método
                       </button>
                     </div>
+
+                    {/* Quick Method Selection Chips for fast checkout */}
+                    {bankAccounts.length > 0 && (
+                      <div className="p-3 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 block">
+                          ⚡ Selección Rápida de Método (1 Clic):
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {bankAccounts.map(acc => {
+                            const isCash = acc.account_type === 'EFECTIVO' || acc.name.toUpperCase().includes('EFECTIVO');
+                            const isPM = acc.name.toUpperCase().includes('PAGO M') || acc.bank_name?.toUpperCase().includes('PAGO M');
+                            const isZelle = acc.name.toUpperCase().includes('ZELLE') || acc.bank_name?.toUpperCase().includes('ZELLE');
+                            const isBinance = acc.name.toUpperCase().includes('BINANCE') || acc.bank_name?.toUpperCase().includes('BINANCE');
+                            const isPoint = acc.name.toUpperCase().includes('PUNTO') || acc.name.toUpperCase().includes('DEBITO') || acc.name.toUpperCase().includes('TARJETA');
+
+                            let icon = '🏦';
+                            if (isCash) icon = acc.currency === 'USD' ? '💵' : '🇻🇪';
+                            else if (isPM) icon = '📱';
+                            else if (isPoint) icon = '💳';
+                            else if (isZelle) icon = '🌐';
+                            else if (isBinance) icon = '🟡';
+
+                            return (
+                              <button
+                                key={acc.id}
+                                type="button"
+                                onClick={() => {
+                                  // Apply this account to the first/active line and auto-fill remaining amount
+                                  const targetIdx = paymentLines.length > 0 ? 0 : 0;
+                                  const otherPaidUsd = paymentLines
+                                    .filter((_, i) => i !== targetIdx)
+                                    .reduce((accTotal, l) => {
+                                      const amt = Number(l.amountOriginal) || 0;
+                                      return accTotal + (l.currency === 'USD' ? amt : (amt / (exchangeRate || 1)));
+                                    }, 0);
+                                  const remaining = Math.max(0, totalUsd - otherPaidUsd);
+                                  const newAmount = acc.currency === 'USD'
+                                    ? Number(remaining.toFixed(2))
+                                    : Number((remaining * exchangeRate).toFixed(2));
+
+                                  const nextLines = paymentLines.length > 0 ? [...paymentLines] : [{
+                                    paymentMethod: '',
+                                    bankAccountId: '',
+                                    amountOriginal: 0,
+                                    currency: 'USD'
+                                  }];
+
+                                  nextLines[targetIdx] = {
+                                    ...nextLines[targetIdx],
+                                    bankAccountId: acc.id,
+                                    paymentMethod: `${acc.name} (${acc.bank_name})`,
+                                    currency: acc.currency,
+                                    amountOriginal: newAmount,
+                                  };
+                                  setPaymentLines(nextLines);
+                                }}
+                                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border shadow-2xs cursor-pointer ${
+                                  paymentLines.some(l => l.bankAccountId === acc.id)
+                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-100 scale-102'
+                                    : 'bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border-slate-200/80 hover:border-indigo-300'
+                                }`}
+                              >
+                                <span>{icon}</span>
+                                <span>{acc.name}</span>
+                                <span className="font-mono text-[10px] opacity-80">({acc.currency})</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="space-y-3">
                       {paymentLines.map((line, idx) => {
@@ -2094,7 +2175,7 @@ export const PosInterface: React.FC = () => {
                                 ) : (
                                   <select
                                     className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
-                                    value={line.paymentMethod}
+                                    value={line.paymentMethod || ''}
                                     onChange={(e) => {
                                       const nextMethod = e.target.value;
                                       const nextCurrency = nextMethod.endsWith('VES') || nextMethod === 'PAGO_MOVIL' || nextMethod === 'TARJETA_DEBITO' ? 'VES' : 'USD';
@@ -2113,6 +2194,7 @@ export const PosInterface: React.FC = () => {
                                       } : l));
                                     }}
                                   >
+                                    <option value="">-- Seleccione Método de Pago --</option>
                                     <option value="CASH_USD">💵 Efectivo en Dólares (USD)</option>
                                     <option value="CASH_VES">💵 Efectivo en Bolívares (VES)</option>
                                     <option value="PAGO_MOVIL">📱 Pago Móvil (VES)</option>
@@ -2281,6 +2363,14 @@ export const PosInterface: React.FC = () => {
                     </ul>
                   </div>
 
+                  {/* Error Alert inside Modal */}
+                  {error && (
+                    <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs font-semibold text-rose-700 flex items-center gap-2 animate-in fade-in duration-200 shadow-2xs">
+                      <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                      <span>{error}</span>
+                    </div>
+                  )}
+
                   {/* Negative Stock Warning & Justification */}
                   {goesNegative && (
                     <div className="space-y-3 animate-in fade-in duration-300">
@@ -2318,7 +2408,28 @@ export const PosInterface: React.FC = () => {
                 <button
                   type="button"
                   onClick={submitSale}
-                  disabled={isSubmittingSale || (goesNegative && !justificationText.trim())}
+                  disabled={
+                    isSubmittingSale ||
+                    remainingUsd > 0.01 ||
+                    (goesNegative && !justificationText.trim()) ||
+                    (bankAccounts.length > 0 && paymentLines.some(l => !l.bankAccountId)) ||
+                    paymentLines.some(line => {
+                      const selectedAcc = bankAccounts.find(a => a.id === line.bankAccountId);
+                      const methodUpper = (line.paymentMethod || selectedAcc?.name || '').toUpperCase();
+                      const isZelleOrBinance = methodUpper.includes('ZELLE') || methodUpper.includes('BINANCE');
+                      const isCash = selectedAcc?.account_type === 'EFECTIVO' || methodUpper.includes('CASH') || methodUpper.includes('EFECTIVO');
+                      const isBanking = !isCash && !isZelleOrBinance;
+
+                      if (isZelleOrBinance) {
+                        return !line.senderIdentifier?.trim() || !line.transactionReference?.trim();
+                      }
+                      if (isBanking) {
+                        const ref = line.lastFourDigits?.trim() || line.transactionReference?.trim() || '';
+                        return ref.length < 4;
+                      }
+                      return false;
+                    })
+                  }
                   className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:from-indigo-700 active:to-violet-700 text-white font-semibold rounded-xl transition-all shadow-md shadow-indigo-200 text-sm cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmittingSale && <Loader2 className="animate-spin h-4 w-4" />}
