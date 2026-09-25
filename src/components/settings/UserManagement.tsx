@@ -302,6 +302,7 @@ export default function UserManagement() {
       return;
     }
 
+    fetchBranches();
     setModalMode('create');
     setSelectedUser(null);
     setFullName('');
@@ -326,6 +327,7 @@ export default function UserManagement() {
 
   // Helper to open edit modal
   const handleOpenEdit = (user: UserItem) => {
+    fetchBranches();
     setModalMode('edit');
     setSelectedUser(user);
     setFullName(user.full_name);
@@ -697,7 +699,7 @@ export default function UserManagement() {
                     <tr className="border-b border-slate-100 bg-slate-50/50 text-xs font-semibold uppercase tracking-wider text-slate-500">
                       <th className="px-6 py-4">Usuario</th>
                       <th className="px-6 py-4">Rol</th>
-                      <th className="px-6 py-4">Sucursal</th>
+                      <th className="px-6 py-4">Sede / Almacén</th>
                       <th className="px-6 py-4">Permisos Clave</th>
                       <th className="px-6 py-4">Jerarquía / Creador</th>
                       <th className="px-6 py-4">Estado</th>
@@ -1038,7 +1040,7 @@ export default function UserManagement() {
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
                       <Building2 className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>Sucursal / Sede Asignada</span>
+                      <span>Sucursal / Almacén de Operación</span>
                     </label>
                     <select
                       value={branchId}
@@ -1048,12 +1050,12 @@ export default function UserManagement() {
                       <option value="">-- Sin Sucursal Asignada (Acceso Global / Central) --</option>
                       {branches.map(b => (
                         <option key={b.id} value={b.id}>
-                          🏢 {b.name} ({b.code}){b.is_main ? ' ★ Sede Principal' : ''} — 📦 Almacén: {b.default_warehouse?.name || 'Sin almacén vinculado'}
+                          📦 {b.default_warehouse?.name || b.name} — ({b.name}{b.is_main ? ' ★ Sede Principal' : ''})
                         </option>
                       ))}
                     </select>
                     <p className="text-[11px] text-slate-500 mt-1">
-                      Si el usuario ingresa al Punto de Venta (POS), operará directamente con el stock del almacén vinculado a esta sede.
+                      El usuario operará las ventas en el Punto de Venta (POS) e inventario descontando existencias de este almacén.
                     </p>
                   </div>
                 )}
