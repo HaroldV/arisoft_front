@@ -252,8 +252,8 @@ export default function DashboardLayout({
       router.replace('/change-password');
     } else if (!isLoading && user?.role === 'SUPER_ADMIN' && typeof window !== 'undefined' && window.location.pathname === '/') {
       router.replace('/admin');
-    } else if (!isLoading && user && user.role !== 'SUPER_ADMIN' && typeof window !== 'undefined') {
-      const currentPath = window.location.pathname;
+    } else if (!isLoading && user && user.role !== 'SUPER_ADMIN') {
+      const currentPath = pathname;
       
       // Mapeo de rutas a permisos requeridos
       const routePermissions: Record<string, string> = {
@@ -264,19 +264,34 @@ export default function DashboardLayout({
         '/inventory/purchases/orders': 'purchases:orders',
         '/inventory/purchases/receptions': 'purchases:receptions',
         '/inventory/purchases/new': 'purchases:new',
+        '/inventory/purchases': 'purchases:invoices',
+        '/inventory/providers': 'providers:manage',
+        '/inventory/initial': 'inventory:create',
+        '/inventory/stock': 'inventory:stock',
+        '/inventory/warehouse': 'inventory:warehouse',
+        '/inventory/categories': 'inventory:categories',
         '/inventory/prices/bulk-update': 'inventory:bulk_prices',
         '/inventory/audit-reports': 'inventory:valuation',
         '/inventory/moves': 'inventory:moves',
+        '/accounts/banks': 'banks:accounts',
+        '/accounts/ledger': 'banks:ledger',
+        '/accounts/cash-shifts': 'banks:shifts',
         '/accounts/receivables': 'accounts:receivables',
         '/accounts/payables': 'accounts:payables',
         '/accounts/history': 'accounts:history',
         '/payroll': 'payroll:manage',
         '/payroll/formulas': 'payroll:manage',
         '/reports': 'reports:view',
+        '/settings/company': 'company:manage',
+        '/settings/branches': 'branches:manage',
+        '/settings/fiscal': 'fiscal:manage',
+        '/settings/users': 'users:manage',
       };
 
       const requiredPermission = routePermissions[currentPath];
-      if (requiredPermission && user.permissions && !user.permissions.includes(requiredPermission)) {
+      const isInConstructionRoute = ['/accounts/history', '/payroll', '/payroll/formulas', '/reports', '/settings/security'].includes(currentPath);
+
+      if (requiredPermission && !isInConstructionRoute && user.role !== 'OWNER' && (!user.permissions || !user.permissions.includes(requiredPermission))) {
         // Redirigir a ruta permitida por defecto
         if (currentPath.startsWith('/accounts')) {
           router.replace('/accounts/banks');
@@ -287,7 +302,7 @@ export default function DashboardLayout({
         }
       }
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, pathname]);
 
   const getInitials = (name?: string) => {
     if (!name) return 'HV';
@@ -401,40 +416,44 @@ export default function DashboardLayout({
               </Link>
 
               {/* 💳 Badge Cuentas por Pagar (CxP) */}
-              <Link
-                href="/accounts/payables"
-                className="hidden sm:flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-rose-50/90 hover:bg-rose-100/80 border border-rose-200 text-rose-700 transition-all shadow-2xs cursor-pointer group"
-                title={`Cuentas por Pagar Pendientes: ${cxpPendingCount} facturas ($${cxpPendingTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-rose-600 group-hover:scale-110 transition-transform" />
-                <div className="flex items-center gap-1 text-[11px] font-bold">
-                  <span className="text-rose-900">CxP:</span>
-                  <span className="px-1.5 py-0.2 bg-rose-200/80 text-rose-900 rounded-full font-mono text-[10px] font-black">
-                    {cxpPendingCount}
-                  </span>
-                  <span className="font-mono text-rose-800 hidden lg:inline">
-                    ${cxpPendingTotal.toFixed(0)}
-                  </span>
-                </div>
-              </Link>
+              {user?.permissions?.includes('accounts:payables') && (
+                <Link
+                  href="/accounts/payables"
+                  className="hidden sm:flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-rose-50/90 hover:bg-rose-100/80 border border-rose-200 text-rose-700 transition-all shadow-2xs cursor-pointer group"
+                  title={`Cuentas por Pagar Pendientes: ${cxpPendingCount} facturas ($${cxpPendingTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-rose-600 group-hover:scale-110 transition-transform" />
+                  <div className="flex items-center gap-1 text-[11px] font-bold">
+                    <span className="text-rose-900">CxP:</span>
+                    <span className="px-1.5 py-0.2 bg-rose-200/80 text-rose-900 rounded-full font-mono text-[10px] font-black">
+                      {cxpPendingCount}
+                    </span>
+                    <span className="font-mono text-rose-800 hidden lg:inline">
+                      ${cxpPendingTotal.toFixed(0)}
+                    </span>
+                  </div>
+                </Link>
+              )}
 
               {/* 📥 Badge Cuentas por Cobrar (CxC) */}
-              <Link
-                href="/accounts/receivables"
-                className="hidden sm:flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-emerald-50/90 hover:bg-emerald-100/80 border border-emerald-200 text-emerald-700 transition-all shadow-2xs cursor-pointer group"
-                title={`Cuentas por Cobrar Pendientes: ${cxcPendingCount} cuentas ($${cxcPendingTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
-              >
-                <Wallet className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
-                <div className="flex items-center gap-1 text-[11px] font-bold">
-                  <span className="text-emerald-900">CxC:</span>
-                  <span className="px-1.5 py-0.2 bg-emerald-200/80 text-emerald-900 rounded-full font-mono text-[10px] font-black">
-                    {cxcPendingCount}
-                  </span>
-                  <span className="font-mono text-emerald-800 hidden lg:inline">
-                    ${cxcPendingTotal.toFixed(0)}
-                  </span>
-                </div>
-              </Link>
+              {user?.permissions?.includes('accounts:receivables') && (
+                <Link
+                  href="/accounts/receivables"
+                  className="hidden sm:flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-emerald-50/90 hover:bg-emerald-100/80 border border-emerald-200 text-emerald-700 transition-all shadow-2xs cursor-pointer group"
+                  title={`Cuentas por Cobrar Pendientes: ${cxcPendingCount} cuentas ($${cxcPendingTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+                >
+                  <Wallet className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
+                  <div className="flex items-center gap-1 text-[11px] font-bold">
+                    <span className="text-emerald-900">CxC:</span>
+                    <span className="px-1.5 py-0.2 bg-emerald-200/80 text-emerald-900 rounded-full font-mono text-[10px] font-black">
+                      {cxcPendingCount}
+                    </span>
+                    <span className="font-mono text-emerald-800 hidden lg:inline">
+                      ${cxcPendingTotal.toFixed(0)}
+                    </span>
+                  </div>
+                </Link>
+              )}
             </div>
 
             {/* Offline Alert Badge if connection lost */}

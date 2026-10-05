@@ -2,10 +2,15 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import apiClient from '@/infrastructure/api/api-client';
+import { useAuth } from '@/context/AuthContext';
 import { STOCK_LEVEL_FILTERS, StockLevelFilter, PRODUCT_TAX_TYPES, ProductTaxType } from '@/constants/domain-constants';
 import { InventoryProduct, ProductCategoryOption, SearchFieldScope, SortField, SortOrder } from '../types/stock.types';
 
 export function useStockData() {
+  const { user } = useAuth();
+  const isOwner = user?.role === 'OWNER' || user?.role === 'SUPER_ADMIN';
+  const assignedWarehouseId = user?.branch?.default_warehouse_id || '';
+
   const [products, setProducts] = useState<InventoryProduct[]>([]);
   const [categories, setCategories] = useState<ProductCategoryOption[]>([]);
   const [search, setSearch] = useState('');
@@ -17,7 +22,7 @@ export function useStockData() {
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
   const [warehouses, setWarehouses] = useState<{ id: string; name: string; type?: string }[]>([]);
-  const [selectedWarehouse, setSelectedWarehouse] = useState<string>('ALL');
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>(assignedWarehouseId || 'ALL');
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +38,13 @@ export function useStockData() {
     try {
       const params: any = {};
       if (query) params.name = query;
-      if (warehouseId && warehouseId !== 'ALL') params.warehouse_id = warehouseId;
+      
+      // For sellers/non-owners with an assigned warehouse, strictly query their warehouse
+      const effectiveWarehouseId = (!isOwner && assignedWarehouseId)
+        ? assignedWarehouseId
+        : (warehouseId && warehouseId !== 'ALL' ? warehouseId : undefined);
+
+      if (effectiveWarehouseId) params.warehouse_id = effectiveWarehouseId;
 
       const response = await apiClient.get('/inventory/products', { params });
       const productList: InventoryProduct[] = Array.isArray(response.data) 
@@ -46,7 +57,7 @@ export function useStockData() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isOwner, assignedWarehouseId]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -61,11 +72,19 @@ export function useStockData() {
     try {
       const response = await apiClient.get('/inventory/warehouse-locations');
       const list = Array.isArray(response.data) ? response.data : (response.data?.items || []);
-      setWarehouses(list);
+      
+      // If user is a seller/non-owner with assigned branch, only expose their branch warehouse
+      if (!isOwner && assignedWarehouseId) {
+        const branchWhs = list.filter((w: any) => w.id === assignedWarehouseId);
+        setWarehouses(branchWhs.length > 0 ? branchWhs : list);
+        setSelectedWarehouse(assignedWarehouseId);
+      } else {
+        setWarehouses(list);
+      }
     } catch (err) {
       console.error('Error fetching warehouses:', err);
     }
-  }, []);
+  }, [isOwner, assignedWarehouseId]);
 
   useEffect(() => {
     fetchCategories();
@@ -73,12 +92,18 @@ export function useStockData() {
   }, [fetchCategories, fetchWarehouses]);
 
   useEffect(() => {
+    const targetWh = (!isOwner && assignedWarehouseId) ? assignedWarehouseId : selectedWarehouse;
     const delayDebounceFn = setTimeout(() => {
-      fetchProducts(search, selectedWarehouse);
+      fetchProducts(search, targetWh);
     }, 400);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [search, selectedWarehouse, fetchProducts]);
+  }, [search, selectedWarehouse, isOwner, assignedWarehouseId, fetchProducts]);
+
+  // When warehouse changes, reset selected category if it no longer exists in current products
+  useEffect(() => {
+    setSelectedCategory('ALL');
+  }, [selectedWarehouse]);
 
   const handleToggleSort = (field: SortField) => {
     if (sortField === field) {

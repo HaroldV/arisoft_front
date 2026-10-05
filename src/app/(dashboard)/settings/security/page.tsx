@@ -1,10 +1,16 @@
 'use client';
 
+import React from 'react';
+import { InConstructionPlaceholder } from '@/components/common/InConstructionPlaceholder';
+
 export default function SecuritySettingsPage() {
   return (
-    <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm text-center">
-      <h1 className="text-2xl font-bold text-slate-900 mb-2">Seguridad del Sistema</h1>
-      <p className="text-slate-500">Módulo en desarrollo. Próximamente disponible.</p>
-    </div>
+    <InConstructionPlaceholder
+      title="Seguridad del Sistema"
+      subtitle="Políticas de acceso, sesiones activas y autenticación de 2 factores (2FA)"
+      description="El panel de configuración de seguridad avanzada, registro de auditoría de sesiones y llaves de acceso se encuentra en desarrollo."
+      returnHref="/settings/users"
+      returnLabel="Volver a Usuarios"
+    />
   );
 }

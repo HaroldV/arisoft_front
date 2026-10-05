@@ -103,11 +103,11 @@ const menuConfig = [
         tenantOnly: true,
         children: [
           { label: 'Cuentas Bancarias', icon: Building, href: '/accounts/banks', permission: 'banks:accounts' },
-          { label: 'Libro Mayor', icon: BookOpen, href: '/accounts/ledger', permission: 'banks:accounts' },
-          { label: 'Cierres de Caja & Arqueos', icon: Clock, href: '/accounts/cash-shifts', roles: ['OWNER', 'MANAGER'], permission: 'banks:accounts' },
+          { label: 'Libro Mayor', icon: BookOpen, href: '/accounts/ledger', permission: 'banks:ledger' },
+          { label: 'Cierres de Caja & Arqueos', icon: Clock, href: '/accounts/cash-shifts', roles: ['OWNER', 'MANAGER'], permission: 'banks:shifts' },
           { label: 'Cuentas por Cobrar (CxC)', icon: Wallet, href: '/accounts/receivables', permission: 'accounts:receivables' },
           { label: 'Cuentas por Pagar (CxP)', icon: FileSpreadsheet, href: '/accounts/payables', permission: 'accounts:payables' },
-          { label: 'Historial', icon: History, href: '/accounts/history', permission: 'accounts:history' },
+          { label: 'Historial', icon: History, href: '/accounts/history', permission: 'accounts:history', inConstruction: true },
         ]
       },
       {
@@ -125,7 +125,7 @@ const menuConfig = [
           { label: 'Sucursales & Tiendas', icon: Building2, href: '/settings/branches', roles: ['OWNER'], permission: 'branches:manage' },
           { label: 'Configuración Fiscal', icon: Receipt, href: '/settings/fiscal', roles: ['OWNER', 'MANAGER'], permission: 'fiscal:manage' },
           { label: 'Usuarios y Roles', icon: Users, href: '/settings/users', roles: ['OWNER', 'MANAGER'], permission: 'users:manage' },
-          { label: 'Seguridad', icon: UserCircle, href: '/settings/security', roles: ['OWNER', 'MANAGER', 'CASHIER', 'WAREHOUSE_KEEPER'] },
+          { label: 'Seguridad', icon: UserCircle, href: '/settings/security', roles: ['OWNER', 'MANAGER', 'CASHIER', 'WAREHOUSE_KEEPER'], inConstruction: true },
         ]
       },
       {
@@ -134,8 +134,8 @@ const menuConfig = [
         module: 'PAYROLL',
         tenantOnly: true,
         children: [
-          { label: 'Procesamiento de Nómina', icon: FileSpreadsheet, href: '/payroll', permission: 'payroll:manage' },
-          { label: 'Fórmulas Legales', icon: FileText, href: '/payroll/formulas', permission: 'payroll:manage' },
+          { label: 'Procesamiento de Nómina', icon: FileSpreadsheet, href: '/payroll', permission: 'payroll:manage', inConstruction: true },
+          { label: 'Fórmulas Legales', icon: FileText, href: '/payroll/formulas', permission: 'payroll:manage', inConstruction: true },
         ]
       },
       {
@@ -144,11 +144,11 @@ const menuConfig = [
         module: 'REPORTS',
         tenantOnly: true,
         children: [
-          { label: 'Tablero General', icon: LayoutDashboard, href: '/reports?tab=OVERVIEW', permission: 'reports:view' },
-          { label: 'Reporte de Ventas', icon: Receipt, href: '/reports?tab=SALES', permission: 'reports:view' },
-          { label: 'Reporte de Compras', icon: ShoppingBag, href: '/reports?tab=PURCHASES', permission: 'reports:view' },
-          { label: 'Reporte de Proveedores', icon: Building2, href: '/reports?tab=SUPPLIERS', permission: 'reports:view' },
-          { label: 'Reporte de Productos', icon: Package, href: '/reports?tab=PRODUCTS', permission: 'reports:view' },
+          { label: 'Tablero General', icon: LayoutDashboard, href: '/reports?tab=OVERVIEW', permission: 'reports:view', inConstruction: true },
+          { label: 'Reporte de Ventas', icon: Receipt, href: '/reports?tab=SALES', permission: 'reports:view', inConstruction: true },
+          { label: 'Reporte de Compras', icon: ShoppingBag, href: '/reports?tab=PURCHASES', permission: 'reports:view', inConstruction: true },
+          { label: 'Reporte de Proveedores', icon: Building2, href: '/reports?tab=SUPPLIERS', permission: 'reports:view', inConstruction: true },
+          { label: 'Reporte de Productos', icon: Package, href: '/reports?tab=PRODUCTS', permission: 'reports:view', inConstruction: true },
         ]
       },
       {
@@ -239,8 +239,8 @@ export default function Sidebar({ isOpen = false, onClose, onToggle }: SidebarPr
             if (child.roles && !child.roles.includes(user?.role) && user?.role !== 'OWNER') {
               return false;
             }
-            // Si el subelemento exige un permiso específico, debe estar contenido en los permisos asignados a la sesión del usuario (salvo OWNER que tiene acceso total)
-            if (child.permission && !user?.permissions?.includes(child.permission) && user?.role !== 'OWNER') {
+            // Si el subelemento exige un permiso específico, debe estar contenido en los permisos asignados a la sesión del usuario
+            if (child.permission && !user?.permissions?.includes(child.permission)) {
               return false;
             }
           }
@@ -355,19 +355,26 @@ export default function Sidebar({ isOpen = false, onClose, onToggle }: SidebarPr
                                 href={sub.href}
                                 onClick={(e) => handleRestrictedNavigation(e, sub.label, sub.href)}
                                 className={cn(
-                                  "flex items-center rounded-lg px-2.5 py-2 text-xs font-medium transition-all duration-200 ease-in-out hover:translate-x-0.5 group relative",
+                                  "flex items-center justify-between rounded-lg px-2.5 py-2 text-xs font-medium transition-all duration-200 ease-in-out hover:translate-x-0.5 group relative",
                                   isSubActive
                                     ? "text-emerald-300 bg-[#0B2C4D] font-bold shadow-xs border-l-2 border-emerald-400"
                                     : "text-slate-400 hover:text-white hover:bg-[#0B2C4D]/60"
                                 )}
                               >
-                                {sub.icon && (
-                                  <sub.icon className={cn(
-                                    "mr-2 h-3.5 w-3.5 shrink-0 transition-colors",
-                                    isSubActive ? "text-emerald-400" : "text-slate-400 group-hover:text-emerald-300"
-                                  )} />
+                                <div className="flex items-center truncate">
+                                  {sub.icon && (
+                                    <sub.icon className={cn(
+                                      "mr-2 h-3.5 w-3.5 shrink-0 transition-colors",
+                                      isSubActive ? "text-emerald-400" : "text-slate-400 group-hover:text-emerald-300"
+                                    )} />
+                                  )}
+                                  <span className="truncate">{sub.label}</span>
+                                </div>
+                                {sub.inConstruction && (
+                                  <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-bold rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                                    Próx.
+                                  </span>
                                 )}
-                                <span>{sub.label}</span>
                               </Link>
                             );
                           })}

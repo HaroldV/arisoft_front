@@ -1,10 +1,16 @@
 'use client';
 
-export default function FormulasPage() {
+import React from 'react';
+import { InConstructionPlaceholder } from '@/components/common/InConstructionPlaceholder';
+
+export default function PayrollFormulasPage() {
   return (
-    <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm text-center">
-      <h1 className="text-2xl font-bold text-slate-900 mb-2">Fórmulas Legales de Nómina</h1>
-      <p className="text-slate-500">Módulo en desarrollo. Próximamente disponible.</p>
-    </div>
+    <InConstructionPlaceholder
+      title="Fórmulas Legales de Nómina"
+      subtitle="Configuración y personalización de cálculos y asignaciones"
+      description="El editor dinámico de fórmulas legales, deducciones laborales y asignaciones salariales estará disponible próximamente."
+      returnHref="/payroll"
+      returnLabel="Volver a Nómina"
+    />
   );
 }

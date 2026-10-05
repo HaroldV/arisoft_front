@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, Search, Edit2, Shield, CheckCircle2, XCircle, X, Key, AlertTriangle, AlertCircle, Percent, 
-  ShoppingCart, Package, Landmark, Settings, UserPlus, FileText, ShoppingBag, Users, BarChart3, Building2 
+  ShoppingCart, Package, Landmark, Settings, UserPlus, FileText, ShoppingBag, Users, BarChart3, Building2,
+  Eye, EyeOff
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import { useAuth } from '@/context/AuthContext';
@@ -73,6 +74,7 @@ interface PermissionDefinition {
   key: string;
   label: string;
   description: string;
+  inConstruction?: boolean;
 }
 
 interface ModuleGroup {
@@ -129,24 +131,27 @@ const permissionGroups: ModuleGroup[] = [
     module: 'BANKS',
     label: '5. Módulo Cuentas y Finanzas',
     permissions: [
-      { key: 'banks:accounts', label: 'Cuentas Bancarias', description: 'Permite gestionar cuentas bancarias y cajas' },
+      { key: 'banks:accounts', label: 'Cuentas Bancarias', description: 'Permite gestionar cuentas bancarias y conciliar saldos' },
+      { key: 'banks:ledger', label: 'Libro Mayor', description: 'Permite auditar movimientos y libro mayor contable' },
+      { key: 'banks:shifts', label: 'Cierres de Caja & Arqueos', description: 'Permite supervisar y auditar cierres de turnos en cajas' },
       { key: 'accounts:receivables', label: 'Cuentas por Cobrar (CxC)', description: 'Permite gestionar créditos y cobranzas a clientes' },
       { key: 'accounts:payables', label: 'Cuentas por Pagar (CxP)', description: 'Permite controlar deudas y pagos a proveedores' },
-      { key: 'accounts:history', label: 'Historial Financiero', description: 'Permite auditar movimientos y libros auxiliares' },
+      { key: 'accounts:history', label: 'Historial Financiero', description: 'Permite auditar movimientos y libros auxiliares', inConstruction: true },
     ],
   },
   {
     module: 'PAYROLL',
     label: '6. Módulo Nómina & RRHH',
     permissions: [
-      { key: 'payroll:manage', label: 'Procesamiento de Nómina', description: 'Permite calcular recibos y asignaciones salariales' },
+      { key: 'payroll:manage', label: 'Procesamiento de Nómina', description: 'Permite calcular recibos y asignaciones salariales', inConstruction: true },
+      { key: 'payroll:formulas', label: 'Fórmulas Legales de Nómina', description: 'Permite personalizar fórmulas de cálculo laboral', inConstruction: true },
     ],
   },
   {
     module: 'REPORTS',
     label: '7. Módulo Reportes & BI',
     permissions: [
-      { key: 'reports:view', label: 'Métricas y Tableros BI', description: 'Permite acceder a estadísticas y reportes ejecutivos' },
+      { key: 'reports:view', label: 'Métricas y Tableros BI', description: 'Permite acceder a estadísticas y reportes ejecutivos', inConstruction: true },
     ],
   },
   {
@@ -154,8 +159,10 @@ const permissionGroups: ModuleGroup[] = [
     label: '8. Módulo Configuración de Empresa',
     permissions: [
       { key: 'company:manage', label: 'Perfil de Empresa', description: 'Permite editar datos de la empresa y monedas' },
+      { key: 'branches:manage', label: 'Sucursales & Tiendas', description: 'Permite administrar depósitos y tiendas físicas' },
       { key: 'fiscal:manage', label: 'Parámetros Fiscales', description: 'Permite configurar correlativos e impresoras fiscales' },
       { key: 'users:manage', label: 'Gestión de Usuarios', description: 'Permite registrar personal y administrar roles' },
+      { key: 'settings:security', label: 'Seguridad del Sistema', description: 'Permite gestionar políticas de autenticación y seguridad', inConstruction: true },
     ],
   },
 ];
@@ -179,6 +186,7 @@ export default function UserManagement() {
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [roleName, setRoleName] = useState('');
   const [rolePermissions, setRolePermissions] = useState<string[]>([]);
+  const [activeRolePreset, setActiveRolePreset] = useState<'SELLER' | 'SUPERVISOR' | 'MANAGER' | null>(null);
   const [isSavingRole, setIsSavingRole] = useState(false);
   const [roleFormError, setRoleFormError] = useState<string | null>(null);
 
@@ -193,9 +201,11 @@ export default function UserManagement() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState('CASHIER');
   const [roleId, setRoleId] = useState<string | null>(null);
   const [branchId, setBranchId] = useState<string>('');
+  const [activeUserPreset, setActiveUserPreset] = useState<'SELLER' | 'SUPERVISOR' | 'MANAGER' | null>(null);
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
@@ -277,9 +287,6 @@ export default function UserManagement() {
     : planDefaultPermissions;
 
   const hasPermissionToDelegate = (perm: string) => {
-    if (currentUser?.role === 'OWNER') {
-      return allowedPermissions.includes(perm);
-    }
     return allowedPermissions.includes(perm);
   };
 
@@ -320,6 +327,7 @@ export default function UserManagement() {
     }
     setSelectedModules([]);
     setSelectedPermissions([]);
+    setActiveUserPreset(null);
     setIsActive(true);
     setFormError(null);
     setIsModalOpen(true);
@@ -336,6 +344,7 @@ export default function UserManagement() {
     setRole(user.role);
     setRoleId(user.role_id);
     setBranchId(user.branch_id || '');
+    setActiveUserPreset(null);
     
     // Parse allowed_modules array
     const mods = typeof user.allowed_modules === 'string'
@@ -359,21 +368,76 @@ export default function UserManagement() {
   };
 
   // Preset Template loader
-  const applyPresetTemplate = (type: 'CASHIER' | 'MANAGER') => {
-    if (type === 'CASHIER') {
-      setSelectedModules(['POS', 'INVENTORY']);
-      setSelectedPermissions(['pos:create', 'clients:manage', 'inventory:view']);
+  const applyPresetTemplate = (type: 'SELLER' | 'SUPERVISOR' | 'MANAGER') => {
+    setActiveUserPreset(type);
+    if (type === 'SELLER') {
+      const sellerPerms = [
+        'pos:create', 
+        'pos:shifts', 
+        'sales:invoicing', 
+        'clients:manage', 
+        'inventory:stock', 
+        'sales:quotations', 
+        'sales:orders'
+      ];
+      setSelectedPermissions(sellerPerms);
+      setSelectedModules(getModulesForPermissions(sellerPerms));
+    } else if (type === 'SUPERVISOR') {
+      const supervisorPerms = [
+        'pos:create', 
+        'pos:shifts', 
+        'sales:invoicing', 
+        'clients:manage', 
+        'inventory:stock', 
+        'inventory:moves',
+        'inventory:adjust',
+        'inventory:categories',
+        'sales:quotations', 
+        'sales:orders', 
+        'sales:deliveries',
+        'accounts:receivables',
+        'reports:view'
+      ];
+      setSelectedPermissions(supervisorPerms);
+      setSelectedModules(getModulesForPermissions(supervisorPerms));
     } else if (type === 'MANAGER') {
-      setSelectedModules(['POS', 'INVENTORY']);
-      setSelectedPermissions([
-        'pos:create', 'pos:discount', 'pos:refund', 'clients:manage',
-        'inventory:view', 'inventory:write', 'inventory:adjust', 'purchases:register', 'providers:manage'
-      ].filter(hasPermissionToDelegate));
+      const managerPerms = [
+        'pos:create', 
+        'pos:shifts', 
+        'sales:invoicing', 
+        'clients:manage', 
+        'sales:quotations', 
+        'sales:orders', 
+        'sales:deliveries',
+        'purchases:new', 
+        'purchases:orders', 
+        'purchases:receptions', 
+        'purchases:invoices', 
+        'providers:manage',
+        'inventory:create', 
+        'inventory:stock', 
+        'inventory:view', 
+        'inventory:write', 
+        'inventory:adjust', 
+        'inventory:bulk_prices', 
+        'inventory:valuation', 
+        'inventory:warehouse', 
+        'inventory:categories', 
+        'inventory:moves',
+        'banks:accounts', 
+        'accounts:receivables', 
+        'accounts:payables', 
+        'accounts:history',
+        'reports:view'
+      ];
+      setSelectedPermissions(managerPerms);
+      setSelectedModules(getModulesForPermissions(managerPerms));
     }
   };
 
   // Handle toggling of individual permissions
   const handleTogglePermission = (perm: string, module: string) => {
+    setActiveUserPreset(null); // Clear preset highlight if manually customized
     setSelectedPermissions(prev => {
       const isSelected = prev.includes(perm);
       const newPerms = isSelected ? prev.filter(p => p !== perm) : [...prev, perm];
@@ -575,6 +639,7 @@ export default function UserManagement() {
                 onClick={() => {
                   setRoleName('');
                   setRolePermissions([]);
+                  setActiveRolePreset(null);
                   setRoleFormError(null);
                   setIsRoleModalOpen(true);
                 }}
@@ -973,13 +1038,25 @@ export default function UserManagement() {
                     <div className="relative">
                       <Key className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                       <input
-                        type="password"
+                        type={showPassword ? 'text' : 'password'}
                         value={password}
                         onChange={e => setPassword(e.target.value)}
                         placeholder="Min. 8 caracteres"
                         required={modalMode === 'create'}
-                        className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium"
+                        className="w-full pl-11 pr-11 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer transition-colors"
+                        title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
                     </div>
                   </div>
 
@@ -995,6 +1072,7 @@ export default function UserManagement() {
                           onClick={() => {
                             setRoleName('');
                             setRolePermissions([]);
+                            setActiveRolePreset(null);
                             setRoleFormError(null);
                             setIsRoleModalOpen(true);
                           }}
@@ -1005,31 +1083,66 @@ export default function UserManagement() {
                         </button>
                       </div>
                       <select
-                        value={role}
+                        value={roleId ? roleId : role}
                         onChange={e => {
-                          const selectedRoleName = e.target.value;
-                          setRole(selectedRoleName);
-                          const selectedRole = roles.find(r => r.name === selectedRoleName);
-                          if (selectedRole) {
-                            setRoleId(selectedRole.id);
-                            const perms = typeof selectedRole.allowed_permissions === 'string'
-                              ? (selectedRole.allowed_permissions as string).split(',').filter(Boolean)
-                              : Array.isArray(selectedRole.allowed_permissions)
-                                ? selectedRole.allowed_permissions
+                          const selectedVal = e.target.value;
+                          // Check if it's a custom or database role by ID or by name
+                          const foundCustomRole = roles.find(r => r.id === selectedVal || r.name === selectedVal);
+                          if (foundCustomRole) {
+                            setRole(foundCustomRole.name);
+                            setRoleId(foundCustomRole.id);
+                            const perms = typeof foundCustomRole.allowed_permissions === 'string'
+                              ? (foundCustomRole.allowed_permissions as string).split(',').filter(Boolean)
+                              : Array.isArray(foundCustomRole.allowed_permissions)
+                                ? foundCustomRole.allowed_permissions
                                 : [];
                             setSelectedPermissions(perms);
                             setSelectedModules(getModulesForPermissions(perms));
+                            // Map preset highlight if name matches
+                            if (foundCustomRole.name === 'CASHIER' || foundCustomRole.name.toUpperCase().includes('VENDEDOR')) {
+                              setActiveUserPreset('SELLER');
+                            } else if (foundCustomRole.name === 'SUPERVISOR') {
+                              setActiveUserPreset('SUPERVISOR');
+                            } else if (foundCustomRole.name === 'MANAGER' || foundCustomRole.name === 'ADMIN') {
+                              setActiveUserPreset('MANAGER');
+                            } else {
+                              setActiveUserPreset(null);
+                            }
+                          } else if (selectedVal === 'CASHIER') {
+                            setRole('CASHIER');
+                            setRoleId(null);
+                            applyPresetTemplate('SELLER');
+                          } else if (selectedVal === 'SUPERVISOR') {
+                            setRole('SUPERVISOR');
+                            setRoleId(null);
+                            applyPresetTemplate('SUPERVISOR');
+                          } else if (selectedVal === 'MANAGER') {
+                            setRole('MANAGER');
+                            setRoleId(null);
+                            applyPresetTemplate('MANAGER');
                           } else {
+                            setRole(selectedVal);
                             setRoleId(null);
                           }
                         }}
                         className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-semibold"
                       >
-                        {roles.map(r => (
-                          <option key={r.id} value={r.name}>
-                            {r.name} {r.is_system ? '(Sistema)' : '(Personalizado)'}
-                          </option>
-                        ))}
+                        <optgroup label="Perfiles Estándar del Sistema">
+                          <option value="CASHIER">Vendedor / Cajero (POS y Facturación)</option>
+                          <option value="SUPERVISOR">Supervisor (Ventas, Inventario y Reportes)</option>
+                          <option value="MANAGER">Gerente / Administrador (Acceso Operativo Total)</option>
+                        </optgroup>
+                        {roles.filter(r => !['OWNER', 'CASHIER', 'SUPERVISOR', 'MANAGER'].includes(r.name)).length > 0 && (
+                          <optgroup label="Roles Personalizados">
+                            {roles
+                              .filter(r => !['OWNER', 'CASHIER', 'SUPERVISOR', 'MANAGER'].includes(r.name))
+                              .map(r => (
+                                <option key={r.id} value={r.id}>
+                                  {r.name} (Personalizado)
+                                </option>
+                              ))}
+                          </optgroup>
+                        )}
                       </select>
                     </div>
                   )}
@@ -1065,22 +1178,47 @@ export default function UserManagement() {
                   <div className="bg-gradient-to-r from-indigo-50/70 via-slate-50 to-blue-50/50 p-4 rounded-2xl border border-indigo-100/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
                     <div className="text-xs">
                       <span className="font-bold text-indigo-950 block">Sobrescribir con Plantilla Rápida</span>
-                      <span className="text-indigo-600/80">Pre-configura los permisos típicos recomendados para este rol.</span>
+                      <span className="text-indigo-600/80">Aplica automáticamente la matriz de permisos recomendada:</span>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => applyPresetTemplate('CASHIER')}
-                        className="px-3.5 py-1.5 bg-white hover:bg-slate-50 text-indigo-700 border border-indigo-200 text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer shadow-2xs hover:shadow-xs"
+                        onClick={() => applyPresetTemplate('SELLER')}
+                        className={cn(
+                          "px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer shadow-2xs active:scale-98 flex items-center gap-1.5 border",
+                          activeUserPreset === 'SELLER'
+                            ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-300 scale-102"
+                            : "bg-white hover:bg-slate-50 text-slate-700 hover:text-indigo-700 border-slate-200 hover:border-indigo-200 hover:shadow-xs"
+                        )}
                       >
-                        Perfil Cajero
+                        <span>🛍️</span>
+                        <span>Vendedor / Caja</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyPresetTemplate('SUPERVISOR')}
+                        className={cn(
+                          "px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer shadow-2xs active:scale-98 flex items-center gap-1.5 border",
+                          activeUserPreset === 'SUPERVISOR'
+                            ? "bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-300 scale-102"
+                            : "bg-white hover:bg-slate-50 text-slate-700 hover:text-emerald-700 border-slate-200 hover:border-emerald-200 hover:shadow-xs"
+                        )}
+                      >
+                        <span>👔</span>
+                        <span>Supervisor</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => applyPresetTemplate('MANAGER')}
-                        className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer shadow-2xs hover:shadow-xs"
+                        className={cn(
+                          "px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer shadow-2xs active:scale-98 flex items-center gap-1.5 border",
+                          activeUserPreset === 'MANAGER'
+                            ? "bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-slate-400 scale-102"
+                            : "bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border-slate-200 hover:border-slate-300 hover:shadow-xs"
+                        )}
                       >
-                        Perfil Gerente
+                        <span>🏛️</span>
+                        <span>Gerente / Admin</span>
                       </button>
                     </div>
                   </div>
@@ -1110,37 +1248,49 @@ export default function UserManagement() {
                             </h4>
                             <div className="space-y-2.5">
                               {group.permissions.map(perm => {
-                                const canDelegate = hasPermissionToDelegate(perm.key);
-                                const isChecked = selectedPermissions.includes(perm.key);
+                                const isUnderConstruction = Boolean(perm.inConstruction);
+                                const canDelegate = !isUnderConstruction && hasPermissionToDelegate(perm.key);
+                                const isChecked = !isUnderConstruction && selectedPermissions.includes(perm.key);
 
                                 return (
                                   <label
                                     key={perm.key}
                                     className={`flex items-center justify-between p-3 bg-white rounded-xl border transition-all duration-200 select-none text-xs ${
-                                      canDelegate 
-                                        ? 'cursor-pointer hover:border-indigo-200 hover:shadow-2xs' 
-                                        : 'cursor-not-allowed opacity-50 bg-slate-50'
+                                      isUnderConstruction
+                                        ? 'cursor-not-allowed opacity-75 bg-amber-50/20 border-amber-200/60'
+                                        : canDelegate 
+                                          ? 'cursor-pointer hover:border-indigo-200 hover:shadow-2xs' 
+                                          : 'cursor-not-allowed opacity-50 bg-slate-50'
                                     } ${isChecked ? 'border-indigo-200 bg-indigo-50/20' : 'border-slate-200/80'}`}
                                   >
                                     <div className="flex items-start gap-3 flex-1 pr-4">
                                       <input
                                         type="checkbox"
                                         checked={isChecked}
-                                        disabled={!canDelegate}
+                                        disabled={isUnderConstruction || !canDelegate}
                                         onChange={() => handleTogglePermission(perm.key, group.module)}
                                         className="w-4 h-4 rounded text-indigo-600 bg-slate-50 border-slate-200 focus:ring-indigo-500 shrink-0 mt-0.5"
                                       />
                                       <div>
-                                        <span className="font-bold text-slate-900 block text-xs">{perm.label}</span>
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-bold text-slate-900 block text-xs">{perm.label}</span>
+                                          {isUnderConstruction && (
+                                            <span className="text-[9px] font-bold px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-md">
+                                              En Construcción
+                                            </span>
+                                          )}
+                                        </div>
                                         <span className="text-[11px] text-slate-500 leading-normal block mt-0.5">{perm.description}</span>
                                       </div>
                                     </div>
                                     <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${
-                                      isChecked
-                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                        : 'bg-slate-100 text-slate-400 border border-slate-200'
+                                      isUnderConstruction
+                                        ? 'bg-amber-50 text-amber-600 border border-amber-200'
+                                        : isChecked
+                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                          : 'bg-slate-100 text-slate-400 border border-slate-200'
                                     }`}>
-                                      {isChecked ? 'Permitido' : 'Bloqueado'}
+                                      {isUnderConstruction ? 'Próximamente' : isChecked ? 'Permitido' : 'Bloqueado'}
                                     </span>
                                   </label>
                                 );
@@ -1248,6 +1398,85 @@ export default function UserManagement() {
                   />
                 </div>
 
+                {/* Templates / Presets Buttons inside Role Modal */}
+                <div className="bg-gradient-to-r from-indigo-50/70 via-slate-50 to-blue-50/50 p-4 rounded-2xl border border-indigo-100/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+                  <div className="text-xs">
+                    <span className="font-bold text-indigo-950 block">Partir desde una Plantilla</span>
+                    <span className="text-indigo-600/80">Carga los permisos recomendados para editar sobre ellos:</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const sellerPerms = [
+                          'pos:create', 'pos:shifts', 'sales:invoicing', 'clients:manage', 
+                          'inventory:stock', 'sales:quotations', 'sales:orders'
+                        ];
+                        setRolePermissions(sellerPerms);
+                        setActiveRolePreset('SELLER');
+                        if (!roleName) setRoleName('Vendedor / Mostrador');
+                      }}
+                      className={cn(
+                        "px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer shadow-2xs active:scale-98 flex items-center gap-1.5 border",
+                        activeRolePreset === 'SELLER'
+                          ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-300 scale-102"
+                          : "bg-white hover:bg-slate-50 text-slate-700 hover:text-indigo-700 border-slate-200 hover:border-indigo-200 hover:shadow-xs"
+                      )}
+                    >
+                      <span>🛍️</span>
+                      <span>Vendedor</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const supervisorPerms = [
+                          'pos:create', 'pos:shifts', 'sales:invoicing', 'clients:manage', 
+                          'inventory:stock', 'inventory:moves', 'inventory:adjust', 'inventory:categories',
+                          'sales:quotations', 'sales:orders', 'sales:deliveries', 'accounts:receivables', 'reports:view'
+                        ];
+                        setRolePermissions(supervisorPerms);
+                        setActiveRolePreset('SUPERVISOR');
+                        if (!roleName) setRoleName('Supervisor de Tienda');
+                      }}
+                      className={cn(
+                        "px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer shadow-2xs active:scale-98 flex items-center gap-1.5 border",
+                        activeRolePreset === 'SUPERVISOR'
+                          ? "bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-300 scale-102"
+                          : "bg-white hover:bg-slate-50 text-slate-700 hover:text-emerald-700 border-slate-200 hover:border-emerald-200 hover:shadow-xs"
+                      )}
+                    >
+                      <span>👔</span>
+                      <span>Supervisor</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const managerPerms = [
+                          'pos:create', 'pos:shifts', 'sales:invoicing', 'clients:manage', 
+                          'sales:quotations', 'sales:orders', 'sales:deliveries', 'purchases:new', 
+                          'purchases:orders', 'purchases:receptions', 'purchases:invoices', 'providers:manage',
+                          'inventory:create', 'inventory:stock', 'inventory:view', 'inventory:write', 
+                          'inventory:adjust', 'inventory:bulk_prices', 'inventory:valuation', 
+                          'inventory:warehouse', 'inventory:categories', 'inventory:moves', 'banks:accounts', 
+                          'accounts:receivables', 'accounts:payables', 'accounts:history', 'reports:view'
+                        ];
+                        setRolePermissions(managerPerms);
+                        setActiveRolePreset('MANAGER');
+                        if (!roleName) setRoleName('Gerente Operativo');
+                      }}
+                      className={cn(
+                        "px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer shadow-2xs active:scale-98 flex items-center gap-1.5 border",
+                        activeRolePreset === 'MANAGER'
+                          ? "bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-slate-400 scale-102"
+                          : "bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border-slate-200 hover:border-slate-300 hover:shadow-xs"
+                      )}
+                    >
+                      <span>🏛️</span>
+                      <span>Gerente</span>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Roles Permissions Checkboxes */}
                 <div className="space-y-4">
                   <div className="border-b border-slate-100 pb-2">
@@ -1269,24 +1498,28 @@ export default function UserManagement() {
                           </h4>
                           <div className="space-y-2.5">
                             {group.permissions.map(perm => {
-                              const canDelegate = hasPermissionToDelegate(perm.key);
-                              const isChecked = rolePermissions.includes(perm.key);
+                              const isUnderConstruction = Boolean(perm.inConstruction);
+                              const canDelegate = !isUnderConstruction && hasPermissionToDelegate(perm.key);
+                              const isChecked = !isUnderConstruction && rolePermissions.includes(perm.key);
 
                               return (
                                 <label
                                   key={perm.key}
                                   className={`flex items-center justify-between p-3 bg-white rounded-xl border transition-all duration-200 select-none text-xs ${
-                                    canDelegate 
-                                      ? 'cursor-pointer hover:border-indigo-200 hover:shadow-2xs' 
-                                      : 'cursor-not-allowed opacity-50 bg-slate-50'
+                                    isUnderConstruction
+                                      ? 'cursor-not-allowed opacity-75 bg-amber-50/20 border-amber-200/60'
+                                      : canDelegate 
+                                        ? 'cursor-pointer hover:border-indigo-200 hover:shadow-2xs' 
+                                        : 'cursor-not-allowed opacity-50 bg-slate-50'
                                   } ${isChecked ? 'border-indigo-200 bg-indigo-50/20' : 'border-slate-200/80'}`}
                                 >
                                   <div className="flex items-start gap-3 flex-1 pr-4">
                                     <input
                                       type="checkbox"
                                       checked={isChecked}
-                                      disabled={!canDelegate}
+                                      disabled={isUnderConstruction || !canDelegate}
                                       onChange={() => {
+                                        setActiveRolePreset(null);
                                         setRolePermissions(prev =>
                                           prev.includes(perm.key) ? prev.filter(p => p !== perm.key) : [...prev, perm.key]
                                         );
@@ -1294,16 +1527,25 @@ export default function UserManagement() {
                                       className="w-4 h-4 rounded text-indigo-600 bg-slate-50 border-slate-200 focus:ring-indigo-500 shrink-0 mt-0.5"
                                     />
                                     <div>
-                                      <span className="font-bold text-slate-900 block text-xs">{perm.label}</span>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-bold text-slate-900 block text-xs">{perm.label}</span>
+                                        {isUnderConstruction && (
+                                          <span className="text-[9px] font-bold px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-md">
+                                            En Construcción
+                                          </span>
+                                        )}
+                                      </div>
                                       <span className="text-[11px] text-slate-500 leading-normal block mt-0.5">{perm.description}</span>
                                     </div>
                                   </div>
                                   <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${
-                                    isChecked
-                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                      : 'bg-slate-100 text-slate-400 border border-slate-200'
+                                    isUnderConstruction
+                                      ? 'bg-amber-50 text-amber-600 border border-amber-200'
+                                      : isChecked
+                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                        : 'bg-slate-100 text-slate-400 border border-slate-200'
                                   }`}>
-                                    {isChecked ? 'Permitido' : 'Bloqueado'}
+                                    {isUnderConstruction ? 'Próximamente' : isChecked ? 'Permitido' : 'Bloqueado'}
                                   </span>
                                 </label>
                               );

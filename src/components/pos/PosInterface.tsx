@@ -127,6 +127,7 @@ export const PosInterface: React.FC = () => {
 
   // Checkout Justification and Confirmation Modal
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('CASH_VES');
   const [justificationText, setJustificationText] = useState('');
   const [isSubmittingSale, setIsSubmittingSale] = useState(false);
@@ -143,12 +144,14 @@ export const PosInterface: React.FC = () => {
   const [openingBalanceUsd, setOpeningBalanceUsd] = useState(0.00);
   const [openingBalanceVes, setOpeningBalanceVes] = useState(0.00);
   const [isOpeningShift, setIsOpeningShift] = useState(false);
+  const [shiftError, setShiftError] = useState<string | null>(null);
 
   // Close shift states
   const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
   const [declaredCashUsd, setDeclaredCashUsd] = useState(0.00);
   const [declaredCashVes, setDeclaredCashVes] = useState(0.00);
   const [isClosingShift, setIsClosingShift] = useState(false);
+  const [closeShiftError, setCloseShiftError] = useState<string | null>(null);
 
   // Split payments & Treasury Accounts states
   interface BankAccountOption {
@@ -179,18 +182,18 @@ export const PosInterface: React.FC = () => {
   const [warehouses, setWarehouses] = useState<{ id: string; name: string; type?: string }[]>([]);
   const isOwner = user?.role === 'OWNER';
   const assignedWarehouseId = user?.branch?.default_warehouse_id || '';
-  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(assignedWarehouseId);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(assignedWarehouseId || '');
 
   const fetchData = async (warehouseIdToFilter?: string) => {
     setIsLoading(true);
     setError(null);
     try {
-      // If user is not OWNER, strictly enforce assigned warehouse
-      const activeWhId = !isOwner 
-        ? (assignedWarehouseId || undefined)
-        : (warehouseIdToFilter !== undefined ? warehouseIdToFilter : (selectedWarehouseId || undefined));
+      // Strictly query products for the cashier's assigned branch/warehouse
+      const targetWhId = warehouseIdToFilter !== undefined 
+        ? warehouseIdToFilter 
+        : (assignedWarehouseId || selectedWarehouseId || '');
 
-      const productParams = activeWhId && activeWhId !== 'ALL' ? { warehouse_id: activeWhId } : {};
+      const productParams = targetWhId ? { warehouse_id: targetWhId } : {};
 
       const [productsRes, clientsRes, rangesRes, profileRes, activeShiftRes, warehousesRes, bcvRes, bankAccountsRes] = await Promise.all([
         apiClient.get('/inventory/products', { params: productParams }).catch((err) => { console.error('Products fetch error:', err); return { data: [] }; }),
@@ -221,17 +224,13 @@ export const PosInterface: React.FC = () => {
       const whList = Array.isArray(warehousesRes.data) ? warehousesRes.data : [];
       setWarehouses(whList);
 
-      // Default selected warehouse for OWNER if not set yet
-      if (isOwner) {
-        if (!selectedWarehouseId && warehouseIdToFilter === undefined) {
-          if (assignedWarehouseId) {
-            setSelectedWarehouseId(assignedWarehouseId);
-          } else if (whList.length > 0) {
-            setSelectedWarehouseId(whList[0].id);
-          }
+      // Initialize selectedWarehouseId with user's assigned warehouse if available, else first warehouse
+      if (!selectedWarehouseId) {
+        if (assignedWarehouseId) {
+          setSelectedWarehouseId(assignedWarehouseId);
+        } else if (whList.length > 0) {
+          setSelectedWarehouseId(whList[0].id);
         }
-      } else {
-        setSelectedWarehouseId(assignedWarehouseId);
       }
 
       // Calculate effective exchange rate from BCV + Tenant Configuration
@@ -261,13 +260,11 @@ export const PosInterface: React.FC = () => {
         setActiveShift(activeShiftRes.data.shift);
       } else {
         setActiveShift(null);
-        if (user?.role === 'CASHIER') {
-          setSuggestedOpeningUsd(activeShiftRes.data?.suggestedOpeningUsd || 0.00);
-          setSuggestedOpeningVes(activeShiftRes.data?.suggestedOpeningVes || 0.00);
-          setOpeningBalanceUsd(activeShiftRes.data?.suggestedOpeningUsd || 0.00);
-          setOpeningBalanceVes(activeShiftRes.data?.suggestedOpeningVes || 0.00);
-          setIsShiftModalOpen(true);
-        }
+        setSuggestedOpeningUsd(activeShiftRes.data?.suggestedOpeningUsd || 0.00);
+        setSuggestedOpeningVes(activeShiftRes.data?.suggestedOpeningVes || 0.00);
+        setOpeningBalanceUsd(activeShiftRes.data?.suggestedOpeningUsd || 0.00);
+        setOpeningBalanceVes(activeShiftRes.data?.suggestedOpeningVes || 0.00);
+        setIsShiftModalOpen(true);
       }
 
       // Check if invoice range is configured
@@ -291,7 +288,7 @@ export const PosInterface: React.FC = () => {
   const handleOpenShift = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsOpeningShift(true);
-    setError(null);
+    setShiftError(null);
     try {
       const response = await apiClient.post('/pos/shifts/open', {
         openingBalanceUsd,
@@ -300,7 +297,7 @@ export const PosInterface: React.FC = () => {
       setActiveShift(response.data);
       setIsShiftModalOpen(false);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al abrir el turno de caja.');
+      setShiftError(err.response?.data?.message || 'Error al abrir el turno de caja.');
     } finally {
       setIsOpeningShift(false);
     }
@@ -382,6 +379,25 @@ export const PosInterface: React.FC = () => {
     } catch (_) {}
   };
 
+  // Determine the effective local branch warehouse ID for the current cashier/seller
+  const effectiveCashierWarehouseId = assignedWarehouseId || (warehouses.length > 0 ? warehouses[0].id : '');
+
+  // Helper to accurately get the stock available strictly in the current cashier's assigned branch/warehouse
+  const getProductLocalStock = (p: Product): number => {
+    // If specific warehouse filter is active and not 'ALL', current_stock is already the stock of that warehouse
+    if (selectedWarehouseId && selectedWarehouseId !== 'ALL') {
+      return p.current_stock ?? 0;
+    }
+    // If viewing 'ALL' (or no warehouse specified), find the stock for the cashier's warehouse
+    if (p.warehouse_stocks && p.warehouse_stocks.length > 0) {
+      if (effectiveCashierWarehouseId) {
+        const localWs = p.warehouse_stocks.find(ws => ws.warehouse_id === effectiveCashierWarehouseId);
+        return localWs ? Number(localWs.stock) : 0;
+      }
+    }
+    return p.current_stock ?? 0;
+  };
+
   const handleScanProductInPos = (rawScannedCode: string) => {
     const raw = rawScannedCode.trim();
     if (!raw) return;
@@ -409,10 +425,13 @@ export const PosInterface: React.FC = () => {
       return;
     }
 
-    // Check stock
-    if (match.current_stock !== undefined && match.current_stock <= 0) {
+    // Check stock in the cashier's local store
+    const localStock = getProductLocalStock(match);
+    if (localStock <= 0) {
       playScanBeep(false);
-      showScanToast(`"${match.name}" no tiene stock disponible en este almacén.`, 'warning');
+      const alternateStocks = (match.warehouse_stocks || []).filter(ws => ws.stock > 0);
+      const targetLocation = alternateStocks[0]?.branch_name || alternateStocks[0]?.warehouse_name || 'otra sucursal';
+      showScanToast(`⚠️ "${match.name}" no tiene existencias en tu sede (Disponible en ${targetLocation}).`, 'warning');
       return;
     }
 
@@ -430,44 +449,54 @@ export const PosInterface: React.FC = () => {
     showScanToast(`+1 "${match.name}" añadido al carrito`, 'success');
   };
 
-  // Global Barcode / QR hardware scanner listener (HID keyboard wedge)
+  const getPaymentMethodDisplay = (method?: string, bankAccountId?: string): string => {
+    if (bankAccountId) {
+      const foundAccount = bankAccounts.find(a => a.id === bankAccountId);
+      if (foundAccount) {
+        const icon = foundAccount.currency === 'USD' ? '💵' : '🇻🇪';
+        return `${icon} ${foundAccount.name} (${foundAccount.bank_name})`;
+      }
+    }
+    if (!method) return '💵 Efectivo';
+    
+    switch (method) {
+      case 'CASH_USD':
+        return '💵 Efectivo en Dólares (USD)';
+      case 'CASH_VES':
+        return '💵 Efectivo en Bolívares (VES)';
+      case 'PAGO_MOVIL':
+        return '📱 Pago Móvil (VES)';
+      case 'TRANSFERENCIA':
+        return '🏦 Transferencia Bancaria';
+      case 'TARJETA_DEBITO':
+        return '💳 Tarjeta de Débito (VES)';
+      case 'TARJETA_CREDITO':
+        return '💳 Tarjeta de Crédito (USD)';
+      default:
+        return method;
+    }
+  };
+
+  // Global Barcode / QR hardware scanner listener and Enter shortcut handler
   const barcodeBufferRef = useRef<string>('');
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is currently typing in an input with multiple letters (unless Enter is pressed on search)
-      const target = e.target as HTMLElement;
-      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
-
-      if (e.key === 'Enter') {
-        if (barcodeBufferRef.current.trim().length >= 2) {
-          const scannedCode = barcodeBufferRef.current.trim();
-          handleScanProductInPos(scannedCode);
-          barcodeBufferRef.current = '';
-          e.preventDefault();
-        }
-        return;
-      }
-
-      if (e.key.length === 1) {
-        barcodeBufferRef.current += e.key;
-
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        timeoutRef.current = setTimeout(() => {
-          barcodeBufferRef.current = '';
-        }, 250);
-      }
-    };
-
-    window.addEventListener('keydown', handleGlobalKeyDown, true);
-    return () => {
-      window.removeEventListener('keydown', handleGlobalKeyDown, true);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, [products, cart]);
-
   const addToCart = (product: Product, variation?: ProductVariation) => {
+    // Strict Branch Stock Guard: Prevent selling products that belong to another branch/warehouse
+    const localStock = getProductLocalStock(product);
+    
+    // Block addition if there is no stock in the cashier's assigned branch/warehouse
+    if (localStock <= 0) {
+      const alternateStocks = (product.warehouse_stocks || []).filter(ws => ws.stock > 0);
+      const targetLocation = alternateStocks[0]?.branch_name || alternateStocks[0]?.warehouse_name || 'otra sucursal';
+      playScanBeep(false);
+      showScanToast(
+        `⚠️ Solo consulta: "${product.name}" no tiene existencias en tu sede. Disponible en ${targetLocation}. Redirige al cliente a esa tienda.`,
+        'warning'
+      );
+      return;
+    }
+
     // If product has variations and none was selected yet, open variation selector modal
     if (!variation && product.variations && product.variations.length > 0) {
       setVariationModalProduct(product);
@@ -724,14 +753,20 @@ export const PosInterface: React.FC = () => {
       return;
     }
 
-    // Validate payment lines: accounts and required metadata
+    if (bankAccounts.length === 0) {
+      setError("No existen cuentas bancarias o cajas registradas en la empresa. Configure al menos una cuenta en Cuentas Bancarias para registrar cobros.");
+      setIsSubmittingSale(false);
+      return;
+    }
+
+    // Validate payment lines: accounts, payment methods, and required metadata
     for (let i = 0; i < paymentLines.length; i++) {
       const line = paymentLines[i];
       const account = bankAccounts.find(a => a.id === line.bankAccountId);
 
-      // If registered accounts exist, enforce account selection
-      if (bankAccounts.length > 0 && !line.bankAccountId) {
-        setError(`El pago #${i + 1} debe tener una cuenta financiera receptora seleccionada.`);
+      // Strict enforcement: every payment line must have a registered bankAccountId
+      if (!line.bankAccountId) {
+        setError(`Por favor selecciona la cuenta bancaria o caja receptora para el Pago #${i + 1}.`);
         setIsSubmittingSale(false);
         return;
       }
@@ -812,11 +847,146 @@ export const PosInterface: React.FC = () => {
       setJustificationText('');
       setIsConfirmModalOpen(false);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Ocurrió un error al registrar la venta.');
+      const rawMsg = err.response?.data?.message;
+      let friendlyMsg = 'Ocurrió un error al registrar la venta.';
+      if (Array.isArray(rawMsg)) {
+        if (rawMsg.some((m: string) => m.includes('paymentMethod'))) {
+          friendlyMsg = 'Por favor selecciona el método de pago o cuenta receptora antes de confirmar.';
+        } else {
+          friendlyMsg = rawMsg.join('. ');
+        }
+      } else if (typeof rawMsg === 'string') {
+        if (rawMsg.includes('paymentMethod')) {
+          friendlyMsg = 'Por favor selecciona el método de pago o cuenta receptora antes de confirmar.';
+        } else {
+          friendlyMsg = rawMsg;
+        }
+      }
+      setError(friendlyMsg);
     } finally {
       setIsSubmittingSale(false);
     }
   };
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        // Priority 1: Hardware Barcode scanner buffer
+        if (barcodeBufferRef.current.trim().length >= 2) {
+          const scannedCode = barcodeBufferRef.current.trim();
+          handleScanProductInPos(scannedCode);
+          barcodeBufferRef.current = '';
+          e.preventDefault();
+          return;
+        }
+
+        // Priority 2: Success Receipt Modal open -> Press Enter to close ticket and start new sale
+        if (completedSale) {
+          e.preventDefault();
+          setCompletedSale(null);
+          return;
+        }
+
+        // Priority 3: Verification Modal open -> Press Enter to confirm emission & invoice
+        if (isVerificationModalOpen) {
+          if (!isSubmittingSale) {
+            e.preventDefault();
+            submitSale().then(() => {
+              setIsVerificationModalOpen(false);
+            }).catch(() => {});
+          }
+          return;
+        }
+
+        // Priority 4: Confirmation & Payment Method Modal open -> Press Enter to proceed to verification
+        if (isConfirmModalOpen) {
+          const { paidUsd: currentPaidUsd } = getTotalsFromLines();
+          const currentRemainingUsd = Number((totalUsd - currentPaidUsd).toFixed(4));
+          const currentGoesNegative = cart.some(item => item.product.current_stock - item.quantity < 0);
+          
+          const isPaymentValid = 
+            !isSubmittingSale &&
+            currentRemainingUsd <= 0.01 &&
+            (!currentGoesNegative || justificationText.trim().length > 0) &&
+            (bankAccounts.length === 0 || paymentLines.every(l => !!l.bankAccountId)) &&
+            (bankAccounts.length > 0 || paymentLines.every(l => !!l.paymentMethod?.trim())) &&
+            paymentLines.every(line => {
+              const selectedAcc = bankAccounts.find(a => a.id === line.bankAccountId);
+              const methodUpper = (line.paymentMethod || selectedAcc?.name || '').toUpperCase();
+              const isZelleOrBinance = methodUpper.includes('ZELLE') || methodUpper.includes('BINANCE');
+              const isCash = selectedAcc?.account_type === 'EFECTIVO' || methodUpper.includes('CASH') || methodUpper.includes('EFECTIVO');
+              const isBanking = !isCash && !isZelleOrBinance;
+
+              if (isZelleOrBinance) {
+                return !!line.senderIdentifier?.trim() && !!line.transactionReference?.trim();
+              }
+              if (isBanking) {
+                const ref = line.lastFourDigits?.trim() || line.transactionReference?.trim() || '';
+                return ref.length >= 4;
+              }
+              return true;
+            });
+
+          if (isPaymentValid) {
+            e.preventDefault();
+            setIsVerificationModalOpen(true);
+          }
+          return;
+        }
+
+        // Priority 5: Client Identification Modal open with registered client found -> Press Enter to proceed
+        if (isIdentifyModalOpen && identifyClientFound) {
+          e.preventDefault();
+          handleSelectIdentifiedClientAndProceed(identifyClientFound);
+          return;
+        }
+
+        // Priority 6: Main POS screen with items in cart (and not typing in another input) -> Trigger Checkout
+        const target = e.target as HTMLElement;
+        const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
+        if (!isInput && !isIdentifyModalOpen && !isClientModalOpen && !isShiftModalOpen && !isCloseShiftModalOpen) {
+          if (cart.length > 0 && !isSubmittingSale && !invoiceRangeError) {
+            e.preventDefault();
+            handleCheckoutClick();
+            return;
+          }
+        }
+        return;
+      }
+
+      if (e.key.length === 1) {
+        barcodeBufferRef.current += e.key;
+
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        timeoutRef.current = setTimeout(() => {
+          barcodeBufferRef.current = '';
+        }, 250);
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown, true);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown, true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [
+    products, 
+    cart, 
+    completedSale, 
+    isVerificationModalOpen, 
+    isConfirmModalOpen, 
+    isIdentifyModalOpen, 
+    identifyClientFound, 
+    isSubmittingSale, 
+    paymentLines, 
+    bankAccounts, 
+    totalUsd, 
+    justificationText, 
+    invoiceRangeError,
+    isClientModalOpen,
+    isShiftModalOpen,
+    isCloseShiftModalOpen
+  ]);
 
   return (
     <div className="flex flex-col h-[calc(100dvh-7.5rem)] sm:h-[calc(100dvh-9rem)] lg:h-[calc(100vh-12rem)] min-h-[500px] bg-slate-50 w-full rounded-2xl overflow-hidden border border-slate-200/80 shadow-sm animate-in fade-in duration-500">
@@ -898,79 +1068,45 @@ export const PosInterface: React.FC = () => {
                   </button>
                 )}
               </div>
-
-              {/* QR / Camera Scanner Button */}
-              <button
-                type="button"
-                onClick={() => setIsScannerOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95 shrink-0"
-                title="Abrir lector de cámara para escanear productos"
-              >
-                <QrCode className="w-4 h-4 text-indigo-600" />
-                <span className="hidden sm:inline">Escanear</span>
-              </button>
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {/* Warehouse Selector in POS toolbar (OWNER only) */}
-              {isOwner && warehouses.length > 0 && (
-                <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-slate-100/90 border border-slate-200/80 rounded-xl text-xs shrink-0">
-                  <Warehouse className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                  <select
-                    value={selectedWarehouseId}
-                    onChange={(e) => {
-                      const newWhId = e.target.value;
-                      setSelectedWarehouseId(newWhId);
-                      fetchData(newWhId);
+              {/* Branch/Warehouse Badge Indicator (Strictly seller's branch) */}
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50/80 border border-indigo-100 rounded-xl text-xs font-bold text-indigo-800 shrink-0 shadow-2xs">
+                <Warehouse className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <span className="truncate max-w-[180px] sm:max-w-none">
+                  📍 Sede: {warehouses.find(w => w.id === (assignedWarehouseId || selectedWarehouseId))?.name || user?.branch?.name || 'Mi Sede'}
+                </span>
+              </div>
+
+              {/* Cash Shift Status Badge & Action Button */}
+              {activeShift ? (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800 shrink-0 shadow-2xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span className="hidden md:inline">Caja Abierta:</span>
+                  <span className="font-mono text-emerald-700">Turno #{activeShift.id.substring(0, 6)}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeclaredCashUsd(0);
+                      setDeclaredCashVes(0);
+                      setIsCloseShiftModalOpen(true);
                     }}
-                    className="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer pr-1 max-w-[130px] sm:max-w-none truncate"
+                    className="ml-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
                   >
-                    <option value="ALL">📦 Todos</option>
-                    {warehouses.map((wh) => (
-                      <option key={wh.id} value={wh.id}>
-                        🏢 {wh.name} {wh.type ? `(${wh.type})` : ''}
-                      </option>
-                    ))}
-                  </select>
+                    (Cerrar)
+                  </button>
                 </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsShiftModalOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl text-xs font-bold text-amber-800 shrink-0 shadow-2xs transition-all cursor-pointer active:scale-98"
+                >
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                  <span>Abrir Turno de Caja</span>
+                </button>
               )}
-
-              {/* Branch and assigned warehouse indicator badge */}
-              {user?.branch && (
-                <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 border border-indigo-100 rounded-xl text-xs font-bold text-indigo-700 shrink-0">
-                  <Building2 className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>{user.branch.name}</span>
-                  {user.branch.default_warehouse && (
-                    <span className="text-[11px] text-indigo-600/80 font-medium">
-                      • 🏢 {user.branch.default_warehouse.name}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* Stock Filter Toggle (Option B: Solo con Stock Local) */}
-              <button
-                type="button"
-                onClick={() => setOnlyInStock(!onlyInStock)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer select-none shrink-0 ${
-                  onlyInStock
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300 shadow-2xs hover:bg-emerald-100'
-                    : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200/80'
-                }`}
-                title={onlyInStock ? "Mostrando solo productos con existencias en esta sucursal (Clic para ver todo)" : "Mostrando todos los productos (Clic para ocultar sin existencias)"}
-              >
-                {onlyInStock ? (
-                  <>
-                    <Package className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span className="hidden sm:inline">Con Stock Local</span>
-                  </>
-                ) : (
-                  <>
-                    <PackageX className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                    <span className="hidden sm:inline">Todos los Productos</span>
-                  </>
-                )}
-              </button>
             </div>
 
             {/* View Mode Toggle (Grid vs Fast List) */}
@@ -1050,7 +1186,7 @@ export const PosInterface: React.FC = () => {
               <div className="bg-white rounded-xl border border-slate-200/80 overflow-hidden shadow-2xs">
                 <div className="divide-y divide-slate-100">
                   {filteredProducts.map((p) => {
-                    const stock = p.current_stock ?? 0;
+                    const stock = getProductLocalStock(p);
                     const isCritical = stock <= 5 && stock > 0;
                     const isOut = stock <= 0;
 
@@ -1087,7 +1223,7 @@ export const PosInterface: React.FC = () => {
                               
                               {/* Stock status badge with Origin Branch Info */}
                               {!isOut ? (
-                                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full border ${
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                                   isCritical 
                                     ? 'bg-amber-50 text-amber-700 border-amber-200' 
                                     : 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -1096,22 +1232,22 @@ export const PosInterface: React.FC = () => {
                                 </span>
                               ) : hasAlternateStock ? (
                                 <span 
-                                  className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200 flex items-center gap-1 max-w-full truncate"
+                                  className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200 flex items-center gap-1.5 max-w-full truncate shadow-2xs"
                                   title={`Disponible en ${alternateStocks.map(a => `${a.branch_name || a.warehouse_name} (${a.stock} un)`).join(', ')}`}
                                 >
-                                  <Building2 className="w-3 h-3 shrink-0 text-indigo-500" />
+                                  <Building2 className="w-3.5 h-3.5 shrink-0 text-indigo-600" />
                                   <span className="truncate">
-                                    Disp. en {altLocationLabel} ({primaryAlt.stock} un){alternateStocks.length > 1 ? ` +${alternateStocks.length - 1}` : ''}
+                                    📍 En {altLocationLabel}: <strong>{primaryAlt.stock} un</strong>{alternateStocks.length > 1 ? ` (+${alternateStocks.length - 1} sedes)` : ''}
                                   </span>
                                 </span>
                               ) : (
-                                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full border bg-rose-50 text-rose-700 border-rose-200">
-                                  Sin Stock Global
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-rose-50 text-rose-700 border-rose-200">
+                                  Agotado Global
                                 </span>
                               )}
 
-                              <span className="text-[11px] text-slate-400 font-medium">
-                                Stock local: <strong className={`font-mono ${isOut ? 'text-rose-600' : 'text-slate-700'}`}>{stock} un</strong>
+                              <span className="text-[11px] text-slate-500 font-medium">
+                                Stock: <strong className={`font-mono ${isOut ? 'text-rose-600 font-bold' : 'text-slate-700'}`}>{stock} un</strong>
                               </span>
                             </div>
                           </div>
@@ -1136,12 +1272,24 @@ export const PosInterface: React.FC = () => {
                             }}
                             className={`p-2 rounded-xl border transition-all shadow-2xs cursor-pointer active:scale-90 ${
                               isOut 
-                                ? 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200 hover:text-slate-600'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
                                 : 'bg-indigo-50 group-hover:bg-indigo-600 text-indigo-600 group-hover:text-white border-indigo-200/70 group-hover:border-indigo-600'
                             }`}
-                            title={p.variations && p.variations.length > 0 ? "Seleccionar variación" : isOut ? "Sin stock en esta sucursal" : "Agregar al carrito"}
+                            title={
+                              isOut && hasAlternateStock
+                                ? `Solo consulta: Disponible en ${altLocationLabel} (${primaryAlt.stock} un). Redirige al cliente.`
+                                : isOut
+                                ? "Sin existencias en ninguna sucursal"
+                                : p.variations && p.variations.length > 0
+                                ? "Seleccionar variación"
+                                : "Agregar al carrito"
+                            }
                           >
-                            <Plus className="h-4 w-4" />
+                            {isOut ? (
+                              <Building2 className="h-4 w-4 text-amber-600" />
+                            ) : (
+                              <Plus className="h-4 w-4" />
+                            )}
                           </button>
                         </div>
                       </div>
@@ -1153,7 +1301,7 @@ export const PosInterface: React.FC = () => {
               /* GRID VIEW (Touch / Tablet Mode) */
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
                 {filteredProducts.map((p) => {
-                  const stock = p.current_stock ?? 0;
+                  const stock = getProductLocalStock(p);
                   const isCritical = stock <= 5 && stock > 0;
                   const isOut = stock <= 0;
 
@@ -1334,7 +1482,7 @@ export const PosInterface: React.FC = () => {
                 <span className="text-xs font-bold text-slate-800 truncate block">{user?.full_name || 'Cajero'}</span>
               </div>
             </div>
-            {activeShift && (
+            {activeShift ? (
               <button
                 type="button"
                 onClick={() => {
@@ -1345,6 +1493,14 @@ export const PosInterface: React.FC = () => {
                 className="px-3.5 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 border border-rose-100 hover:bg-rose-100/80 active:bg-rose-200 rounded-xl transition-all cursor-pointer"
               >
                 Cerrar Turno
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsShiftModalOpen(true)}
+                className="px-3.5 py-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 active:bg-amber-200 rounded-xl transition-all cursor-pointer"
+              >
+                Abrir Turno
               </button>
             )}
           </div>
@@ -1541,7 +1697,10 @@ export const PosInterface: React.FC = () => {
               ) : (
                 <>
                   <CreditCard className="h-5 w-5" />
-                  PAGAR / FACTURAR
+                  <span>PAGAR / FACTURAR</span>
+                  <span className="hidden sm:inline-block ml-1 text-[10px] font-mono bg-emerald-700/80 px-1.5 py-0.5 rounded border border-emerald-500/50">
+                    ↵ Enter
+                  </span>
                 </>
               )}
             </button>
@@ -1793,6 +1952,9 @@ export const PosInterface: React.FC = () => {
                     className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:from-emerald-700 active:to-teal-700 text-white font-semibold rounded-xl transition-all shadow-md shadow-emerald-200 text-sm cursor-pointer active:scale-98"
                   >
                     <span>Continuar al Pago</span>
+                    <span className="text-[10px] font-mono bg-emerald-800/60 px-1.5 py-0.5 rounded border border-emerald-400/40">
+                      ↵ Enter
+                    </span>
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -1897,7 +2059,7 @@ export const PosInterface: React.FC = () => {
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-lg max-h-[92vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
               
               {/* Header Fijo */}
               <div className="flex justify-between items-center px-6 py-4.5 border-b border-slate-100 bg-gradient-to-r from-indigo-50/80 via-white to-indigo-50/30 shrink-0">
@@ -2040,6 +2202,33 @@ export const PosInterface: React.FC = () => {
                       </button>
                     </div>
 
+                    {/* Zero Bank Accounts Warning Banner (Enforce Treasury Accounts) */}
+                    {bankAccounts.length === 0 && (
+                      <div className="p-4 bg-amber-50/90 border border-amber-200/90 rounded-2xl space-y-2.5 animate-in fade-in duration-200">
+                        <div className="flex items-start gap-2.5">
+                          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                          <div className="space-y-1">
+                            <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wide">
+                              Atención: Sin Cuentas Receptoras / Cajas Registradas
+                            </h4>
+                            <p className="text-xs text-amber-900 leading-relaxed font-medium">
+                              Para procesar cobros y garantizar que las ventas se sincronicen con el saldo real de tesorería y el libro mayor, debe registrar al menos una cuenta bancaria o caja física.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="pt-1 flex items-center justify-end">
+                          <Link
+                            href="/accounts/banks"
+                            target="_blank"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
+                          >
+                            <span>Configurar Cuentas Bancarias</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Quick Method Selection Chips for fast checkout */}
                     {bankAccounts.length > 0 && (
                       <div className="p-3 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-2">
@@ -2162,6 +2351,12 @@ export const PosInterface: React.FC = () => {
                                           currency: acc.currency,
                                           amountOriginal: newAmount,
                                         } : l));
+                                      } else {
+                                        setPaymentLines(paymentLines.map((l, i) => i === idx ? {
+                                          ...l,
+                                          bankAccountId: '',
+                                          paymentMethod: '',
+                                        } : l));
                                       }
                                     }}
                                   >
@@ -2173,35 +2368,18 @@ export const PosInterface: React.FC = () => {
                                     ))}
                                   </select>
                                 ) : (
-                                  <select
-                                    className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
-                                    value={line.paymentMethod || ''}
-                                    onChange={(e) => {
-                                      const nextMethod = e.target.value;
-                                      const nextCurrency = nextMethod.endsWith('VES') || nextMethod === 'PAGO_MOVIL' || nextMethod === 'TARJETA_DEBITO' ? 'VES' : 'USD';
-                                      const prevCurrency = line.currency;
-                                      let newAmount = line.amountOriginal;
-                                      if (prevCurrency === 'USD' && nextCurrency === 'VES') {
-                                        newAmount = Number((line.amountOriginal * exchangeRate).toFixed(2));
-                                      } else if (prevCurrency === 'VES' && nextCurrency === 'USD') {
-                                        newAmount = Number((line.amountOriginal / exchangeRate).toFixed(2));
-                                      }
-                                      setPaymentLines(paymentLines.map((l, i) => i === idx ? { 
-                                        ...l, 
-                                        paymentMethod: nextMethod, 
-                                        currency: nextCurrency,
-                                        amountOriginal: newAmount
-                                      } : l));
-                                    }}
-                                  >
-                                    <option value="">-- Seleccione Método de Pago --</option>
-                                    <option value="CASH_USD">💵 Efectivo en Dólares (USD)</option>
-                                    <option value="CASH_VES">💵 Efectivo en Bolívares (VES)</option>
-                                    <option value="PAGO_MOVIL">📱 Pago Móvil (VES)</option>
-                                    <option value="TRANSFERENCIA">🏦 Transferencia Bancaria</option>
-                                    <option value="TARJETA_DEBITO">💳 Tarjeta de Débito (VES)</option>
-                                    <option value="TARJETA_CREDITO">💳 Tarjeta de Crédito (USD)</option>
-                                  </select>
+                                  <div className="space-y-1">
+                                    <select
+                                      disabled
+                                      className="w-full p-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-400 cursor-not-allowed"
+                                      value=""
+                                    >
+                                      <option value="">⚠️ Sin cuentas registradas</option>
+                                    </select>
+                                    <span className="text-[10px] text-amber-700 font-semibold block">
+                                      Configure cuentas en Cuentas Bancarias para habilitar cobros.
+                                    </span>
+                                  </div>
                                 )}
                               </div>
 
@@ -2407,12 +2585,13 @@ export const PosInterface: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={submitSale}
+                  onClick={() => setIsVerificationModalOpen(true)}
                   disabled={
                     isSubmittingSale ||
                     remainingUsd > 0.01 ||
                     (goesNegative && !justificationText.trim()) ||
-                    (bankAccounts.length > 0 && paymentLines.some(l => !l.bankAccountId)) ||
+                    bankAccounts.length === 0 ||
+                    paymentLines.some(l => !l.bankAccountId) ||
                     paymentLines.some(line => {
                       const selectedAcc = bankAccounts.find(a => a.id === line.bankAccountId);
                       const methodUpper = (line.paymentMethod || selectedAcc?.name || '').toUpperCase();
@@ -2430,10 +2609,142 @@ export const PosInterface: React.FC = () => {
                       return false;
                     })
                   }
-                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:from-indigo-700 active:to-violet-700 text-white font-semibold rounded-xl transition-all shadow-md shadow-indigo-200 text-sm cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:from-emerald-700 active:to-teal-700 text-white font-semibold rounded-xl transition-all shadow-md shadow-emerald-200 text-sm cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span>Proceder a Facturar</span>
+                  <span className="text-[10px] font-mono bg-emerald-800/60 px-1.5 py-0.5 rounded border border-emerald-400/40">
+                    ↵ Enter
+                  </span>
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Verification / Security Confirmation Prompt Modal (Sally Enterprise UX Standard) */}
+      {isVerificationModalOpen && (() => {
+        const selectedClient = clients.find(c => c.id === selectedClientId);
+        const { paidUsd, paidVes } = getTotalsFromLines();
+
+        return (
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-md max-h-[92vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+              
+              {/* Header Fijo */}
+              <div className="flex justify-between items-center px-6 py-4.5 border-b border-slate-100 bg-gradient-to-r from-indigo-50/90 via-white to-indigo-50/40 shrink-0">
+                <div className="flex items-center gap-3.5">
+                  <div className="bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-xl p-3 shadow-md shadow-indigo-100 flex items-center justify-center">
+                    <CheckCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                      ¿Confirmar Emisión de Venta?
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                      Verificación final antes de emitir comprobante fiscal
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsVerificationModalOpen(false)}
+                  disabled={isSubmittingSale}
+                  className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer disabled:opacity-40"
+                  title="Cerrar modal"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Contenido / Resumen de Confirmación */}
+              <div className="p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+                
+                {/* Luminous Financial Banner */}
+                <div className="bg-gradient-to-br from-indigo-50/90 via-slate-50 to-blue-50/60 border border-indigo-100/90 rounded-2xl p-4 shadow-xs space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-white/95 border border-slate-200/80 rounded-xl p-3 shadow-2xs">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-0.5">Monto Total USD</span>
+                      <div className="font-mono font-black text-xl text-slate-900">
+                        ${totalUsd.toFixed(2)}
+                      </div>
+                    </div>
+                    <div className="bg-indigo-50/80 border border-indigo-200/80 rounded-xl p-3 shadow-2xs">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 block mb-0.5">Monto Total VES</span>
+                      <div className="font-mono font-black text-xl text-indigo-700">
+                        Bs. {totalVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Grid de Metadatos de la Transacción */}
+                <div className="space-y-2 text-xs">
+                  <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between">
+                    <span className="text-slate-500 font-bold uppercase text-[10px]">Cliente:</span>
+                    <span className="font-bold text-slate-900 truncate max-w-[200px]">
+                      {selectedClient ? `${selectedClient.name} (${selectedClient.tax_id})` : 'Venta Mostrador (Genérico)'}
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between">
+                    <span className="text-slate-500 font-bold uppercase text-[10px]">Total Artículos:</span>
+                    <span className="font-bold text-slate-900 font-mono">
+                      {cart.reduce((sum, item) => sum + item.quantity, 0)} unidades ({cart.length} productos)
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between">
+                    <span className="text-slate-500 font-bold uppercase text-[10px]">Método(s) de Pago:</span>
+                    <span className="font-bold text-indigo-700 font-sans text-xs text-right truncate max-w-[240px]">
+                      {paymentLines.map(l => getPaymentMethodDisplay(l.paymentMethod, l.bankAccountId)).join(', ')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Advertencia de Operación */}
+                <div className="p-3 bg-amber-50/90 border border-amber-200/80 rounded-xl text-amber-900 text-xs flex items-start gap-2.5 shadow-2xs">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <p className="leading-relaxed">
+                    Al confirmar, se descontará el inventario en la sede y se generará la factura fiscal correspondiente.
+                  </p>
+                </div>
+
+                {/* Error Alert in Verification Modal */}
+                {error && (
+                  <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs font-semibold text-rose-700 flex items-center gap-2 animate-in fade-in duration-200 shadow-2xs">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                    <span>{error}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer Fijo */}
+              <div className="flex justify-between items-center px-6 py-4 border-t border-slate-100 bg-slate-50/80 shrink-0">
+                <button
+                  type="button"
+                  disabled={isSubmittingSale}
+                  onClick={() => setIsVerificationModalOpen(false)}
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold rounded-xl transition-all cursor-pointer text-sm font-sans disabled:opacity-50"
+                >
+                  Volver / Revisar
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmittingSale}
+                  onClick={async () => {
+                    await submitSale();
+                    setIsVerificationModalOpen(false);
+                  }}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:from-emerald-700 active:to-teal-700 text-white font-semibold rounded-xl transition-all shadow-md shadow-emerald-200 text-sm cursor-pointer active:scale-98 disabled:opacity-50"
                 >
                   {isSubmittingSale && <Loader2 className="animate-spin h-4 w-4" />}
-                  <span>{isSubmittingSale ? 'Procesando...' : 'Confirmar y Facturar'}</span>
+                  <span>{isSubmittingSale ? 'Facturando...' : 'Sí, Confirmar y Facturar'}</span>
+                  {!isSubmittingSale && (
+                    <span className="text-[10px] font-mono bg-emerald-800/60 px-1.5 py-0.5 rounded border border-emerald-400/40">
+                      ↵ Enter
+                    </span>
+                  )}
                 </button>
               </div>
 
@@ -2589,9 +2900,12 @@ export const PosInterface: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setCompletedSale(null)}
-                className="flex-1 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:from-indigo-700 active:to-violet-700 rounded-xl font-semibold text-white text-sm transition-all cursor-pointer shadow-md shadow-indigo-200 active:scale-98"
+                className="flex-1 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:from-emerald-700 active:to-teal-700 rounded-xl font-semibold text-white text-sm transition-all cursor-pointer shadow-md shadow-emerald-200 active:scale-98 flex items-center justify-center gap-1.5"
               >
-                Cerrar Ticket
+                <span>Cerrar Ticket</span>
+                <span className="text-[10px] font-mono bg-emerald-800/60 px-1.5 py-0.5 rounded border border-emerald-400/40">
+                  ↵ Enter
+                </span>
               </button>
             </div>
           </div>
@@ -2675,10 +2989,10 @@ export const PosInterface: React.FC = () => {
                   </div>
                 </div>
 
-                {error && (
+                {shiftError && (
                   <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-xs text-rose-700 flex items-center gap-1.5">
                     <AlertCircle className="h-4 w-4 shrink-0" />
-                    <span>{error}</span>
+                    <span>{shiftError}</span>
                   </div>
                 )}
               </div>
@@ -2732,7 +3046,7 @@ export const PosInterface: React.FC = () => {
               onSubmit={async (e) => {
                 e.preventDefault();
                 setIsClosingShift(true);
-                setError(null);
+                setCloseShiftError(null);
                 try {
                   await apiClient.post('/pos/shifts/close', {
                     declaredCashUsd,
@@ -2744,7 +3058,7 @@ export const PosInterface: React.FC = () => {
                     setIsShiftModalOpen(true);
                   }
                 } catch (err: any) {
-                  setError(err.response?.data?.message || 'Error al cerrar el turno de caja.');
+                  setCloseShiftError(err.response?.data?.message || 'Error al cerrar el turno de caja.');
                 } finally {
                   setIsClosingShift(false);
                 }
@@ -2795,10 +3109,10 @@ export const PosInterface: React.FC = () => {
                   </div>
                 </div>
 
-                {error && (
+                {closeShiftError && (
                   <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-xs text-rose-700 flex items-center gap-1.5">
                     <AlertCircle className="h-4 w-4 shrink-0" />
-                    <span>{error}</span>
+                    <span>{closeShiftError}</span>
                   </div>
                 )}
               </div>
