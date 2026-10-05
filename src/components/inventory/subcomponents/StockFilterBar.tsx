@@ -163,8 +163,8 @@ export const StockFilterBar: React.FC<StockFilterBarProps> = ({
 
         {/* Custom Category Dropdown, Warehouse Dropdown & Reset */}
         <div className="flex flex-wrap items-center gap-3">
-          {/* Warehouse Dropdown */}
-          {warehouses.length > 0 && setSelectedWarehouse && (
+          {/* Warehouse Selector / Badge */}
+          {warehouses.length > 1 && setSelectedWarehouse ? (
             <div className="relative shrink-0 min-w-[200px]" ref={warehouseDropdownRef}>
               <button
                 type="button"
@@ -224,7 +224,12 @@ export const StockFilterBar: React.FC<StockFilterBarProps> = ({
                 </div>
               )}
             </div>
-          )}
+          ) : warehouses.length === 1 ? (
+            <div className="flex items-center gap-2 px-3.5 py-2.5 bg-indigo-50/80 border border-indigo-100 rounded-2xl text-xs font-bold text-indigo-800 shrink-0 shadow-2xs">
+              <Building2 className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span className="truncate">📍 Sede: {warehouses[0].name}</span>
+            </div>
+          ) : null}
 
           {/* Category Dropdown */}
           <div className="relative shrink-0 min-w-[200px]" ref={categoryDropdownRef}>

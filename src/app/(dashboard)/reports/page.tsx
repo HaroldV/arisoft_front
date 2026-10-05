@@ -1,16 +1,16 @@
-import React, { Suspense } from 'react';
-import ReportsDashboard from '@/components/reports/ReportsDashboard';
-import { Metadata } from 'next';
+'use client';
 
-export const metadata: Metadata = {
-  title: 'Reportes & Analítica | ERP ARI',
-  description: 'Dashboard analítico y reportes ejecutivos de ventas, compras, productos y proveedores',
-};
+import React from 'react';
+import { InConstructionPlaceholder } from '@/components/common/InConstructionPlaceholder';
 
 export default function ReportsPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-slate-500">Cargando reportes...</div>}>
-      <ReportsDashboard />
-    </Suspense>
+    <InConstructionPlaceholder
+      title="Reportes & Analítica de Negocio"
+      subtitle="Tableros ejecutivos, métricas BI y consolidación financiera"
+      description="El centro de inteligencia de negocios (BI), reportes consolidados de ventas, márgenes comerciales y proyecciones se encuentra en desarrollo y estará disponible próximamente."
+      returnHref="/"
+      returnLabel="Volver al Inicio"
+    />
   );
 }
