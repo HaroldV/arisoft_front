@@ -687,6 +687,13 @@ export const PosInterface: React.FC = () => {
     if (cart.length === 0) return;
     setError(null);
 
+    // Enforce active shift requirement before checkout/payment
+    if (!activeShift) {
+      setError('Debes abrir un turno de caja para procesar ventas y registrar cobros.');
+      setIsShiftModalOpen(true);
+      return;
+    }
+
     // If client is already selected, proceed directly to payment confirmation with neutral payment line
     if (selectedClientId) {
       setPaymentLines([
@@ -736,6 +743,13 @@ export const PosInterface: React.FC = () => {
         goesNegative = true;
         break;
       }
+    }
+
+    if (!activeShift) {
+      setError('Debes abrir un turno de caja para poder procesar ventas y registrar cobros.');
+      setIsSubmittingSale(false);
+      setIsShiftModalOpen(true);
+      return;
     }
 
     if (goesNegative && !justificationText.trim()) {
@@ -1170,6 +1184,30 @@ export const PosInterface: React.FC = () => {
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto p-4 custom-scrollbar">
+            {/* Luminous Alert Banner when shift is not open */}
+            {!activeShift && !isLoading && (
+              <div className="mb-4 bg-gradient-to-r from-amber-500/10 via-amber-50 to-orange-50/50 border border-amber-200/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs animate-in fade-in duration-200">
+                <div className="flex items-start sm:items-center gap-3">
+                  <div className="bg-amber-100 text-amber-800 rounded-xl p-2.5 shrink-0 flex items-center justify-center">
+                    <AlertCircle className="w-5 h-5 text-amber-700" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wider">Turno de Caja Inactivo</h4>
+                    <p className="text-xs text-amber-700 font-medium mt-0.5">
+                      Puedes consultar productos, pero <strong>debes abrir el turno de caja</strong> para poder registrar cobros y facturar.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsShiftModalOpen(true)}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition-all shadow-xs shrink-0 cursor-pointer self-start sm:self-auto"
+                >
+                  Abrir Turno Ahora
+                </button>
+              </div>
+            )}
+
             {isLoading ? (
               <div className="h-full flex items-center justify-center flex-col gap-2 py-16">
                 <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
@@ -2930,6 +2968,14 @@ export const PosInterface: React.FC = () => {
                   </p>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setIsShiftModalOpen(false)}
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+                title="Cerrar ventana de turno"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             {/* Scrollable Center Body */}
@@ -2998,11 +3044,18 @@ export const PosInterface: React.FC = () => {
               </div>
 
               {/* Footer Fijo */}
-              <div className="flex justify-end items-center px-6 py-4 border-t border-slate-100 bg-slate-50/80 shrink-0">
+              <div className="flex justify-between items-center px-6 py-4 border-t border-slate-100 bg-slate-50/80 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsShiftModalOpen(false)}
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold rounded-xl transition-all cursor-pointer text-sm font-sans"
+                >
+                  Cancelar / Explorar
+                </button>
                 <button
                   type="submit"
                   disabled={isOpeningShift}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:from-indigo-700 active:to-violet-700 text-white font-semibold rounded-xl transition-all shadow-md shadow-indigo-200 text-sm cursor-pointer"
+                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:from-indigo-700 active:to-violet-700 text-white font-semibold rounded-xl transition-all shadow-md shadow-indigo-200 text-sm cursor-pointer disabled:opacity-50"
                 >
                   {isOpeningShift && <Loader2 className="animate-spin h-4 w-4" />}
                   <span>{isOpeningShift ? 'Abriendo...' : 'Abrir Turno de Caja'}</span>
