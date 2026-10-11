@@ -18,6 +18,8 @@ export const CurrencyConfig: React.FC = () => {
 
   const [bcvUsdRate, setBcvUsdRate] = useState<number>(36.5);
   const [bcvEurRate, setBcvEurRate] = useState<number>(39.8);
+  const [binanceRate, setBinanceRate] = useState<number>(1013.5);
+  const [showBinanceRate, setShowBinanceRate] = useState<boolean>(false);
   const [bcvValueDate, setBcvValueDate] = useState<string>('');
 
   const [isLoading, setIsLoading] = useState(true);
@@ -35,6 +37,7 @@ export const CurrencyConfig: React.FC = () => {
       const settings = profileRes.data?.settings || {};
       
       setBaseCurrency(settings.baseCurrency || 'USD');
+      setShowBinanceRate(!!settings.showBinanceRate);
 
       // Mapear modo configurado
       if (settings.isAutomatic === false || settings.currencyMode === 'MANUAL') {
@@ -56,6 +59,7 @@ export const CurrencyConfig: React.FC = () => {
         else if (ratesRes.data.rate) setBcvUsdRate(Number(ratesRes.data.rate));
 
         if (ratesRes.data.EUR?.rate) setBcvEurRate(Number(ratesRes.data.EUR.rate));
+        if (ratesRes.data.BINANCE?.rate) setBinanceRate(Number(ratesRes.data.BINANCE.rate));
         if (ratesRes.data.value_date) setBcvValueDate(ratesRes.data.value_date);
       }
     } catch (err: any) {
@@ -119,6 +123,7 @@ export const CurrencyConfig: React.FC = () => {
         officialCurrency,
         manualRate: manualVal || 36.50,
         exchangeRate: effectiveRate,
+        showBinanceRate,
       },
     };
 
@@ -133,6 +138,8 @@ export const CurrencyConfig: React.FC = () => {
               rate: effectiveRate,
               usdRate: bcvUsdRate,
               eurRate: bcvEurRate,
+              binanceRate,
+              showBinanceRate,
               manualRate: manualVal,
               mode: rateMode,
               officialCurrency,
@@ -355,6 +362,38 @@ export const CurrencyConfig: React.FC = () => {
           >
             Bolívares Digitales (VES)
           </button>
+        </div>
+      </div>
+
+      {/* Visibilidad de Tasa Binance P2P en el Header */}
+      <div className="pt-4 border-t border-slate-100">
+        <div className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-2xs hover:border-amber-200 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 font-black text-xs">
+                ₮
+              </span>
+              <span className="text-xs font-bold text-slate-900">
+                Mostrar Tasa Binance P2P en la Barra Superior
+              </span>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                Bs. {binanceRate.toFixed(2)}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500">
+              Al activar esta opción, los usuarios verán la cotización en vivo de Binance P2P (USDT/VES) en el header junto al dólar y euro BCV.
+            </p>
+          </div>
+
+          <label className="relative inline-flex items-center cursor-pointer shrink-0">
+            <input
+              type="checkbox"
+              checked={showBinanceRate}
+              onChange={(e) => setShowBinanceRate(e.target.checked)}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+          </label>
         </div>
       </div>
 

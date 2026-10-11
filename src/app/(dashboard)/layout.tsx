@@ -28,6 +28,8 @@ export default function DashboardLayout({
   const [isOnline, setIsOnline] = useState(true);
   const [bcvUsdRate, setBcvUsdRate] = useState<number>(772.54);
   const [bcvEurRate, setBcvEurRate] = useState<number>(894.49);
+  const [binanceRate, setBinanceRate] = useState<number>(1013.50);
+  const [showBinanceRate, setShowBinanceRate] = useState<boolean>(false);
   const [currencyMode, setCurrencyMode] = useState<string>('BCV');
   const [manualRate, setManualRate] = useState<number>(780.00);
 
@@ -122,12 +124,13 @@ export default function DashboardLayout({
   useEffect(() => {
     const fetchRates = async () => {
       try {
-        // 1. Obtener tasas maestras del backend (actualizadas por cronjob BCV o superadmin)
+        // 1. Obtener tasas maestras del backend (actualizadas por cronjob BCV/Binance o superadmin)
         const bcvRes = await apiClient.get('/auth/bcv/rate');
         if (bcvRes.data) {
           if (bcvRes.data.USD?.rate) setBcvUsdRate(Number(bcvRes.data.USD.rate));
           else if (bcvRes.data.rate) setBcvUsdRate(Number(bcvRes.data.rate));
           if (bcvRes.data.EUR?.rate) setBcvEurRate(Number(bcvRes.data.EUR.rate));
+          if (bcvRes.data.BINANCE?.rate) setBinanceRate(Number(bcvRes.data.BINANCE.rate));
         }
 
         // 2. Obtener configuración de la empresa
@@ -139,15 +142,19 @@ export default function DashboardLayout({
         if (settings.manualRate) {
           setManualRate(Number(settings.manualRate));
         }
+        setShowBinanceRate(!!settings.showBinanceRate);
 
         const usdR = bcvRes?.data?.USD?.rate ? Number(bcvRes.data.USD.rate) : (bcvRes?.data?.rate ? Number(bcvRes.data.rate) : undefined);
         const eurR = bcvRes?.data?.EUR?.rate ? Number(bcvRes.data.EUR.rate) : undefined;
+        const binanceR = bcvRes?.data?.BINANCE?.rate ? Number(bcvRes.data.BINANCE.rate) : undefined;
         if (typeof window !== 'undefined' && usdR) {
           window.dispatchEvent(
             new CustomEvent('exchange-rate-updated', {
               detail: {
                 usdRate: usdR,
                 eurRate: eurR,
+                binanceRate: binanceR,
+                showBinanceRate: !!settings.showBinanceRate,
                 manualRate: settings.manualRate ? Number(settings.manualRate) : undefined,
                 mode: settings.currencyMode || 'BCV_USD',
               },
@@ -211,6 +218,8 @@ export default function DashboardLayout({
         if (customEvent.detail) {
           if (typeof customEvent.detail.usdRate === 'number') setBcvUsdRate(customEvent.detail.usdRate);
           if (typeof customEvent.detail.eurRate === 'number') setBcvEurRate(customEvent.detail.eurRate);
+          if (typeof customEvent.detail.binanceRate === 'number') setBinanceRate(customEvent.detail.binanceRate);
+          if (typeof customEvent.detail.showBinanceRate === 'boolean') setShowBinanceRate(customEvent.detail.showBinanceRate);
           if (typeof customEvent.detail.rate === 'number' && !customEvent.detail.usdRate) {
             if (customEvent.detail.officialCurrency === 'EUR') {
               setBcvEurRate(customEvent.detail.rate);
@@ -413,6 +422,19 @@ export default function DashboardLayout({
                     BCV
                   </span>
                 </div>
+
+                {/* Badge Tasa Binance P2P (Condicional según configuración) */}
+                {showBinanceRate && (
+                  <div className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg bg-white border border-amber-200 text-amber-800 shadow-2xs group-hover:border-amber-300 transition-all animate-in fade-in duration-200">
+                    <span className="text-[10px] font-black text-amber-600">₮</span>
+                    <span className="font-mono text-xs font-black text-slate-800">
+                      {binanceRate.toFixed(2)}
+                    </span>
+                    <span className="text-[9px] uppercase tracking-tighter text-amber-700 font-bold ml-0.5 hidden md:inline-block">
+                      Binance
+                    </span>
+                  </div>
+                )}
               </Link>
 
               {/* 💳 Badge Cuentas por Pagar (CxP) */}
