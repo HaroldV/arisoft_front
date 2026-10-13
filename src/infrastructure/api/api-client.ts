@@ -62,6 +62,7 @@ apiClient.interceptors.response.use(
       // Avoid looping or attempting refresh for auth endpoints (login, register, refresh)
       if (
         originalRequest.url?.includes('/auth/login') ||
+        originalRequest.url?.includes('/auth/employee-login') ||
         originalRequest.url?.includes('/auth/register') ||
         originalRequest.url?.includes('/auth/refresh')
       ) {

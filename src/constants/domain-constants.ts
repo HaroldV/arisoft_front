@@ -138,6 +138,130 @@ export const STOCK_LEVEL_FILTERS = {
 
 export type StockLevelFilter = typeof STOCK_LEVEL_FILTERS[keyof typeof STOCK_LEVEL_FILTERS];
 
+export const SYSTEM_ROLES = {
+  OWNER: 'OWNER',
+  MANAGER: 'MANAGER',
+  SUPERVISOR: 'SUPERVISOR',
+  CASHIER: 'CASHIER',
+  SUPER_ADMIN: 'SUPER_ADMIN',
+} as const;
+
+export type SystemRole = typeof SYSTEM_ROLES[keyof typeof SYSTEM_ROLES];
+
+export const SYSTEM_PERMISSIONS = {
+  // 1. Módulo POS
+  POS_CREATE: 'pos:create',
+  POS_DISCOUNT: 'pos:discount',
+  POS_REFUND: 'pos:refund',
+  POS_SHIFTS: 'pos:shifts',
+  SALES_INVOICING: 'sales:invoicing',
+  CLIENTS_MANAGE: 'clients:manage',
+
+  // 2. Módulo Ventas
+  SALES_QUOTATIONS: 'sales:quotations',
+  SALES_ORDERS: 'sales:orders',
+  SALES_DELIVERIES: 'sales:deliveries',
+
+  // 3. Módulo Compras
+  PURCHASES_NEW: 'purchases:new',
+  PURCHASES_ORDERS: 'purchases:orders',
+  PURCHASES_RECEPTIONS: 'purchases:receptions',
+  PURCHASES_INVOICES: 'purchases:invoices',
+  PROVIDERS_MANAGE: 'providers:manage',
+
+  // 4. Módulo Inventario
+  INVENTORY_CREATE: 'inventory:create',
+  INVENTORY_STOCK: 'inventory:stock',
+  INVENTORY_VIEW: 'inventory:view',
+  INVENTORY_WRITE: 'inventory:write',
+  INVENTORY_ADJUST: 'inventory:adjust',
+  INVENTORY_WAREHOUSE: 'inventory:warehouse',
+  INVENTORY_CATEGORIES: 'inventory:categories',
+  INVENTORY_MOVES: 'inventory:moves',
+  INVENTORY_BULK_PRICES: 'inventory:bulk_prices',
+  INVENTORY_VALUATION: 'inventory:valuation',
+
+  // 5. Módulo Cuentas y Finanzas
+  BANKS_ACCOUNTS: 'banks:accounts',
+  BANKS_LEDGER: 'banks:ledger',
+  BANKS_SHIFTS: 'banks:shifts',
+  ACCOUNTS_RECEIVABLES: 'accounts:receivables',
+  ACCOUNTS_PAYABLES: 'accounts:payables',
+  ACCOUNTS_HISTORY: 'accounts:history',
+
+  // 6. Módulo Nómina & RRHH
+  PAYROLL_MANAGE: 'payroll:manage',
+  PAYROLL_FORMULAS: 'payroll:formulas',
+
+  // 7. Módulo Reportes
+  REPORTS_VIEW: 'reports:view',
+
+  // 8. Módulo Configuración de Empresa
+  COMPANY_MANAGE: 'company:manage',
+  BRANCHES_MANAGE: 'branches:manage',
+  FISCAL_MANAGE: 'fiscal:manage',
+  USERS_MANAGE: 'users:manage',
+  SETTINGS_SECURITY: 'settings:security',
+} as const;
+
+export type SystemPermission = typeof SYSTEM_PERMISSIONS[keyof typeof SYSTEM_PERMISSIONS];
+
+export const ROLE_PRESET_PERMISSIONS = {
+  SELLER: [
+    SYSTEM_PERMISSIONS.POS_CREATE,
+    SYSTEM_PERMISSIONS.POS_SHIFTS,
+    SYSTEM_PERMISSIONS.SALES_INVOICING,
+    SYSTEM_PERMISSIONS.CLIENTS_MANAGE,
+    SYSTEM_PERMISSIONS.INVENTORY_STOCK,
+    SYSTEM_PERMISSIONS.SALES_QUOTATIONS,
+    SYSTEM_PERMISSIONS.SALES_ORDERS,
+  ],
+  SUPERVISOR: [
+    SYSTEM_PERMISSIONS.POS_CREATE,
+    SYSTEM_PERMISSIONS.POS_SHIFTS,
+    SYSTEM_PERMISSIONS.SALES_INVOICING,
+    SYSTEM_PERMISSIONS.CLIENTS_MANAGE,
+    SYSTEM_PERMISSIONS.INVENTORY_STOCK,
+    SYSTEM_PERMISSIONS.INVENTORY_MOVES,
+    SYSTEM_PERMISSIONS.INVENTORY_ADJUST,
+    SYSTEM_PERMISSIONS.INVENTORY_CATEGORIES,
+    SYSTEM_PERMISSIONS.SALES_QUOTATIONS,
+    SYSTEM_PERMISSIONS.SALES_ORDERS,
+    SYSTEM_PERMISSIONS.SALES_DELIVERIES,
+    SYSTEM_PERMISSIONS.ACCOUNTS_RECEIVABLES,
+    SYSTEM_PERMISSIONS.REPORTS_VIEW,
+  ],
+  MANAGER: [
+    SYSTEM_PERMISSIONS.POS_CREATE,
+    SYSTEM_PERMISSIONS.POS_SHIFTS,
+    SYSTEM_PERMISSIONS.SALES_INVOICING,
+    SYSTEM_PERMISSIONS.CLIENTS_MANAGE,
+    SYSTEM_PERMISSIONS.SALES_QUOTATIONS,
+    SYSTEM_PERMISSIONS.SALES_ORDERS,
+    SYSTEM_PERMISSIONS.SALES_DELIVERIES,
+    SYSTEM_PERMISSIONS.PURCHASES_NEW,
+    SYSTEM_PERMISSIONS.PURCHASES_ORDERS,
+    SYSTEM_PERMISSIONS.PURCHASES_RECEPTIONS,
+    SYSTEM_PERMISSIONS.PURCHASES_INVOICES,
+    SYSTEM_PERMISSIONS.PROVIDERS_MANAGE,
+    SYSTEM_PERMISSIONS.INVENTORY_CREATE,
+    SYSTEM_PERMISSIONS.INVENTORY_STOCK,
+    SYSTEM_PERMISSIONS.INVENTORY_VIEW,
+    SYSTEM_PERMISSIONS.INVENTORY_WRITE,
+    SYSTEM_PERMISSIONS.INVENTORY_ADJUST,
+    SYSTEM_PERMISSIONS.INVENTORY_BULK_PRICES,
+    SYSTEM_PERMISSIONS.INVENTORY_VALUATION,
+    SYSTEM_PERMISSIONS.INVENTORY_WAREHOUSE,
+    SYSTEM_PERMISSIONS.INVENTORY_CATEGORIES,
+    SYSTEM_PERMISSIONS.INVENTORY_MOVES,
+    SYSTEM_PERMISSIONS.BANKS_ACCOUNTS,
+    SYSTEM_PERMISSIONS.ACCOUNTS_RECEIVABLES,
+    SYSTEM_PERMISSIONS.ACCOUNTS_PAYABLES,
+    SYSTEM_PERMISSIONS.ACCOUNTS_HISTORY,
+    SYSTEM_PERMISSIONS.REPORTS_VIEW,
+  ],
+} as const;
+
 export const RIF_TYPES = {
   JURIDICO: 'JURIDICO',
   NATURAL_V: 'NATURAL_V',
@@ -214,6 +338,8 @@ export const PLAN_DEFAULT_PERMISSIONS: Record<SaasPlanCode, string[]> = {
   [SAAS_PLAN_CODES.EMPRENDEDOR]: [
     // 1. Módulo Ventas (POS)
     'pos:create',
+    'pos:discount',
+    'pos:refund',
     'sales:invoicing',
     'clients:manage',
     // 2. Módulo Compras (INVENTORY_PURCHASES)
@@ -238,6 +364,8 @@ export const PLAN_DEFAULT_PERMISSIONS: Record<SaasPlanCode, string[]> = {
   ],
   [SAAS_PLAN_CODES.COMERCIAL_PRO]: [
     'pos:create',
+    'pos:discount',
+    'pos:refund',
     'sales:invoicing',
     'sales:quotations',
     'sales:orders',
@@ -271,6 +399,8 @@ export const PLAN_DEFAULT_PERMISSIONS: Record<SaasPlanCode, string[]> = {
   ],
   [SAAS_PLAN_CODES.CORPORATIVO]: [
     'pos:create',
+    'pos:discount',
+    'pos:refund',
     'sales:invoicing',
     'sales:quotations',
     'sales:orders',
