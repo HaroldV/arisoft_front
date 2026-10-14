@@ -2188,27 +2188,55 @@ export const PosInterface: React.FC = () => {
                   {/* Explicit breakdown of Base, Descuento, IVA and Tasa */}
                   <div className="pt-2 border-t border-indigo-100/80 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-600 bg-white/60 p-2.5 rounded-xl">
                     <div>
-                      <span className="text-[9px] uppercase font-bold text-slate-400 block">Subtotal Base:</span>
-                      <span className="font-mono font-bold text-slate-800">${subtotal.toFixed(2)}</span>
+                      <span className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Subtotal Base:</span>
+                      <span className="font-mono font-bold text-slate-800 text-xs">${subtotal.toFixed(2)}</span>
                     </div>
-                    {discountPercent > 0 ? (
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-rose-500 block">Desc. ({discountPercent}%):</span>
-                        <span className="font-mono font-bold text-rose-600">-${discountAmount.toFixed(2)}</span>
-                      </div>
-                    ) : (
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-slate-400 block">Descuento:</span>
-                        <span className="font-mono font-bold text-slate-500">$0.00</span>
-                      </div>
-                    )}
+
+                    {/* Descuento Editable en Modal */}
                     <div>
-                      <span className="text-[9px] uppercase font-bold text-slate-400 block">Impuesto (IVA):</span>
-                      <span className="font-mono font-bold text-slate-800">${taxAmount.toFixed(2)}</span>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-[9px] uppercase font-bold text-slate-400">Desc. (%):</span>
+                        {!canApplyDiscount && (
+                          <span className="text-[8px] text-slate-400 italic font-semibold">Bloqueado</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          disabled={!canApplyDiscount}
+                          value={discountPercent}
+                          onChange={(e) => setDiscountPercent(Math.min(100, Math.max(0, Number(e.target.value))))}
+                          className="w-14 text-center text-xs font-bold font-mono text-slate-800 bg-white border border-slate-200 rounded-lg py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 disabled:bg-slate-100"
+                        />
+                        {discountPercent > 0 && (
+                          <span className="font-mono text-[10px] font-bold text-rose-600">-${discountAmount.toFixed(2)}</span>
+                        )}
+                      </div>
                     </div>
+
                     <div>
-                      <span className="text-[9px] uppercase font-bold text-slate-400 block">Tasa BCV:</span>
-                      <span className="font-mono font-bold text-indigo-700">Bs. {exchangeRate.toFixed(2)}</span>
+                      <span className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Impuesto (IVA):</span>
+                      <span className="font-mono font-bold text-slate-800 text-xs">${taxAmount.toFixed(2)}</span>
+                    </div>
+
+                    {/* Tasa Editable en Modal */}
+                    <div>
+                      <span className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Tasa Cambio (Bs.):</span>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          value={exchangeRate}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            if (val >= 0) setExchangeRate(val);
+                          }}
+                          className="w-20 text-center text-xs font-bold font-mono text-indigo-700 bg-white border border-indigo-200 rounded-lg py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
