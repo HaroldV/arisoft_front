@@ -786,14 +786,16 @@ export function useSuperAdminData() {
         setNewTenantPassword(createdPassword);
       }
     } catch (err: any) {
-      const backendMessage = err?.response?.data?.message;
+      const backendMessage = Array.isArray(err?.response?.data?.message)
+        ? err.response.data.message.join(', ')
+        : err?.response?.data?.message;
       const status = err?.response?.status;
       if (status === 409) {
         setModalError(backendMessage || 'El RIF o el email ya están registrados en la plataforma.');
       } else if (status === 400) {
         setModalError(backendMessage || 'Datos inválidos. Verifica los campos requeridos.');
       } else {
-        setModalError('Error al guardar la empresa. Intenta de nuevo.');
+        setModalError(backendMessage || 'Error al guardar la empresa. Intenta de nuevo.');
       }
     } finally {
       setIsSaving(false);
