@@ -347,42 +347,43 @@ export default function DashboardLayout({
       )}>
         <SandboxBanner />
         {/* Top Header con Breadcrumb y Monitor de Divisas Proporcional y Responsivo */}
-        <header className="h-16 bg-white border-b border-slate-200/80 flex items-center justify-between px-3 sm:px-6 lg:px-8 sticky top-0 z-30 shadow-2xs gap-2 min-w-0">
+        {/* Header - Aumentado de tamaño y presencia ejecutiva según diseño Sally */}
+        <header className="h-18 sm:h-20 bg-white border-b border-slate-200/80 flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-30 shadow-2xs gap-3 min-w-0 transition-all">
           
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
             {/* Botón Toggle en Cabecera (Accesible en todos los dispositivos) */}
             <button
               onClick={() => setIsSidebarOpen(prev => !prev)}
-              className="p-2 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50/80 active:scale-95 transition-all border border-slate-200/80 shadow-2xs cursor-pointer shrink-0 flex items-center justify-center group"
+              className="p-2.5 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50/80 active:scale-95 transition-all border border-slate-200/80 shadow-2xs cursor-pointer shrink-0 flex items-center justify-center group"
               aria-label="Alternar menú de navegación"
               title={isSidebarOpen ? "Colapsar menú lateral" : "Expandir menú lateral"}
             >
-              <Menu className="w-4.5 h-4.5 text-slate-600 group-hover:text-indigo-600 transition-colors" />
+              <Menu className="w-5 h-5 text-slate-600 group-hover:text-indigo-600 transition-colors" />
             </button>
 
             {/* 🧭 Breadcrumb Dinámico Adaptativo */}
-            <nav className="flex items-center gap-1 sm:gap-1.5 text-xs text-slate-500 overflow-x-auto py-1 scrollbar-hide min-w-0">
+            <nav className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-slate-500 overflow-x-auto py-1 scrollbar-hide min-w-0">
               <Link 
                 href="/" 
                 className="flex items-center gap-1 font-semibold text-slate-400 hover:text-[#0B2C4D] transition-colors shrink-0"
                 title="Ir al Inicio"
               >
-                <Home className="w-3.5 h-3.5 text-slate-400" />
+                <Home className="w-4 h-4 text-slate-400" />
               </Link>
 
               {breadcrumbs.slice(1).map((crumb, idx) => {
                 const isLast = idx === breadcrumbs.slice(1).length - 1;
                 return (
-                  <div key={crumb.href + idx} className="flex items-center gap-1 sm:gap-1.5 shrink-0 min-w-0">
-                    <ChevronRight className="w-3 h-3 text-slate-300 stroke-[2.5] shrink-0" />
+                  <div key={crumb.href + idx} className="flex items-center gap-1.5 sm:gap-2 shrink-0 min-w-0">
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-300 stroke-[2.5] shrink-0" />
                     {isLast ? (
-                      <span className="font-bold text-slate-800 bg-slate-100/80 px-2 py-0.5 rounded-md truncate max-w-[110px] xs:max-w-[150px] sm:max-w-[200px] md:max-w-none">
+                      <span className="font-bold text-slate-800 bg-slate-100/90 px-2.5 py-1 rounded-lg truncate max-w-[120px] xs:max-w-[160px] sm:max-w-[220px] md:max-w-none shadow-2xs">
                         {crumb.label}
                       </span>
                     ) : (
                       <Link 
                         href={crumb.href} 
-                        className="font-medium text-slate-500 hover:text-[#0B2C4D] transition-colors truncate max-w-[80px] xs:max-w-[120px] sm:max-w-none hidden sm:inline"
+                        className="font-medium text-slate-500 hover:text-[#0B2C4D] transition-colors truncate max-w-[90px] xs:max-w-[130px] sm:max-w-none hidden sm:inline"
                       >
                         {crumb.label}
                       </Link>
@@ -394,43 +395,43 @@ export default function DashboardLayout({
           </div>
 
           {/* 💱 Monitor Dual de Divisas & Badges de Tesorería (BCV USD + BCV EUR + CxP + CxC) */}
-          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3.5 shrink-0">
+            <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
               <Link 
                 href="/settings/company" 
-                className="flex items-center gap-1.5 select-none group cursor-pointer bg-slate-50 hover:bg-slate-100/80 p-1 rounded-xl border border-slate-200/70 transition-all shadow-2xs"
+                className="flex items-center gap-1.5 sm:gap-2 select-none group cursor-pointer bg-slate-50/90 hover:bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/80 transition-all shadow-2xs"
                 title="Tasas oficiales vigentes del Banco Central de Venezuela (BCV). Clic para configurar."
               >
                 {/* Badge Tasa BCV USD */}
-                <div className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg bg-white border border-emerald-100 text-emerald-800 shadow-2xs group-hover:border-emerald-200 transition-all">
-                  <span className="text-[10px] font-black text-emerald-600">$</span>
-                  <span className="font-mono text-xs font-black text-slate-800">
+                <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white border border-emerald-100/90 text-emerald-800 shadow-2xs group-hover:border-emerald-300 transition-all">
+                  <span className="text-xs sm:text-sm font-black text-emerald-600 leading-none">$</span>
+                  <span className="font-mono text-xs sm:text-sm font-black text-slate-900 tracking-tight leading-none">
                     {currencyMode === 'MANUAL' ? manualRate.toFixed(2) : bcvUsdRate.toFixed(2)}
                   </span>
-                  <span className="text-[9px] uppercase tracking-tighter text-slate-400 font-bold ml-0.5 hidden md:inline-block">
+                  <span className="text-[10px] sm:text-xs uppercase tracking-tight text-slate-400 font-bold ml-0.5 hidden md:inline-block leading-none">
                     {currencyMode === 'MANUAL' ? 'Manual' : 'BCV'}
                   </span>
                 </div>
 
                 {/* Badge Tasa BCV EUR */}
-                <div className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg bg-white border border-blue-100 text-blue-800 shadow-2xs group-hover:border-blue-200 transition-all">
-                  <span className="text-[10px] font-black text-blue-600">€</span>
-                  <span className="font-mono text-xs font-black text-slate-800">
+                <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white border border-blue-100/90 text-blue-800 shadow-2xs group-hover:border-blue-300 transition-all">
+                  <span className="text-xs sm:text-sm font-black text-blue-600 leading-none">€</span>
+                  <span className="font-mono text-xs sm:text-sm font-black text-slate-900 tracking-tight leading-none">
                     {bcvEurRate.toFixed(2)}
                   </span>
-                  <span className="text-[9px] uppercase tracking-tighter text-slate-400 font-bold ml-0.5 hidden md:inline-block">
+                  <span className="text-[10px] sm:text-xs uppercase tracking-tight text-slate-400 font-bold ml-0.5 hidden md:inline-block leading-none">
                     BCV
                   </span>
                 </div>
 
                 {/* Badge Tasa Binance P2P (Condicional según configuración) */}
                 {showBinanceRate && (
-                  <div className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg bg-white border border-amber-200 text-amber-800 shadow-2xs group-hover:border-amber-300 transition-all animate-in fade-in duration-200">
-                    <span className="text-[10px] font-black text-amber-600">₮</span>
-                    <span className="font-mono text-xs font-black text-slate-800">
+                  <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white border border-amber-200 text-amber-800 shadow-2xs group-hover:border-amber-300 transition-all animate-in fade-in duration-200">
+                    <span className="text-xs sm:text-sm font-black text-amber-600 leading-none">₮</span>
+                    <span className="font-mono text-xs sm:text-sm font-black text-slate-900 tracking-tight leading-none">
                       {binanceRate.toFixed(2)}
                     </span>
-                    <span className="text-[9px] uppercase tracking-tighter text-amber-700 font-bold ml-0.5 hidden md:inline-block">
+                    <span className="text-[10px] sm:text-xs uppercase tracking-tight text-amber-700 font-bold ml-0.5 hidden md:inline-block leading-none">
                       Binance
                     </span>
                   </div>
@@ -441,16 +442,16 @@ export default function DashboardLayout({
               {user?.permissions?.includes('accounts:payables') && (
                 <Link
                   href="/accounts/payables"
-                  className="hidden sm:flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-rose-50/90 hover:bg-rose-100/80 border border-rose-200 text-rose-700 transition-all shadow-2xs cursor-pointer group"
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50/90 hover:bg-rose-100/80 border border-rose-200 text-rose-700 transition-all shadow-2xs cursor-pointer group"
                   title={`Cuentas por Pagar Pendientes: ${cxpPendingCount} facturas ($${cxpPendingTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
                 >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-rose-600 group-hover:scale-110 transition-transform" />
-                  <div className="flex items-center gap-1 text-[11px] font-bold">
+                  <FileSpreadsheet className="w-4 h-4 text-rose-600 group-hover:scale-110 transition-transform" />
+                  <div className="flex items-center gap-1.5 text-xs font-bold leading-none">
                     <span className="text-rose-900">CxP:</span>
-                    <span className="px-1.5 py-0.2 bg-rose-200/80 text-rose-900 rounded-full font-mono text-[10px] font-black">
+                    <span className="px-2 py-0.5 bg-rose-200/80 text-rose-900 rounded-full font-mono text-xs font-black">
                       {cxpPendingCount}
                     </span>
-                    <span className="font-mono text-rose-800 hidden lg:inline">
+                    <span className="font-mono text-rose-800 hidden lg:inline font-bold">
                       ${cxpPendingTotal.toFixed(0)}
                     </span>
                   </div>
@@ -461,16 +462,16 @@ export default function DashboardLayout({
               {user?.permissions?.includes('accounts:receivables') && (
                 <Link
                   href="/accounts/receivables"
-                  className="hidden sm:flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-emerald-50/90 hover:bg-emerald-100/80 border border-emerald-200 text-emerald-700 transition-all shadow-2xs cursor-pointer group"
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50/90 hover:bg-emerald-100/80 border border-emerald-200 text-emerald-700 transition-all shadow-2xs cursor-pointer group"
                   title={`Cuentas por Cobrar Pendientes: ${cxcPendingCount} cuentas ($${cxcPendingTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
                 >
-                  <Wallet className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
-                  <div className="flex items-center gap-1 text-[11px] font-bold">
+                  <Wallet className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform" />
+                  <div className="flex items-center gap-1.5 text-xs font-bold leading-none">
                     <span className="text-emerald-900">CxC:</span>
-                    <span className="px-1.5 py-0.2 bg-emerald-200/80 text-emerald-900 rounded-full font-mono text-[10px] font-black">
+                    <span className="px-2 py-0.5 bg-emerald-200/80 text-emerald-900 rounded-full font-mono text-xs font-black">
                       {cxcPendingCount}
                     </span>
-                    <span className="font-mono text-emerald-800 hidden lg:inline">
+                    <span className="font-mono text-emerald-800 hidden lg:inline font-bold">
                       ${cxcPendingTotal.toFixed(0)}
                     </span>
                   </div>
@@ -480,24 +481,24 @@ export default function DashboardLayout({
 
             {/* Offline Alert Badge if connection lost */}
             {!isOnline && (
-              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold animate-pulse">
-                <WifiOff className="h-3.5 w-3.5" />
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold animate-pulse">
+                <WifiOff className="h-4 w-4" />
                 <span className="hidden md:inline">Offline</span>
               </div>
             )}
 
             <button 
-              className="p-1.5 sm:p-2 text-slate-400 hover:text-[#0B2C4D] hover:bg-slate-100 rounded-xl transition-all relative cursor-pointer"
+              className="p-2 sm:p-2.5 text-slate-400 hover:text-[#0B2C4D] hover:bg-slate-100 rounded-xl transition-all relative cursor-pointer"
               title="Notificaciones del Sistema"
             >
-              <Bell className="h-4 w-4" />
-              <span className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 h-1.5 w-1.5 bg-emerald-500 rounded-full"></span>
+              <Bell className="h-4.5 w-4.5" />
+              <span className="absolute top-2 right-2 sm:top-2.5 sm:right-2.5 h-2 w-2 bg-emerald-500 rounded-full ring-2 ring-white"></span>
             </button>
 
-            <div className="h-5 sm:h-6 w-px bg-slate-200"></div>
+            <div className="h-6 sm:h-7 w-px bg-slate-200"></div>
 
             <div className="flex items-center cursor-pointer group" title={user.full_name}>
-              <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-xl bg-slate-100 group-hover:bg-indigo-50 flex items-center justify-center text-[#0B2C4D] font-black text-xs border border-slate-200 group-hover:border-indigo-300 transition-all shadow-2xs">
+              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-slate-100 group-hover:bg-indigo-50 flex items-center justify-center text-[#0B2C4D] font-black text-xs sm:text-sm border border-slate-200 group-hover:border-indigo-300 transition-all shadow-2xs">
                 {getInitials(user.full_name)}
               </div>
             </div>
