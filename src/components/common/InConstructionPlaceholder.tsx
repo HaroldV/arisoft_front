@@ -15,7 +15,7 @@ interface InConstructionPlaceholderProps {
 
 export const InConstructionPlaceholder: React.FC<InConstructionPlaceholderProps> = ({
   title,
-  subtitle = 'Módulo en desarrollo para el ERP ARI',
+  subtitle = 'Módulo en desarrollo para Arivsoft',
   description = 'Esta funcionalidad se encuentra en fase activa de diseño e implementación. Estará disponible en una próxima actualización de la plataforma.',
   badgeText = 'Próximamente',
   returnHref = '/',

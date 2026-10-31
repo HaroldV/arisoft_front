@@ -35,7 +35,7 @@ export function exportToStyledExcel(options: ExcelExportOptions) {
  xmlns:html="http://www.w3.org/TR/REC-html40">
  <DocumentProperties xmlns="urn:schemas-microsoft-com:office:office">
   <Title>${title}</Title>
-  <Author>ERP ARI - Business Intelligence</Author>
+  <Author>Arivsoft - Business Intelligence</Author>
   <Created>${new Date().toISOString()}</Created>
  </DocumentProperties>
  <Styles>

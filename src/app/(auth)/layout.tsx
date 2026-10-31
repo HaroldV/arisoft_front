@@ -35,7 +35,7 @@ export default function AuthLayout({
               priority 
             />
             <span className="text-xs font-black uppercase tracking-widest text-indigo-900 border-l border-slate-200 pl-3 group-hover:text-indigo-600 transition-colors">
-              ERP ARI
+              Arivsoft
             </span>
           </Link>
         </div>

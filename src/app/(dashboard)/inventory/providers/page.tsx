@@ -18,13 +18,15 @@ import {
   MapPin,
   Map,
   ShieldAlert,
-  Truck
+  Truck,
+  FileSpreadsheet
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import { VENEZUELAN_STATES, TAXPAYER_TYPES } from '@/constants/venezuela';
 import { ActionTooltip } from '@/components/ActionTooltip';
 import { RifInput } from '@/components/RifInput';
 import { SearchableSelect } from '@/components/SearchableSelect';
+import { BulkImportModal } from '@/components/common/subcomponents/BulkImportModal';
 
 interface Provider {
   id: string;
@@ -50,6 +52,7 @@ export default function ProvidersPage() {
 
   // Modal control
   const [isOpen, setIsOpen] = useState(false);
+  const [isBulkOpen, setIsBulkOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -276,13 +279,23 @@ export default function ProvidersPage() {
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Proveedores</h1>
           <p className="text-slate-500">Administra el catálogo de proveedores asociados a las compras de productos.</p>
         </div>
-        <button
-          onClick={handleOpenAdd}
-          className="flex items-center gap-1.5 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-primary-600/10 hover:shadow-lg cursor-pointer"
-        >
-          <Plus className="h-4.5 w-4.5" />
-          Registrar Proveedor
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={() => setIsBulkOpen(true)}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-sm font-semibold rounded-xl transition-all cursor-pointer shadow-2xs"
+            title="Importar lista de proveedores mediante archivo Excel"
+          >
+            <FileSpreadsheet className="h-4.5 w-4.5 text-indigo-600" />
+            Carga Masiva (Excel)
+          </button>
+          <button
+            onClick={handleOpenAdd}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-primary-600/10 hover:shadow-lg cursor-pointer"
+          >
+            <Plus className="h-4.5 w-4.5" />
+            Registrar Proveedor
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -621,6 +634,15 @@ export default function ProvidersPage() {
           </div>
         </div>
       )}
+      {/* Bulk Import Modal */}
+      <BulkImportModal
+        isOpen={isBulkOpen}
+        onClose={() => setIsBulkOpen(false)}
+        onSuccess={() => {
+          fetchProviders(search);
+        }}
+        partyType="provider"
+      />
     </div>
   );
 }

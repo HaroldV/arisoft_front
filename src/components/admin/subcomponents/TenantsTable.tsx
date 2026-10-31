@@ -120,13 +120,24 @@ export const TenantsTable: React.FC<TenantsTableProps> = ({
                     </div>
                   </div>
 
-                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 border shrink-0 ${
-                    t.status === TENANT_STATUS.ACTIVE
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                      : 'bg-slate-100 text-slate-600 border-slate-200'
-                  }`}>
-                    {t.status === TENANT_STATUS.ACTIVE ? 'Activa' : 'Inactiva'}
-                  </span>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 border ${
+                      t.status === TENANT_STATUS.ACTIVE
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                        : 'bg-slate-100 text-slate-600 border-slate-200'
+                    }`}>
+                      {t.status === TENANT_STATUS.ACTIVE ? 'Activa' : 'Inactiva'}
+                    </span>
+                    {t.status === TENANT_STATUS.ACTIVE && (
+                      <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-md border ${
+                        t.plan_is_active
+                          ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                      }`} title={t.plan_is_active ? `Vence: ${t.subscription_expires_at || 'Sin fecha'}` : 'Requiere pago de plan'}>
+                        {t.plan_is_active ? 'Plan Activo' : 'Requiere Pago'}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="bg-slate-50/80 border border-slate-100/90 rounded-2xl p-3.5 grid grid-cols-3 gap-2 text-center">
@@ -281,13 +292,24 @@ export const TenantsTable: React.FC<TenantsTableProps> = ({
                     </div>
                   </td>
                   <td className="py-3.5 px-4 text-center">
-                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
-                      t.status === TENANT_STATUS.ACTIVE
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                        : 'bg-slate-100 text-slate-600 border-slate-200'
-                    }`}>
-                      {t.status === TENANT_STATUS.ACTIVE ? 'Activa' : 'Inactiva'}
-                    </span>
+                    <div className="flex flex-col items-center gap-1">
+                      <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                        t.status === TENANT_STATUS.ACTIVE
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                          : 'bg-slate-100 text-slate-600 border-slate-200'
+                      }`}>
+                        {t.status === TENANT_STATUS.ACTIVE ? 'Activa' : 'Inactiva'}
+                      </span>
+                      {t.status === TENANT_STATUS.ACTIVE && (
+                        <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-md border ${
+                          t.plan_is_active
+                            ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                        }`} title={t.plan_is_active ? `Vence: ${t.subscription_expires_at || 'Sin fecha'}` : 'Requiere pago de plan'}>
+                          {t.plan_is_active ? 'Plan Activo' : 'Requiere Pago'}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3.5 px-4 text-right">
                     <div className="flex items-center justify-end gap-1">

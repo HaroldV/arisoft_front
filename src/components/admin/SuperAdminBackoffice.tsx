@@ -60,6 +60,7 @@ export interface TenantCompany {
   subdomain: string;
   plan_name: string;
   status: 'ACTIVE' | 'SUSPENDED';
+  plan_is_active?: boolean;
   user_count: number;
   inactive_user_count?: number;
   max_users: number;
@@ -125,6 +126,8 @@ export default function SuperAdminBackoffice() {
     planModalError,
     formPlan,
     formStatus, setFormStatus,
+    formPlanIsActive, setFormPlanIsActive,
+    formSubscriptionExpiresAt, setFormSubscriptionExpiresAt,
     formMaxUsers, setFormMaxUsers,
     formMaxProducts, setFormMaxProducts,
     formMonthlyFee, setFormMonthlyFee,
@@ -652,6 +655,10 @@ export default function SuperAdminBackoffice() {
         onSelectPlan={handleSelectPlanInForm}
         status={formStatus}
         setStatus={setFormStatus}
+        planIsActive={formPlanIsActive}
+        setPlanIsActive={setFormPlanIsActive}
+        subscriptionExpiresAt={formSubscriptionExpiresAt}
+        setSubscriptionExpiresAt={setFormSubscriptionExpiresAt}
         maxUsers={formMaxUsers}
         setMaxUsers={setFormMaxUsers}
         maxProducts={formMaxProducts}

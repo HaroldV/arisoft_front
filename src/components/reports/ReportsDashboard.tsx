@@ -344,7 +344,7 @@ export default function ReportsDashboard() {
     exportToStyledExcel({
       fileName: `Reporte_Ventas_ERP_ARI_${new Date().toISOString().split('T')[0]}`,
       sheetName: 'Ventas_Consolidadas',
-      title: 'ERP ARI — Reporte Gerencial de Ventas Facturadas',
+      title: 'Arivsoft — Reporte Gerencial de Ventas Facturadas',
       subtitle: `Rango: ${timeRange} | Cajero: ${selectedCashier} | Tasa Oficial: Bs. ${exchangeRate.toFixed(2)}`,
       columns: [
         { header: '#', key: 'index', width: 40, type: 'number' },
@@ -382,7 +382,7 @@ export default function ReportsDashboard() {
     exportToStyledExcel({
       fileName: `Reporte_Compras_Proveedores_${new Date().toISOString().split('T')[0]}`,
       sheetName: 'Compras_Proveedores',
-      title: 'ERP ARI — Reporte Gerencial de Compras y Reabastecimiento',
+      title: 'Arivsoft — Reporte Gerencial de Compras y Reabastecimiento',
       subtitle: `Rango: ${timeRange} | Total Egresos: $${totalPurchasesUsd.toFixed(2)} USD`,
       columns: [
         { header: '#', key: 'index', width: 40, type: 'number' },
@@ -417,9 +417,9 @@ export default function ReportsDashboard() {
     }));
 
     exportToStyledExcel({
-      fileName: `Ranking_Proveedores_ERP_ARI_${new Date().toISOString().split('T')[0]}`,
+      fileName: `Ranking_Proveedores_Arivsoft_${new Date().toISOString().split('T')[0]}`,
       sheetName: 'Ranking_Proveedores',
-      title: 'ERP ARI — Evaluación y Scoring de Proveedores',
+      title: 'Arivsoft — Evaluación y Scoring de Proveedores',
       subtitle: 'Análisis de volumen de compra, recurrencia semanal y mejores costos unitarios',
       columns: [
         { header: '#', key: 'index', width: 40, type: 'number' },
@@ -450,7 +450,7 @@ export default function ReportsDashboard() {
     exportToStyledExcel({
       fileName: `Matriz_Productos_Rentabilidad_${new Date().toISOString().split('T')[0]}`,
       sheetName: 'Matriz_Productos',
-      title: 'ERP ARI — Matriz de Rentabilidad y Rotación de Productos',
+      title: 'Arivsoft — Matriz de Rentabilidad y Rotación de Productos',
       subtitle: 'Catálogo de Inventario, Costo vs. Precio de Venta y Margen de Utilidad',
       columns: [
         { header: '#', key: 'index', width: 40, type: 'number' },

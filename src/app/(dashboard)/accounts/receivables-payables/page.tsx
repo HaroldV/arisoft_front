@@ -1,7 +1,7 @@
 import ReceivablesPayables from '@/components/accounts/ReceivablesPayables';
 
 export const metadata = {
-  title: 'Cuentas por Cobrar y Pagar | ERP ARI',
+  title: 'Cuentas por Cobrar y Pagar | Arivsoft',
   description: 'Gestión inteligente de deudas, acreedores, abonado multimoneda e importación masiva desde Excel.',
 };
 
