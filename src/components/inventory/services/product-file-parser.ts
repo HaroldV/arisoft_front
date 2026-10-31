@@ -115,6 +115,24 @@ export function parseProductFile(dataBuffer: ArrayBuffer | Uint8Array, selectedS
     const row = rawRows[r] || [];
     const rowStr = row.map(c => cleanString(c).toLowerCase()).join(' | ');
 
+    if (rowStr.includes('sku') || ((rowStr.includes('codigo') || rowStr.includes('código')) && (rowStr.includes('name') || rowStr.includes('nombre') || rowStr.includes('producto') || rowStr.includes('descripc')))) {
+      headerRowIndex = r;
+      detectedFormat = 'STANDARD_COLUMNS';
+      row.forEach((colVal, cIdx) => {
+        const val = cleanString(colVal).toLowerCase();
+        if (val === 'sku' || val.includes('codigo') || val.includes('código')) colIndexes.sku = cIdx;
+        if (val.includes('name') || val.includes('nombre') || val.includes('producto') || val.includes('descripc')) colIndexes.name = cIdx;
+        if (val.includes('categor')) colIndexes.category = cIdx;
+        if (val.includes('cost')) colIndexes.costUsd = cIdx;
+        if (val.includes('price') || val.includes('precio')) colIndexes.price = cIdx;
+        if (val.includes('tax') || val.includes('iva')) colIndexes.taxRate = cIdx;
+        if (val.includes('stock') || val.includes('cantidad') || val.includes('cant') || val.includes('existencia')) colIndexes.quantity = cIdx;
+        if (val.includes('unit') || val.includes('unidad') || val.includes('medida') || val.includes('presentacion') || val.includes('presentación')) colIndexes.unit = cIdx;
+        if (val.includes('warehouse') || val.includes('almacen') || val.includes('almacén') || val.includes('ubicacion') || val.includes('ubicación')) colIndexes.warehouse = cIdx;
+      });
+      break;
+    }
+
     if (rowStr.includes('categor') && rowStr.includes('descripci') && (rowStr.includes('cantidad') || rowStr.includes('precio'))) {
       headerRowIndex = r;
       detectedFormat = rowStr.includes('cantidad') ? 'HIDROZULCA_EXCEL' : 'PRICE_LIST';
@@ -124,24 +142,6 @@ export function parseProductFile(dataBuffer: ArrayBuffer | Uint8Array, selectedS
         if (val.includes('descripci') || val.includes('nombre') || val.includes('producto')) colIndexes.name = cIdx;
         if (val.includes('cantidad') || val.includes('stock')) colIndexes.quantity = cIdx;
         if (val.includes('precio')) colIndexes.price = cIdx;
-      });
-      break;
-    }
-
-    if (rowStr.includes('sku') && (rowStr.includes('name') || rowStr.includes('nombre') || rowStr.includes('producto'))) {
-      headerRowIndex = r;
-      detectedFormat = 'STANDARD_COLUMNS';
-      row.forEach((colVal, cIdx) => {
-        const val = cleanString(colVal).toLowerCase();
-        if (val === 'sku' || val.includes('codigo') || val.includes('código')) colIndexes.sku = cIdx;
-        if (val.includes('name') || val.includes('nombre') || val.includes('producto')) colIndexes.name = cIdx;
-        if (val.includes('categor')) colIndexes.category = cIdx;
-        if (val.includes('cost')) colIndexes.costUsd = cIdx;
-        if (val.includes('price') || val.includes('precio')) colIndexes.price = cIdx;
-        if (val.includes('tax') || val.includes('iva')) colIndexes.taxRate = cIdx;
-        if (val.includes('stock') || val.includes('cantidad') || val.includes('cant')) colIndexes.quantity = cIdx;
-        if (val.includes('unit') || val.includes('unidad') || val.includes('medida')) colIndexes.unit = cIdx;
-        if (val.includes('warehouse') || val.includes('almacen') || val.includes('almacén')) colIndexes.warehouse = cIdx;
       });
       break;
     }

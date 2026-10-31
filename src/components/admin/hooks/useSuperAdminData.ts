@@ -251,6 +251,8 @@ export function useSuperAdminData() {
 
   const [formPlan, setFormPlan] = useState<string>('EMPRENDEDOR');
   const [formStatus, setFormStatus] = useState<'ACTIVE' | 'SUSPENDED'>('ACTIVE');
+  const [formPlanIsActive, setFormPlanIsActive] = useState<boolean>(true);
+  const [formSubscriptionExpiresAt, setFormSubscriptionExpiresAt] = useState<string>('');
   const [formMaxUsers, setFormMaxUsers] = useState<number>(2);
   const [formMaxProducts, setFormMaxProducts] = useState<number>(500);
   const [formMonthlyFee, setFormMonthlyFee] = useState<number>(25);
@@ -583,6 +585,8 @@ export function useSuperAdminData() {
       setFormSubdomain(tenant.subdomain);
       setFormPlan(tenant.plan_name);
       setFormStatus(tenant.status);
+      setFormPlanIsActive(tenant.plan_is_active !== undefined ? Boolean(tenant.plan_is_active) : (tenant.status === 'ACTIVE'));
+      setFormSubscriptionExpiresAt(tenant.subscription_expires_at || '');
       setFormMaxUsers(tenant.max_users);
       setFormMaxProducts(tenant.max_products);
       setFormMonthlyFee(tenant.monthly_fee_usd);
@@ -611,6 +615,10 @@ export function useSuperAdminData() {
       setFormSubdomain('');
       setFormPlan('EMPRENDEDOR');
       setFormStatus('ACTIVE');
+      setFormPlanIsActive(true);
+      const defaultExpDate = new Date();
+      defaultExpDate.setMonth(defaultExpDate.getMonth() + 3);
+      setFormSubscriptionExpiresAt(defaultExpDate.toISOString().split('T')[0]);
       setFormMaxUsers(2);
       setFormMaxProducts(500);
       setFormMonthlyFee(25);
@@ -723,6 +731,8 @@ export function useSuperAdminData() {
       subdomain: formSubdomain.trim().toLowerCase() || formName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
       plan_name: formPlan,
       status: formStatus,
+      plan_is_active: formPlanIsActive,
+      subscription_expires_at: formSubscriptionExpiresAt || undefined,
       max_users: Number(formMaxUsers),
       max_products: Number(formMaxProducts),
       monthly_fee_usd: Number(formMonthlyFee),
@@ -755,6 +765,8 @@ export function useSuperAdminData() {
               subdomain: payload.subdomain,
               plan_name: payload.plan_name,
               status: payload.status,
+              plan_is_active: payload.plan_is_active,
+              subscription_expires_at: payload.subscription_expires_at || t.subscription_expires_at,
               max_users: payload.max_users,
               max_products: payload.max_products,
               monthly_fee_usd: payload.monthly_fee_usd,
@@ -952,6 +964,8 @@ export function useSuperAdminData() {
     planModalError,
     formPlan, setFormPlan,
     formStatus, setFormStatus,
+    formPlanIsActive, setFormPlanIsActive,
+    formSubscriptionExpiresAt, setFormSubscriptionExpiresAt,
     formMaxUsers, setFormMaxUsers,
     formMaxProducts, setFormMaxProducts,
     formMonthlyFee, setFormMonthlyFee,

@@ -65,13 +65,13 @@ export default function InitialInventoryPage() {
   };
 
   const processSelectedFile = async (selectedFile: File, sheetToParse?: string) => {
-    const validExtensions = ['.xlsx', '.xls', '.csv'];
+    const validExtensions = ['.xlsx', '.xls'];
     const hasValidExt = validExtensions.some(ext => selectedFile.name.toLowerCase().endsWith(ext));
 
     if (!hasValidExt) {
       setUploadResult({
         success: false,
-        message: 'Error: Formato no soportado. Únicamente se permiten archivos Excel (.xlsx, .xls) o CSV (.csv).'
+        message: 'Error: Formato no soportado. Únicamente se permiten archivos Excel (.xlsx, .xls).'
       });
       return;
     }
@@ -215,7 +215,7 @@ export default function InitialInventoryPage() {
               : 'border-transparent text-slate-500 hover:text-slate-700'
           }`}
         >
-          Carga Masiva (Excel / CSV)
+          Carga Masiva (Excel)
         </button>
       </div>
 
@@ -228,29 +228,20 @@ export default function InitialInventoryPage() {
             <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm space-y-6">
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">Carga Masiva por Excel o CSV</h3>
+                  <h3 className="text-lg font-bold text-slate-900">Carga Masiva por Excel</h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Importa tu catálogo de productos masivamente. Compatible con el formato oficial de inventario Excel (Categoría, Descripción, Cantidad, Precio) o plantilla CSV.
+                    Importa tu catálogo de productos masivamente con la plantilla oficial de Excel de Arivsoft.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <a
-                    href="/plantilla_inventario_hidrozulca.xlsx"
+                    href="/plantilla_productos_ari.xlsx"
                     download
                     className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition-colors cursor-pointer shadow-2xs"
-                    title="Descargar plantilla Excel basada en Hidrozulca"
+                    title="Descargar plantilla oficial Excel de productos"
                   >
                     <Download className="h-4 w-4 text-emerald-600" />
-                    <span>Plantilla Excel (.xlsx)</span>
-                  </a>
-                  <a
-                    href="/template_inventario.csv"
-                    download
-                    className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-primary-700 bg-primary-50 border border-primary-200 rounded-xl hover:bg-primary-100 transition-colors cursor-pointer shadow-2xs"
-                    title="Descargar plantilla estándar CSV"
-                  >
-                    <Download className="h-4 w-4 text-primary-600" />
-                    <span>Plantilla CSV</span>
+                    <span>Plantilla Productos (.xlsx)</span>
                   </a>
                 </div>
               </div>
@@ -264,7 +255,7 @@ export default function InitialInventoryPage() {
                       <span>Almacén Destino para Stock Inicial</span>
                     </label>
                     <p className="text-[11px] text-slate-500">
-                      Las existencias iniciales del archivo CSV se registrarán en este almacén (a menos que el CSV contenga la columna <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800 font-mono">warehouseCode</code>).
+                      Las existencias iniciales del archivo Excel se registrarán en este almacén (a menos que el archivo contenga la columna <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800 font-mono">ubicación de almacen</code>).
                     </p>
                   </div>
                   <div className="sm:w-72">
@@ -304,7 +295,7 @@ export default function InitialInventoryPage() {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".xlsx, .xls, .csv"
+                    accept=".xlsx, .xls"
                     className="hidden"
                     onChange={handleFileChange}
                   />
@@ -318,10 +309,10 @@ export default function InitialInventoryPage() {
                       )}
                     </div>
                     <p className="text-sm font-semibold text-slate-700">
-                      {isParsing ? 'Analizando archivo...' : 'Arrastra tu archivo Excel (.xlsx, .xls) o CSV (.csv) aquí'}
+                      {isParsing ? 'Analizando archivo...' : 'Arrastra tu archivo Excel (.xlsx, .xls) aquí'}
                     </p>
                     <p className="text-xs text-slate-400">
-                      Compatible con el formato Inventario Hidrozulca (Categoría, Descripción, Cantidad, Precio)
+                      Soporta el formato de la plantilla oficial de Arivsoft (.xlsx)
                     </p>
                   </div>
                 </div>

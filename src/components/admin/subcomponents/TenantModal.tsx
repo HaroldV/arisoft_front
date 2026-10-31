@@ -37,6 +37,10 @@ interface TenantModalProps {
   onSelectPlan: (v: string) => void;
   status: 'ACTIVE' | 'SUSPENDED';
   setStatus: (v: 'ACTIVE' | 'SUSPENDED') => void;
+  planIsActive?: boolean;
+  setPlanIsActive?: (v: boolean) => void;
+  subscriptionExpiresAt?: string;
+  setSubscriptionExpiresAt?: (v: string) => void;
   maxUsers: number;
   setMaxUsers: (v: number) => void;
   maxProducts: number;
@@ -89,6 +93,10 @@ export const TenantModal: React.FC<TenantModalProps> = ({
   onSelectPlan,
   status,
   setStatus,
+  planIsActive = true,
+  setPlanIsActive,
+  subscriptionExpiresAt = '',
+  setSubscriptionExpiresAt,
   maxUsers,
   setMaxUsers,
   maxProducts,
@@ -269,6 +277,93 @@ export const TenantModal: React.FC<TenantModalProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Opción 2: Habilitación Inmediata de Plan Comercial y Fecha de Vencimiento */}
+              {setPlanIsActive && (
+                <div className="p-3.5 bg-slate-50 border border-slate-200/90 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="plan_is_active_toggle"
+                        checked={planIsActive}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setPlanIsActive(checked);
+                          if (checked && !subscriptionExpiresAt && setSubscriptionExpiresAt) {
+                            const d = new Date();
+                            d.setMonth(d.getMonth() + 3);
+                            setSubscriptionExpiresAt(d.toISOString().split('T')[0]);
+                          }
+                        }}
+                        className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                      />
+                      <label htmlFor="plan_is_active_toggle" className="text-xs font-bold text-slate-800 cursor-pointer select-none">
+                        Habilitar Plan Comercial Inmediatamente (Período de Prueba o Cortesía)
+                      </label>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      planIsActive 
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                    }`}>
+                      {planIsActive ? 'Acceso Habilitado' : 'Requiere Pago'}
+                    </span>
+                  </div>
+
+                  {planIsActive && setSubscriptionExpiresAt && (
+                    <div className="pt-2 border-t border-slate-200/60 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                      <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                          Vencimiento de Prueba / Suscripción
+                        </label>
+                        <input
+                          type="date"
+                          value={subscriptionExpiresAt}
+                          onChange={(e) => setSubscriptionExpiresAt(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5 pt-3 sm:pt-4">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = new Date();
+                            d.setMonth(d.getMonth() + 1);
+                            setSubscriptionExpiresAt(d.toISOString().split('T')[0]);
+                          }}
+                          className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded text-[10px] font-bold text-slate-600 transition-all cursor-pointer"
+                        >
+                          +1 Mes
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = new Date();
+                            d.setMonth(d.getMonth() + 3);
+                            setSubscriptionExpiresAt(d.toISOString().split('T')[0]);
+                          }}
+                          className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded text-[10px] font-bold text-slate-600 transition-all cursor-pointer"
+                        >
+                          +3 Meses
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = new Date();
+                            d.setMonth(d.getMonth() + 6);
+                            setSubscriptionExpiresAt(d.toISOString().split('T')[0]);
+                          }}
+                          className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded text-[10px] font-bold text-slate-600 transition-all cursor-pointer"
+                        >
+                          +6 Meses
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
