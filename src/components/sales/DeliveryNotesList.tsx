@@ -24,6 +24,7 @@ import {
 import apiClient from '@/infrastructure/api/api-client';
 import { ActionTooltip } from '@/components/ActionTooltip';
 import { CurrencyInput } from '@/components/CurrencyInput';
+import { DELIVERY_TYPES, DELIVERY_TYPE_LABELS, DeliveryType, formatPaymentMethod } from '@/constants/domain-constants';
 
 interface DeliveryNoteItem {
   id?: string;
@@ -46,10 +47,11 @@ interface DeliveryNote {
   carrier_name?: string;
   driver_name?: string;
   vehicle_plate?: string;
-  status: 'DISPATCHED' | 'DELIVERED' | 'INVOICED' | 'DRAFT';
+  status: 'DISPATCHED' | 'DELIVERED' | 'INVOICED' | 'DRAFT' | string;
   issue_date?: string;
   delivery_date?: string;
   payment_method?: string;
+  notes?: string;
   total_usd: number | string;
   total_bs: number | string;
   exchange_rate: number | string;
@@ -58,14 +60,12 @@ interface DeliveryNote {
 }
 
 const getPaymentMethodLabel = (pm?: string) => {
-  switch (pm) {
-    case 'CASH_USD': return 'Efectivo $';
-    case 'PAGO_MOVIL': return 'Pago Móvil';
-    case 'TRANSFER_BS': return 'Transferencia Bs.';
-    case 'ZELLE': return 'Zelle';
-    case 'CREDIT': return 'Crédito';
-    default: return null;
+  if (!pm) return null;
+  // If multiple methods separated by comma
+  if (pm.includes(',')) {
+    return pm.split(',').map(m => formatPaymentMethod(m.trim())).join(', ');
   }
+  return formatPaymentMethod(pm);
 };
 
 export default function DeliveryNotesList() {
@@ -257,10 +257,51 @@ export default function DeliveryNotesList() {
     }
   };
 
-  const isPickupMode = (doc: DeliveryNote) => {
+  const getDeliveryModeInfo = (doc: DeliveryNote): {
+    type: DeliveryType;
+    label: string;
+    badgeClass: string;
+    icon: string;
+    detail: string;
+  } => {
     const carrier = (doc.carrier_name || '').toLowerCase();
     const plate = (doc.vehicle_plate || '').toUpperCase();
-    return carrier.includes('retiro') || carrier.includes('tienda') || carrier.includes('mostrador') || plate === 'N/A';
+    const notes = (doc.notes || '').toLowerCase();
+
+    // 1. Envío por Tienda
+    if (carrier.includes('envío por tienda') || carrier.includes('envio por tienda') || notes.includes('envío por tienda') || notes.includes('envio por tienda') || plate === 'TIENDA') {
+      return {
+        type: DELIVERY_TYPES.STORE_DELIVERY,
+        label: DELIVERY_TYPE_LABELS[DELIVERY_TYPES.STORE_DELIVERY],
+        badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+        icon: '🛵',
+        detail: doc.driver_name || 'Personal de Tienda'
+      };
+    }
+
+    // 2. Por Flete
+    if (carrier.includes('flete') || notes.includes('flete') || plate === 'FLETE') {
+      return {
+        type: DELIVERY_TYPES.FREIGHT,
+        label: doc.carrier_name && doc.carrier_name !== 'FLETE' ? doc.carrier_name : DELIVERY_TYPE_LABELS[DELIVERY_TYPES.FREIGHT],
+        badgeClass: 'bg-purple-50 text-purple-700 border-purple-100',
+        icon: '🚛',
+        detail: `Chofer: ${doc.driver_name || 'S/D'} • Placa: ${doc.vehicle_plate || 'S/P'}`
+      };
+    }
+
+    // 3. Retiro en Tienda (default / fallback)
+    return {
+      type: DELIVERY_TYPES.STORE_PICKUP,
+      label: DELIVERY_TYPE_LABELS[DELIVERY_TYPES.STORE_PICKUP],
+      badgeClass: 'bg-blue-50 text-blue-700 border-blue-100',
+      icon: '🏢',
+      detail: `Recibido por: ${doc.driver_name || doc.client_name || 'Cliente en Mostrador'}`
+    };
+  };
+
+  const isPickupMode = (doc: DeliveryNote) => {
+    return getDeliveryModeInfo(doc).type === DELIVERY_TYPES.STORE_PICKUP;
   };
 
   return (
@@ -341,27 +382,20 @@ export default function DeliveryNotesList() {
                       </div>
                     </td>
                     <td className="py-3.5 px-4 text-xs text-slate-700">
-                      {pickup ? (
-                        <div>
-                          <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-100 text-[11px] font-semibold px-2 py-0.5 rounded">
-                            <Store className="w-3 h-3 text-blue-600" />
-                            Retiro en Tienda / Mostrador
-                          </span>
-                          <p className="text-[11px] text-slate-500 mt-0.5">
-                            Recibido por: <span className="font-medium text-slate-700">{item.driver_name || item.client_name}</span>
-                          </p>
-                        </div>
-                      ) : (
-                        <div>
-                          <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 border border-purple-100 text-[11px] font-semibold px-2 py-0.5 rounded">
-                            <Truck className="w-3 h-3 text-purple-600" />
-                            {item.carrier_name || 'Flete Propio'}
-                          </span>
-                          <p className="text-[11px] text-slate-500 mt-0.5">
-                            Chofer: {item.driver_name || 'S/D'} • Placa: <span className="font-mono">{item.vehicle_plate || 'S/P'}</span>
-                          </p>
-                        </div>
-                      )}
+                      {(() => {
+                        const mode = getDeliveryModeInfo(item);
+                        return (
+                          <div>
+                            <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded border ${mode.badgeClass}`}>
+                              <span>{mode.icon}</span>
+                              <span>{mode.label}</span>
+                            </span>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              {mode.detail}
+                            </p>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="py-3.5 px-4 text-xs font-medium text-slate-600">
                       {getPaymentMethodLabel(item.payment_method) ? (
@@ -379,14 +413,26 @@ export default function DeliveryNotesList() {
                       Bs. {Number(item.total_bs || 0).toFixed(2)}
                     </td>
                     <td className="py-3.5 px-4 text-center">
-                      {item.status === 'DISPATCHED' && (
-                        <span className="bg-purple-50 text-purple-700 border border-purple-100 text-xs font-semibold px-2.5 py-0.5 rounded-full">
-                          En Tránsito / Entregada
+                      {(item.status === 'DELIVERED' || item.status === 'DISPATCHED') && (
+                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-xs font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span>Entregada</span>
                         </span>
                       )}
                       {item.status === 'INVOICED' && (
-                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-xs font-semibold px-2.5 py-0.5 rounded-full">
-                          Facturada
+                        <span className="bg-blue-50 text-blue-700 border border-blue-100 text-xs font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                          <Receipt className="w-3 h-3 text-blue-600" />
+                          <span>Facturada</span>
+                        </span>
+                      )}
+                      {item.status === 'DRAFT' && (
+                        <span className="bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                          Borrador
+                        </span>
+                      )}
+                      {!['DELIVERED', 'DISPATCHED', 'INVOICED', 'DRAFT'].includes(item.status) && (
+                        <span className="bg-slate-100 text-slate-600 border border-slate-200 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                          {item.status}
                         </span>
                       )}
                     </td>
@@ -435,9 +481,23 @@ export default function DeliveryNotesList() {
                     <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
                       Nota de Entrega #{viewingDelivery.document_number}
                     </h3>
-                    <span className="bg-purple-50 text-purple-700 border border-purple-100 text-xs font-semibold px-2.5 py-0.5 rounded-full">
-                      {viewingDelivery.status === 'INVOICED' ? 'Facturada' : 'Entregada / Despachada'}
-                    </span>
+                    {(viewingDelivery.status === 'DELIVERED' || viewingDelivery.status === 'DISPATCHED') && (
+                      <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-xs font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        <span>Entregada</span>
+                      </span>
+                    )}
+                    {viewingDelivery.status === 'INVOICED' && (
+                      <span className="bg-blue-50 text-blue-700 border border-blue-100 text-xs font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                        <Receipt className="w-3 h-3 text-blue-600" />
+                        <span>Facturada</span>
+                      </span>
+                    )}
+                    {viewingDelivery.status === 'DRAFT' && (
+                      <span className="bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                        Borrador
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-slate-500 font-medium mt-0.5">
                     Guía de despacho y comprobante de entrega física de mercancía
@@ -465,19 +525,18 @@ export default function DeliveryNotesList() {
                   </p>
                 </div>
                 <div className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-2xs hover:border-indigo-200 transition-all">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Modalidad / Flete</span>
-                  <p className="font-bold text-slate-900 text-sm sm:text-base truncate">
-                    {isPickupMode(viewingDelivery) ? '🏬 Mostrador' : `🚚 ${viewingDelivery.carrier_name || 'Flete Propio'}`}
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Modalidad de Entrega</span>
+                  <p className="font-bold text-slate-900 text-sm sm:text-base truncate flex items-center gap-1.5">
+                    <span>{getDeliveryModeInfo(viewingDelivery).icon}</span>
+                    <span>{getDeliveryModeInfo(viewingDelivery).label}</span>
                   </p>
                 </div>
                 <div className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-2xs hover:border-indigo-200 transition-all">
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1.5">
-                    {isPickupMode(viewingDelivery) ? 'Recibido por' : 'Chofer / Placa'}
+                    {getDeliveryModeInfo(viewingDelivery).type === 'STORE_PICKUP' ? 'Recibido por' : 'Detalle Despacho'}
                   </span>
                   <p className="font-bold text-slate-900 text-sm sm:text-base truncate">
-                    {isPickupMode(viewingDelivery)
-                      ? (viewingDelivery.driver_name || viewingDelivery.client_name)
-                      : `${viewingDelivery.driver_name || 'S/D'} • ${viewingDelivery.vehicle_plate || 'S/P'}`}
+                    {getDeliveryModeInfo(viewingDelivery).detail}
                   </p>
                 </div>
                 <div className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-2xs hover:border-indigo-200 transition-all">

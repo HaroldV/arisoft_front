@@ -32,13 +32,21 @@ import {
   Package,
   PackageX,
   SlidersHorizontal,
-  MapPin
+  MapPin,
+  Truck
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import { useAuth } from '@/context/AuthContext';
 import { CurrencyInput } from '@/components/CurrencyInput';
 import { BarcodeScannerModal } from '@/components/inventory/subcomponents/BarcodeScannerModal';
 import { SectorAutocompleteInput } from '@/components/pos/subcomponents/SectorAutocompleteInput';
+import { 
+  DELIVERY_TYPES, 
+  DELIVERY_TYPE_LABELS, 
+  DeliveryType, 
+  POS_DOCUMENT_TYPES, 
+  PosDocumentType 
+} from '@/constants/domain-constants';
 
 export interface ProductVariation {
   name: string;
@@ -131,6 +139,12 @@ export const PosInterface: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState('CASH_VES');
   const [justificationText, setJustificationText] = useState('');
   const [isSubmittingSale, setIsSubmittingSale] = useState(false);
+
+  // Hotfix POS: Document Type & Tax Inclusion (Default: DELIVERY_NOTE per user request)
+  const [posDocumentType, setPosDocumentType] = useState<PosDocumentType>(POS_DOCUMENT_TYPES.DELIVERY_NOTE);
+  const [applyTaxInSale, setApplyTaxInSale] = useState<boolean>(false);
+  const [posDeliveryType, setPosDeliveryType] = useState<DeliveryType>(DELIVERY_TYPES.STORE_PICKUP);
+  const [posFreightDestination, setPosFreightDestination] = useState<string>('');
 
   // Success Receipt Modal
   const [completedSale, setCompletedSale] = useState<any | null>(null);
@@ -544,12 +558,14 @@ export const PosInterface: React.FC = () => {
   const subtotal = Number(cart.reduce((sum, item) => sum + (item.product.priceUsd * item.quantity), 0).toFixed(2));
   const discountAmount = Number((subtotal * (discountPercent / 100)).toFixed(2));
   const discountedSubtotal = Number((subtotal - discountAmount).toFixed(2));
-  const taxAmount = Number(cart.reduce((sum, item) => {
-    const itemTotal = item.product.priceUsd * item.quantity;
-    const itemDiscount = itemTotal * (discountPercent / 100);
-    const itemTax = (itemTotal - itemDiscount) * (item.product.taxRate / 100);
-    return sum + itemTax;
-  }, 0).toFixed(2));
+  const taxAmount = applyTaxInSale
+    ? Number(cart.reduce((sum, item) => {
+        const itemTotal = item.product.priceUsd * item.quantity;
+        const itemDiscount = itemTotal * (discountPercent / 100);
+        const itemTax = (itemTotal - itemDiscount) * (item.product.taxRate / 100);
+        return sum + itemTax;
+      }, 0).toFixed(2))
+    : 0;
   const totalUsd = Number((discountedSubtotal + taxAmount).toFixed(2));
   const totalVes = Number((totalUsd * exchangeRate).toFixed(2));
 
@@ -832,6 +848,10 @@ export const PosInterface: React.FC = () => {
       clientId: selectedClientId || undefined,
       discountPercent: discountPercent > 0 ? discountPercent : undefined,
       paymentMethod: paymentLines[0]?.paymentMethod || 'CASH_USD',
+      documentType: posDocumentType,
+      applyTax: applyTaxInSale,
+      deliveryType: posDeliveryType,
+      freightDestination: posDeliveryType === 'FREIGHT' && posFreightDestination.trim() ? posFreightDestination.trim() : undefined,
       payments,
       change,
       items: cart.map(item => ({
@@ -846,10 +866,14 @@ export const PosInterface: React.FC = () => {
         id: response.data.saleId,
         invoiceNumber: response.data.invoiceNumber,
         controlNumber: response.data.controlNumber,
+        documentType: posDocumentType,
+        deliveryType: posDeliveryType,
+        freightDestination: posFreightDestination,
         total: totalUsd,
         totalVes,
         discountPercent,
         discountAmount,
+        taxAmount,
         items: [...cart],
         client: clients.find(c => c.id === selectedClientId),
         exchangeRate,
@@ -859,6 +883,10 @@ export const PosInterface: React.FC = () => {
       setSelectedClientId('');
       setDiscountPercent(0);
       setJustificationText('');
+      setApplyTaxInSale(false);
+      setPosDocumentType(POS_DOCUMENT_TYPES.DELIVERY_NOTE);
+      setPosDeliveryType(DELIVERY_TYPES.STORE_PICKUP);
+      setPosFreightDestination('');
       setIsConfirmModalOpen(false);
     } catch (err: any) {
       const rawMsg = err.response?.data?.message;
@@ -1702,9 +1730,9 @@ export const PosInterface: React.FC = () => {
                 </div>
               )}
 
-              <div className="flex justify-between">
+              <div className="flex justify-between text-slate-500">
                 <span>Impuesto (IVA)</span>
-                <span>${taxAmount.toFixed(2)}</span>
+                <span className="italic font-medium">{applyTaxInSale ? `$${taxAmount.toFixed(2)}` : 'Sin IVA (Configurable al finalizar)'}</span>
               </div>
             </div>
 
@@ -1720,12 +1748,8 @@ export const PosInterface: React.FC = () => {
 
             <button
               onClick={handleCheckoutClick}
-              disabled={cart.length === 0 || isSubmittingSale || !!invoiceRangeError}
-              className={`w-full flex items-center justify-center gap-2 py-3.5 text-white font-bold rounded-xl shadow-lg transition-all ${
-                invoiceRangeError 
-                  ? 'bg-rose-500/80 cursor-not-allowed opacity-60 shadow-rose-500/10' 
-                  : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/10 hover:shadow-emerald-600/20 disabled:opacity-50 disabled:cursor-not-allowed'
-              }`}
+              disabled={cart.length === 0 || isSubmittingSale}
+              className="w-full flex items-center justify-center gap-2 py-3.5 text-white font-bold rounded-xl shadow-lg transition-all bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/10 hover:shadow-emerald-600/20 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {isSubmittingSale ? (
                 <>
@@ -2097,7 +2121,7 @@ export const PosInterface: React.FC = () => {
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
               
               {/* Header Fijo */}
               <div className="flex justify-between items-center px-6 py-4.5 border-b border-slate-100 bg-gradient-to-r from-indigo-50/80 via-white to-indigo-50/30 shrink-0">
@@ -2106,11 +2130,11 @@ export const PosInterface: React.FC = () => {
                     <CreditCard className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                    <h3 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
                       Confirmar y Finalizar Venta
                     </h3>
-                    <p className="text-xs text-slate-500 font-medium mt-0.5">
-                      Verificación de montos, método de pago y stock fiscal
+                    <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
+                      Verificación de montos, método de pago y comprobante fiscal o de entrega
                     </p>
                   </div>
                 </div>
@@ -2124,24 +2148,24 @@ export const PosInterface: React.FC = () => {
               </div>
 
               {/* Scrollable Center Body */}
-              <div className="p-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
+              <div className="p-6 sm:p-7 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
                 
                 {/* Client Information Header Badge */}
                 {selectedClient && (
-                  <div className="p-3.5 bg-indigo-50/80 border border-indigo-100 rounded-2xl flex items-center justify-between shadow-2xs">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="p-2 bg-indigo-600 text-white rounded-xl shrink-0">
-                        <UserCheck className="w-4 h-4" />
+                  <div className="p-4 bg-indigo-50/80 border border-indigo-100 rounded-2xl flex items-center justify-between shadow-2xs">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="p-2.5 bg-indigo-600 text-white rounded-xl shrink-0">
+                        <UserCheck className="w-5 h-5" />
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 text-sm truncate">{selectedClient.name}</span>
-                          <span className="font-mono text-xs font-bold text-indigo-700 bg-white px-2 py-0.5 rounded-md border border-indigo-200 shrink-0">
+                        <div className="flex items-center gap-2.5">
+                          <span className="font-bold text-slate-900 text-base truncate">{selectedClient.name}</span>
+                          <span className="font-mono text-xs sm:text-sm font-bold text-indigo-700 bg-white px-2.5 py-0.5 rounded-md border border-indigo-200 shrink-0">
                             {selectedClient.tax_id}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-600 flex items-center gap-1 mt-0.5 truncate">
-                          <MapPin className="w-3 h-3 text-indigo-600 shrink-0" />
+                        <p className="text-xs sm:text-sm text-slate-600 flex items-center gap-1.5 mt-0.5 truncate">
+                          <MapPin className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                           <span>{selectedClient.address || 'Sector no especificado'}</span>
                         </p>
                       </div>
@@ -2161,7 +2185,7 @@ export const PosInterface: React.FC = () => {
                         setIdentifyClientFound(selectedClient);
                         setIsIdentifyModalOpen(true);
                       }}
-                      className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline shrink-0 ml-2"
+                      className="text-xs sm:text-sm font-bold text-indigo-600 hover:text-indigo-800 hover:underline shrink-0 ml-3 cursor-pointer"
                     >
                       Cambiar
                     </button>
@@ -2169,38 +2193,38 @@ export const PosInterface: React.FC = () => {
                 )}
 
                 {/* Luminous Summary Banner with explicit Tax (IVA) breakdown */}
-                <div className="bg-gradient-to-br from-indigo-50/90 via-slate-50 to-blue-50/60 border border-indigo-100/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3.5">
-                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                    <div className="bg-white/95 border border-slate-200/80 rounded-xl p-3.5 sm:p-4 shadow-2xs">
-                      <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Total USD</span>
-                      <div className="font-mono font-black text-lg sm:text-2xl text-slate-900 tracking-tight">
+                <div className="bg-gradient-to-br from-indigo-50/90 via-slate-50 to-blue-50/60 border border-indigo-100/90 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-white/95 border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-2xs">
+                      <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-500 block mb-1">Total USD</span>
+                      <div className="font-mono font-black text-2xl sm:text-3xl text-slate-900 tracking-tight">
                         ${totalUsd.toFixed(2)}
                       </div>
                     </div>
-                    <div className="bg-indigo-50/80 border border-indigo-200/80 rounded-xl p-3.5 sm:p-4 shadow-2xs">
-                      <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-indigo-700 block mb-1">Total VES</span>
-                      <div className="font-mono font-black text-lg sm:text-2xl text-indigo-700 tracking-tight">
+                    <div className="bg-indigo-50/80 border border-indigo-200/80 rounded-xl p-4 sm:p-5 shadow-2xs">
+                      <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-indigo-700 block mb-1">Total VES</span>
+                      <div className="font-mono font-black text-2xl sm:text-3xl text-indigo-700 tracking-tight">
                         Bs. {totalVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
                   </div>
 
                   {/* Explicit breakdown of Base, Descuento, IVA and Tasa */}
-                  <div className="pt-2 border-t border-indigo-100/80 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-600 bg-white/60 p-2.5 rounded-xl">
+                  <div className="pt-3 border-t border-indigo-100/80 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs sm:text-sm text-slate-600 bg-white/70 p-3.5 rounded-xl">
                     <div>
-                      <span className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Subtotal Base:</span>
-                      <span className="font-mono font-bold text-slate-800 text-xs">${subtotal.toFixed(2)}</span>
+                      <span className="text-[10px] sm:text-xs uppercase font-bold text-slate-400 block mb-0.5">Subtotal Base:</span>
+                      <span className="font-mono font-bold text-slate-900 text-sm sm:text-base">${subtotal.toFixed(2)}</span>
                     </div>
 
                     {/* Descuento Editable en Modal */}
                     <div>
                       <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-[9px] uppercase font-bold text-slate-400">Desc. (%):</span>
+                        <span className="text-[10px] sm:text-xs uppercase font-bold text-slate-400">Desc. (%):</span>
                         {!canApplyDiscount && (
-                          <span className="text-[8px] text-slate-400 italic font-semibold">Bloqueado</span>
+                          <span className="text-[9px] text-slate-400 italic font-semibold">Bloqueado</span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5">
                         <input
                           type="number"
                           min="0"
@@ -2208,22 +2232,22 @@ export const PosInterface: React.FC = () => {
                           disabled={!canApplyDiscount}
                           value={discountPercent}
                           onChange={(e) => setDiscountPercent(Math.min(100, Math.max(0, Number(e.target.value))))}
-                          className="w-14 text-center text-xs font-bold font-mono text-slate-800 bg-white border border-slate-200 rounded-lg py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 disabled:bg-slate-100"
+                          className="w-16 text-center text-xs sm:text-sm font-bold font-mono text-slate-800 bg-white border border-slate-200 rounded-lg py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 disabled:bg-slate-100"
                         />
                         {discountPercent > 0 && (
-                          <span className="font-mono text-[10px] font-bold text-rose-600">-${discountAmount.toFixed(2)}</span>
+                          <span className="font-mono text-xs font-bold text-rose-600">-${discountAmount.toFixed(2)}</span>
                         )}
                       </div>
                     </div>
 
                     <div>
-                      <span className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Impuesto (IVA):</span>
-                      <span className="font-mono font-bold text-slate-800 text-xs">${taxAmount.toFixed(2)}</span>
+                      <span className="text-[10px] sm:text-xs uppercase font-bold text-slate-400 block mb-0.5">Impuesto (IVA):</span>
+                      <span className="font-mono font-bold text-slate-900 text-sm sm:text-base">${taxAmount.toFixed(2)}</span>
                     </div>
 
                     {/* Tasa Editable en Modal */}
                     <div>
-                      <span className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Tasa Cambio (Bs.):</span>
+                      <span className="text-[10px] sm:text-xs uppercase font-bold text-slate-400 block mb-0.5">Tasa Cambio (Bs.):</span>
                       <div className="flex items-center gap-1">
                         <input
                           type="number"
@@ -2234,9 +2258,155 @@ export const PosInterface: React.FC = () => {
                             const val = Number(e.target.value);
                             if (val >= 0) setExchangeRate(val);
                           }}
-                          className="w-20 text-center text-xs font-bold font-mono text-indigo-700 bg-white border border-indigo-200 rounded-lg py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          className="w-24 text-center text-xs sm:text-sm font-bold font-mono text-indigo-700 bg-white border border-indigo-200 rounded-lg py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                         />
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Hotfix: Opciones de Documento y Aplicación de IVA (Resaltado y Llamativo con Estándar Luminous) */}
+                  <div className="p-4 sm:p-5 bg-gradient-to-br from-indigo-50/90 via-slate-50 to-indigo-50/60 border-2 border-indigo-300 rounded-2xl space-y-3.5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-indigo-950 flex items-center gap-2">
+                        <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />
+                        Modalidad de Emisión e Impuesto
+                      </span>
+                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-100/90 text-indigo-800 border border-indigo-300/80 shadow-2xs">
+                        {posDocumentType === POS_DOCUMENT_TYPES.DELIVERY_NOTE ? '📦 Nota de Entrega Activa' : '🧾 Factura Fiscal Activa'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
+                      {/* Document Type Selector */}
+                      <div className="bg-white/95 p-4 rounded-xl border border-indigo-100 shadow-2xs flex flex-col justify-between space-y-2.5">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                          Tipo de Comprobante
+                        </label>
+                        <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100/90 rounded-xl border border-slate-200 h-12 items-center">
+                          <button
+                            type="button"
+                            onClick={() => setPosDocumentType(POS_DOCUMENT_TYPES.DELIVERY_NOTE)}
+                            className={`h-full px-3 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                              posDocumentType === POS_DOCUMENT_TYPES.DELIVERY_NOTE
+                                ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-200 scale-101'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                            }`}
+                          >
+                            <span>📦 Nota Entrega</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPosDocumentType(POS_DOCUMENT_TYPES.INVOICE)}
+                            className={`h-full px-3 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                              posDocumentType === POS_DOCUMENT_TYPES.INVOICE
+                                ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-200 scale-101'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                            }`}
+                          >
+                            <span>🧾 Factura</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Tax Inclusion Toggle */}
+                      <div className="bg-white/95 p-4 rounded-xl border border-indigo-100 shadow-2xs flex flex-col justify-between space-y-2.5">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                          Cálculo de Impuesto
+                        </label>
+                        <div className="h-12 flex items-center">
+                          <button
+                            type="button"
+                            onClick={() => setApplyTaxInSale(!applyTaxInSale)}
+                            className={`w-full h-full px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all flex items-center justify-between cursor-pointer ${
+                              applyTaxInSale
+                                ? 'bg-indigo-600 text-white border-indigo-700 shadow-md shadow-indigo-200'
+                                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
+                            }`}
+                          >
+                            <span className="flex items-center gap-2 font-sans">
+                              <Percent className={`w-4 h-4 ${applyTaxInSale ? 'text-white' : 'text-indigo-600'}`} />
+                              <span>{applyTaxInSale ? 'IVA Aplicado (16%)' : 'Excluir IVA (0%)'}</span>
+                            </span>
+                            <span className={`px-2.5 py-1 rounded-lg text-[11px] font-black tracking-wider ${
+                              applyTaxInSale ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                            }`}>
+                              {applyTaxInSale ? 'ACTIVO' : 'SIN IVA'}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Delivery Method Options: Retiro en tienda (default), Envío por tienda, Flete */}
+                    <div className="pt-3 border-t border-indigo-100/90 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                          <Truck className="w-4 h-4 text-indigo-600" />
+                          Modalidad de Entrega / Despacho
+                        </label>
+                        <span className="text-[11px] font-bold text-slate-500">
+                          {posDeliveryType === 'STORE_PICKUP' && '🏢 Retiro en Tienda'}
+                          {posDeliveryType === 'STORE_DELIVERY' && '🛵 Envío por Tienda'}
+                          {posDeliveryType === 'FREIGHT' && '🚛 Flete (Transporte Externo)'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setPosDeliveryType(DELIVERY_TYPES.STORE_PICKUP)}
+                          className={`px-3 py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                            posDeliveryType === DELIVERY_TYPES.STORE_PICKUP
+                              ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
+                              : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          <span>🏢</span>
+                          <span>{DELIVERY_TYPE_LABELS[DELIVERY_TYPES.STORE_PICKUP]}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setPosDeliveryType(DELIVERY_TYPES.STORE_DELIVERY)}
+                          className={`px-3 py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                            posDeliveryType === DELIVERY_TYPES.STORE_DELIVERY
+                              ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
+                              : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          <span>🛵</span>
+                          <span>{DELIVERY_TYPE_LABELS[DELIVERY_TYPES.STORE_DELIVERY]}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setPosDeliveryType(DELIVERY_TYPES.FREIGHT)}
+                          className={`px-3 py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                            posDeliveryType === DELIVERY_TYPES.FREIGHT
+                              ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
+                              : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          <span>🚛</span>
+                          <span>{DELIVERY_TYPE_LABELS[DELIVERY_TYPES.FREIGHT]}</span>
+                        </button>
+                      </div>
+
+                      {/* Optional Freight Destination input */}
+                      {posDeliveryType === DELIVERY_TYPES.FREIGHT && (
+                        <div className="pt-2 animate-in fade-in duration-150">
+                          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                            Destino / Dirección del Flete <span className="text-slate-400 font-normal">(Opcional)</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ej: Terminal de Carga, Av. Bolívar Galpón 3, Maracay o Retiro en Agencia..."
+                            value={posFreightDestination}
+                            onChange={(e) => setPosFreightDestination(e.target.value)}
+                            className="w-full px-3.5 py-2 bg-white border border-indigo-200 rounded-xl text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2246,7 +2416,7 @@ export const PosInterface: React.FC = () => {
                   {/* Split Payments Section */}
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                      <label className="block text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-600">
                         Métodos de Pago Fraccionados (Máx. 3) <span className="text-rose-500">*</span>
                       </label>
                       <button
@@ -2262,9 +2432,9 @@ export const PosInterface: React.FC = () => {
                             currency: 'USD'
                           }]);
                         }}
-                        className="text-xs font-bold text-indigo-600 hover:text-indigo-700 disabled:opacity-40 flex items-center gap-1 cursor-pointer"
+                        className="text-xs sm:text-sm font-bold text-indigo-600 hover:text-indigo-700 disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
                       >
-                        <Plus className="h-3.5 w-3.5" /> Agregar Método
+                        <Plus className="h-4 w-4" /> Agregar Método
                       </button>
                     </div>
 
@@ -2297,11 +2467,11 @@ export const PosInterface: React.FC = () => {
 
                     {/* Quick Method Selection Chips for fast checkout */}
                     {bankAccounts.length > 0 && (
-                      <div className="p-3 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 block">
+                      <div className="p-3.5 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-2.5">
+                        <span className="text-xs font-bold uppercase tracking-wider text-indigo-800 block">
                           ⚡ Selección Rápida de Método (1 Clic):
                         </span>
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex flex-wrap gap-2">
                           {bankAccounts.map(acc => {
                             const isCash = acc.account_type === 'EFECTIVO' || acc.name.toUpperCase().includes('EFECTIVO');
                             const isPM = acc.name.toUpperCase().includes('PAGO M') || acc.bank_name?.toUpperCase().includes('PAGO M');
@@ -2350,7 +2520,7 @@ export const PosInterface: React.FC = () => {
                                   };
                                   setPaymentLines(nextLines);
                                 }}
-                                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border shadow-2xs cursor-pointer ${
+                                className={`px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 border shadow-2xs cursor-pointer ${
                                   paymentLines.some(l => l.bankAccountId === acc.id)
                                     ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-100 scale-102'
                                     : 'bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border-slate-200/80 hover:border-indigo-300'
@@ -2358,7 +2528,7 @@ export const PosInterface: React.FC = () => {
                               >
                                 <span>{icon}</span>
                                 <span>{acc.name}</span>
-                                <span className="font-mono text-[10px] opacity-80">({acc.currency})</span>
+                                <span className="font-mono text-xs opacity-80">({acc.currency})</span>
                               </button>
                             );
                           })}
@@ -2366,7 +2536,7 @@ export const PosInterface: React.FC = () => {
                       </div>
                     )}
 
-                    <div className="space-y-3">
+                    <div className="space-y-3.5">
                       {paymentLines.map((line, idx) => {
                         const selectedAcc = bankAccounts.find(a => a.id === line.bankAccountId);
                         const methodUpper = (line.paymentMethod || selectedAcc?.name || '').toUpperCase();
@@ -2375,28 +2545,28 @@ export const PosInterface: React.FC = () => {
                         const isBanking = !isCash && !isZelleOrBinance;
 
                         return (
-                          <div key={idx} className="bg-slate-50 p-4 border border-slate-200/80 rounded-2xl space-y-3 animate-in fade-in duration-150">
+                          <div key={idx} className="bg-slate-50 p-4 sm:p-5 border border-slate-200/80 rounded-2xl space-y-3.5 animate-in fade-in duration-150">
                             <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pago #{idx + 1}</span>
+                              <span className="text-xs sm:text-sm font-bold text-slate-600 uppercase tracking-wider">Pago #{idx + 1}</span>
                               {paymentLines.length > 1 && (
                                 <button
                                   type="button"
                                   onClick={() => setPaymentLines(paymentLines.filter((_, i) => i !== idx))}
-                                  className="text-xs font-bold text-rose-500 hover:text-rose-600 cursor-pointer"
+                                  className="text-xs sm:text-sm font-bold text-rose-500 hover:text-rose-600 cursor-pointer"
                                 >
                                   Eliminar
                                 </button>
                               )}
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                               <div>
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
                                   Cuenta Receptora / Método <span className="text-rose-500">*</span>
                                 </label>
                                 {bankAccounts.length > 0 ? (
                                   <select
-                                    className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
+                                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
                                     value={line.bankAccountId || ''}
                                     onChange={(e) => {
                                       const accId = e.target.value;
@@ -2696,7 +2866,7 @@ export const PosInterface: React.FC = () => {
 
         return (
           <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-md max-h-[92vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
               
               {/* Header Fijo */}
               <div className="flex justify-between items-center px-6 py-4.5 border-b border-slate-100 bg-gradient-to-r from-indigo-50/90 via-white to-indigo-50/40 shrink-0">
@@ -2705,11 +2875,11 @@ export const PosInterface: React.FC = () => {
                     <CheckCircle className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                      ¿Confirmar Emisión de Venta?
+                    <h3 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+                      {posDocumentType === 'DELIVERY_NOTE' ? '¿Confirmar Emisión de Nota de Entrega?' : '¿Confirmar Emisión de Factura Fiscal?'}
                     </h3>
-                    <p className="text-xs text-slate-500 font-medium mt-0.5">
-                      Verificación final antes de emitir comprobante fiscal
+                    <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
+                      Verificación final antes de registrar el comprobante y descontar inventario
                     </p>
                   </div>
                 </div>
@@ -2724,20 +2894,20 @@ export const PosInterface: React.FC = () => {
               </div>
 
               {/* Contenido / Resumen de Confirmación */}
-              <div className="p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+              <div className="p-6 sm:p-7 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
                 
                 {/* Luminous Financial Banner */}
-                <div className="bg-gradient-to-br from-indigo-50/90 via-slate-50 to-blue-50/60 border border-indigo-100/90 rounded-2xl p-4 shadow-xs space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-white/95 border border-slate-200/80 rounded-xl p-3 shadow-2xs">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-0.5">Monto Total USD</span>
-                      <div className="font-mono font-black text-xl text-slate-900">
+                <div className="bg-gradient-to-br from-indigo-50/90 via-slate-50 to-blue-50/60 border border-indigo-100/90 rounded-2xl p-5 shadow-xs space-y-3.5">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-white/95 border border-slate-200/80 rounded-xl p-4 shadow-2xs">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Monto Total USD</span>
+                      <div className="font-mono font-black text-2xl sm:text-3xl text-slate-900 tracking-tight">
                         ${totalUsd.toFixed(2)}
                       </div>
                     </div>
-                    <div className="bg-indigo-50/80 border border-indigo-200/80 rounded-xl p-3 shadow-2xs">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 block mb-0.5">Monto Total VES</span>
-                      <div className="font-mono font-black text-xl text-indigo-700">
+                    <div className="bg-indigo-50/80 border border-indigo-200/80 rounded-xl p-4 shadow-2xs">
+                      <span className="text-xs font-bold uppercase tracking-wider text-indigo-700 block mb-1">Monto Total VES</span>
+                      <div className="font-mono font-black text-2xl sm:text-3xl text-indigo-700 tracking-tight">
                         Bs. {totalVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
@@ -2745,40 +2915,57 @@ export const PosInterface: React.FC = () => {
                 </div>
 
                 {/* Grid de Metadatos de la Transacción */}
-                <div className="space-y-2 text-xs">
-                  <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between">
-                    <span className="text-slate-500 font-bold uppercase text-[10px]">Cliente:</span>
-                    <span className="font-bold text-slate-900 truncate max-w-[200px]">
+                <div className="space-y-2.5 text-xs sm:text-sm">
+                  <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between">
+                    <span className="text-slate-500 font-bold uppercase text-xs">Tipo de Documento:</span>
+                    <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                      {posDocumentType === 'DELIVERY_NOTE' ? '📦 Nota de Entrega' : '🧾 Factura Fiscal'}
+                      <span className="text-xs text-slate-500 font-normal">({applyTaxInSale ? 'Con IVA 16%' : 'Sin IVA 0%'})</span>
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between">
+                    <span className="text-slate-500 font-bold uppercase text-xs">Cliente:</span>
+                    <span className="font-bold text-slate-900 truncate max-w-[320px]">
                       {selectedClient ? `${selectedClient.name} (${selectedClient.tax_id})` : 'Venta Mostrador (Genérico)'}
                     </span>
                   </div>
 
-                  <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between">
-                    <span className="text-slate-500 font-bold uppercase text-[10px]">Total Artículos:</span>
+                  <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between">
+                    <span className="text-slate-500 font-bold uppercase text-xs">Total Artículos:</span>
                     <span className="font-bold text-slate-900 font-mono">
                       {cart.reduce((sum, item) => sum + item.quantity, 0)} unidades ({cart.length} productos)
                     </span>
                   </div>
 
-                  <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between">
-                    <span className="text-slate-500 font-bold uppercase text-[10px]">Método(s) de Pago:</span>
-                    <span className="font-bold text-indigo-700 font-sans text-xs text-right truncate max-w-[240px]">
+                  <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between">
+                    <span className="text-slate-500 font-bold uppercase text-xs">Modalidad de Entrega:</span>
+                    <span className="font-bold text-indigo-700 text-xs sm:text-sm">
+                      {posDeliveryType === DELIVERY_TYPES.STORE_PICKUP && `🏢 ${DELIVERY_TYPE_LABELS[DELIVERY_TYPES.STORE_PICKUP]}`}
+                      {posDeliveryType === DELIVERY_TYPES.STORE_DELIVERY && `🛵 ${DELIVERY_TYPE_LABELS[DELIVERY_TYPES.STORE_DELIVERY]}`}
+                      {posDeliveryType === DELIVERY_TYPES.FREIGHT && `🚛 ${DELIVERY_TYPE_LABELS[DELIVERY_TYPES.FREIGHT]}${posFreightDestination.trim() ? ` (${posFreightDestination.trim()})` : ''}`}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between">
+                    <span className="text-slate-500 font-bold uppercase text-xs">Método(s) de Pago:</span>
+                    <span className="font-bold text-indigo-700 font-sans text-xs sm:text-sm text-right truncate max-w-[320px]">
                       {paymentLines.map(l => getPaymentMethodDisplay(l.paymentMethod, l.bankAccountId)).join(', ')}
                     </span>
                   </div>
                 </div>
 
                 {/* Advertencia de Operación */}
-                <div className="p-3 bg-amber-50/90 border border-amber-200/80 rounded-xl text-amber-900 text-xs flex items-start gap-2.5 shadow-2xs">
-                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="p-3.5 bg-amber-50/90 border border-amber-200/80 rounded-xl text-amber-900 text-xs sm:text-sm flex items-start gap-3 shadow-2xs">
+                  <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                   <p className="leading-relaxed">
-                    Al confirmar, se descontará el inventario en la sede y se generará la factura fiscal correspondiente.
+                    Al confirmar, se descontará el inventario en la sede y se registrará {posDocumentType === POS_DOCUMENT_TYPES.DELIVERY_NOTE ? 'la nota de entrega' : 'la factura fiscal'} de forma definitiva.
                   </p>
                 </div>
 
                 {/* Error Alert in Verification Modal */}
                 {error && (
-                  <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs font-semibold text-rose-700 flex items-center gap-2 animate-in fade-in duration-200 shadow-2xs">
+                  <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs sm:text-sm font-semibold text-rose-700 flex items-center gap-2 animate-in fade-in duration-200 shadow-2xs">
                     <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
                     <span>{error}</span>
                   </div>
@@ -2786,7 +2973,7 @@ export const PosInterface: React.FC = () => {
               </div>
 
               {/* Footer Fijo */}
-              <div className="flex justify-between items-center px-6 py-4 border-t border-slate-100 bg-slate-50/80 shrink-0">
+              <div className="flex justify-between items-center px-6 py-4.5 border-t border-slate-100 bg-slate-50/80 shrink-0">
                 <button
                   type="button"
                   disabled={isSubmittingSale}
@@ -2805,7 +2992,7 @@ export const PosInterface: React.FC = () => {
                   className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:from-emerald-700 active:to-teal-700 text-white font-semibold rounded-xl transition-all shadow-md shadow-emerald-200 text-sm cursor-pointer active:scale-98 disabled:opacity-50"
                 >
                   {isSubmittingSale && <Loader2 className="animate-spin h-4 w-4" />}
-                  <span>{isSubmittingSale ? 'Facturando...' : 'Sí, Confirmar y Facturar'}</span>
+                  <span>{isSubmittingSale ? 'Procesando...' : (posDocumentType === POS_DOCUMENT_TYPES.DELIVERY_NOTE ? 'Sí, Emitir Nota de Entrega' : 'Sí, Emitir Factura Fiscal')}</span>
                   {!isSubmittingSale && (
                     <span className="text-[10px] font-mono bg-emerald-800/60 px-1.5 py-0.5 rounded border border-emerald-400/40">
                       ↵ Enter
@@ -2834,7 +3021,9 @@ export const PosInterface: React.FC = () => {
                     ¡Venta Completada con Éxito!
                   </h3>
                   <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    Factura #{completedSale.invoiceNumber} • Control #{completedSale.controlNumber}
+                    {completedSale.documentType === 'DELIVERY_NOTE'
+                      ? `Nota de Entrega #${completedSale.invoiceNumber}`
+                      : `Factura #${completedSale.invoiceNumber} • Control #${completedSale.controlNumber}`}
                   </p>
                 </div>
               </div>
@@ -2873,13 +3062,17 @@ export const PosInterface: React.FC = () => {
 
               <div className="border-b border-dashed border-slate-200 pb-3 space-y-1">
                 <p className="flex justify-between">
-                  <span className="text-slate-500">Factura Nro:</span>
+                  <span className="text-slate-500">
+                    {completedSale.documentType === 'DELIVERY_NOTE' ? 'Comprobante:' : 'Factura Nro:'}
+                  </span>
                   <span className="font-bold text-slate-900">{completedSale.invoiceNumber}</span>
                 </p>
-                <p className="flex justify-between">
-                  <span className="text-slate-500">Nro. Control:</span>
-                  <span className="font-bold text-slate-900">{completedSale.controlNumber}</span>
-                </p>
+                {completedSale.controlNumber && (
+                  <p className="flex justify-between">
+                    <span className="text-slate-500">Nro. Control:</span>
+                    <span className="font-bold text-slate-900">{completedSale.controlNumber}</span>
+                  </p>
+                )}
                 <p className="flex justify-between">
                   <span className="text-slate-500">Cliente:</span>
                   <span className="font-bold text-slate-900">{completedSale.client?.name || 'Cliente Genérico'}</span>

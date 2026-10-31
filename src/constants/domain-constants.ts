@@ -11,6 +11,27 @@ export const TENANT_STATUS = {
 
 export type TenantStatus = typeof TENANT_STATUS[keyof typeof TENANT_STATUS];
 
+export const DELIVERY_TYPES = {
+  STORE_PICKUP: 'STORE_PICKUP',
+  STORE_DELIVERY: 'STORE_DELIVERY',
+  FREIGHT: 'FREIGHT',
+} as const;
+
+export type DeliveryType = typeof DELIVERY_TYPES[keyof typeof DELIVERY_TYPES];
+
+export const DELIVERY_TYPE_LABELS: Record<DeliveryType, string> = {
+  [DELIVERY_TYPES.STORE_PICKUP]: 'Retiro en Tienda',
+  [DELIVERY_TYPES.STORE_DELIVERY]: 'Envío por Tienda',
+  [DELIVERY_TYPES.FREIGHT]: 'Por Flete',
+};
+
+export const POS_DOCUMENT_TYPES = {
+  INVOICE: 'INVOICE',
+  DELIVERY_NOTE: 'DELIVERY_NOTE',
+} as const;
+
+export type PosDocumentType = typeof POS_DOCUMENT_TYPES[keyof typeof POS_DOCUMENT_TYPES];
+
 export const ACCOUNT_STATUS = {
   PENDING: 'PENDING',
   PAID: 'PAID',
