@@ -2195,15 +2195,19 @@ export const PosInterface: React.FC = () => {
                 {/* Luminous Summary Banner with explicit Tax (IVA) breakdown */}
                 <div className="bg-gradient-to-br from-indigo-50/90 via-slate-50 to-blue-50/60 border border-indigo-100/90 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-white/95 border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-2xs">
-                      <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-500 block mb-1">Total USD</span>
-                      <div className="font-mono font-black text-2xl sm:text-3xl text-slate-900 tracking-tight">
+                    <div className="bg-white/95 border border-slate-200/80 rounded-xl p-5 sm:p-6 shadow-2xs">
+                      <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-500 block mb-1.5">
+                        Monto Total USD
+                      </span>
+                      <div className="font-mono font-black text-3xl sm:text-4xl text-slate-900 tracking-tight">
                         ${totalUsd.toFixed(2)}
                       </div>
                     </div>
-                    <div className="bg-indigo-50/80 border border-indigo-200/80 rounded-xl p-4 sm:p-5 shadow-2xs">
-                      <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-indigo-700 block mb-1">Total VES</span>
-                      <div className="font-mono font-black text-2xl sm:text-3xl text-indigo-700 tracking-tight">
+                    <div className="bg-indigo-50/80 border border-indigo-200/80 rounded-xl p-5 sm:p-6 shadow-2xs">
+                      <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-indigo-700 block mb-1.5">
+                        Monto Total VES
+                      </span>
+                      <div className="font-mono font-black text-3xl sm:text-4xl text-indigo-700 tracking-tight">
                         Bs. {totalVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
@@ -2469,7 +2473,7 @@ export const PosInterface: React.FC = () => {
                     {bankAccounts.length > 0 && (
                       <div className="p-3.5 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-2.5">
                         <span className="text-xs font-bold uppercase tracking-wider text-indigo-800 block">
-                          ⚡ Selección Rápida de Método (1 Clic):
+                          Cuentas Registradas
                         </span>
                         <div className="flex flex-wrap gap-2">
                           {bankAccounts.map(acc => {
@@ -2486,13 +2490,19 @@ export const PosInterface: React.FC = () => {
                             else if (isZelle) icon = '🌐';
                             else if (isBinance) icon = '🟡';
 
+                            const isSelected = paymentLines.some(l => l.bankAccountId === acc.id);
+
                             return (
                               <button
                                 key={acc.id}
                                 type="button"
                                 onClick={() => {
-                                  // Apply this account to the first/active line and auto-fill remaining amount
-                                  const targetIdx = paymentLines.length > 0 ? 0 : 0;
+                                  // If already selected, select it as active target or update first empty
+                                  const existingIdx = paymentLines.findIndex(l => l.bankAccountId === acc.id);
+                                  const targetIdx = existingIdx >= 0 
+                                    ? existingIdx 
+                                    : (paymentLines.findIndex(l => !l.bankAccountId) >= 0 ? paymentLines.findIndex(l => !l.bankAccountId) : paymentLines.length > 0 ? 0 : 0);
+
                                   const otherPaidUsd = paymentLines
                                     .filter((_, i) => i !== targetIdx)
                                     .reduce((accTotal, l) => {
@@ -2521,8 +2531,8 @@ export const PosInterface: React.FC = () => {
                                   setPaymentLines(nextLines);
                                 }}
                                 className={`px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 border shadow-2xs cursor-pointer ${
-                                  paymentLines.some(l => l.bankAccountId === acc.id)
-                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-100 scale-102'
+                                  isSelected
+                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-100 scale-102 ring-2 ring-indigo-300'
                                     : 'bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border-slate-200/80 hover:border-indigo-300'
                                 }`}
                               >
@@ -2547,7 +2557,20 @@ export const PosInterface: React.FC = () => {
                         return (
                           <div key={idx} className="bg-slate-50 p-4 sm:p-5 border border-slate-200/80 rounded-2xl space-y-3.5 animate-in fade-in duration-150">
                             <div className="flex items-center justify-between">
-                              <span className="text-xs sm:text-sm font-bold text-slate-600 uppercase tracking-wider">Pago #{idx + 1}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs sm:text-sm font-bold text-slate-700 uppercase tracking-wider">
+                                  Pago #{idx + 1}
+                                </span>
+                                {selectedAcc ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-xs">
+                                    {selectedAcc.currency === 'USD' ? '💵' : '🇻🇪'} {selectedAcc.name} ({selectedAcc.currency})
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 font-bold text-xs">
+                                    ⚠️ Selecciona una cuenta arriba
+                                  </span>
+                                )}
+                              </div>
                               {paymentLines.length > 1 && (
                                 <button
                                   type="button"
@@ -2559,78 +2582,19 @@ export const PosInterface: React.FC = () => {
                               )}
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                              <div>
-                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                                  Cuenta Receptora / Método <span className="text-rose-500">*</span>
-                                </label>
-                                {bankAccounts.length > 0 ? (
-                                  <select
-                                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
-                                    value={line.bankAccountId || ''}
-                                    onChange={(e) => {
-                                      const accId = e.target.value;
-                                      const acc = bankAccounts.find(a => a.id === accId);
-                                      if (acc) {
-                                        const nextCurrency = acc.currency;
-                                        const prevCurrency = line.currency;
-                                        let newAmount = line.amountOriginal;
-                                        if (prevCurrency === 'USD' && nextCurrency === 'VES') {
-                                          newAmount = Number((line.amountOriginal * exchangeRate).toFixed(2));
-                                        } else if (prevCurrency === 'VES' && nextCurrency === 'USD') {
-                                          newAmount = Number((line.amountOriginal / exchangeRate).toFixed(2));
-                                        }
-                                        setPaymentLines(paymentLines.map((l, i) => i === idx ? {
-                                          ...l,
-                                          bankAccountId: acc.id,
-                                          paymentMethod: `${acc.name} (${acc.bank_name})`,
-                                          currency: acc.currency,
-                                          amountOriginal: newAmount,
-                                        } : l));
-                                      } else {
-                                        setPaymentLines(paymentLines.map((l, i) => i === idx ? {
-                                          ...l,
-                                          bankAccountId: '',
-                                          paymentMethod: '',
-                                        } : l));
-                                      }
-                                    }}
-                                  >
-                                    <option value="">-- Seleccione Cuenta Receptora --</option>
-                                    {bankAccounts.map((acc) => (
-                                      <option key={acc.id} value={acc.id}>
-                                        {acc.currency === 'USD' ? '💵' : '🇻🇪'} {acc.name} • {acc.bank_name} ({acc.currency})
-                                      </option>
-                                    ))}
-                                  </select>
-                                ) : (
-                                  <div className="space-y-1">
-                                    <select
-                                      disabled
-                                      className="w-full p-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-400 cursor-not-allowed"
-                                      value=""
-                                    >
-                                      <option value="">⚠️ Sin cuentas registradas</option>
-                                    </select>
-                                    <span className="text-[10px] text-amber-700 font-semibold block">
-                                      Configure cuentas en Cuentas Bancarias para habilitar cobros.
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-
-                              <div>
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Monto ({line.currency})</label>
-                                <CurrencyInput
-                                  value={line.amountOriginal}
-                                  onChange={(val) => {
-                                    setPaymentLines(paymentLines.map((l, i) => i === idx ? { ...l, amountOriginal: val } : l));
-                                  }}
-                                  placeholder="0.00"
-                                  currencyPrefix={line.currency === 'USD' ? '$' : 'Bs.'}
-                                  className="p-2 text-xs font-mono font-bold"
-                                />
-                              </div>
+                            <div className="space-y-1.5">
+                              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                                Monto ({line.currency || 'USD'})
+                              </label>
+                              <CurrencyInput
+                                value={line.amountOriginal}
+                                onChange={(val) => {
+                                  setPaymentLines(paymentLines.map((l, i) => i === idx ? { ...l, amountOriginal: val } : l));
+                                }}
+                                placeholder="0.00"
+                                currencyPrefix={line.currency === 'USD' ? '$' : 'Bs.'}
+                                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-base sm:text-lg font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-900"
+                              />
                             </div>
 
                             {/* Conditional inputs according to Account Type & Method */}
