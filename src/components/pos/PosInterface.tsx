@@ -2667,33 +2667,43 @@ export const PosInterface: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Summary / Calculator */}
+                  {/* Summary / Calculator con diseño espacioso y alta legibilidad */}
                   {(() => {
                     const { paidUsd, paidVes } = getTotalsFromLines();
                     const remainingUsd = Number((totalUsd - paidUsd).toFixed(4));
                     const remainingVes = Number((totalVes - paidVes).toFixed(2));
 
                     return (
-                      <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="text-slate-500 font-bold uppercase">Total a pagar:</span>
-                          <span className="font-mono font-black text-slate-800">${totalUsd.toFixed(2)} / Bs. {totalVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <div className="p-4 sm:p-5 bg-slate-50/90 border border-slate-200/90 rounded-2xl space-y-3.5 shadow-2xs">
+                        <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
+                          <span className="text-xs sm:text-sm text-slate-600 font-bold uppercase tracking-wider">
+                            Total a Pagar:
+                          </span>
+                          <span className="font-mono font-black text-sm sm:text-base text-slate-900 tracking-tight">
+                            ${totalUsd.toFixed(2)} <span className="text-slate-400 font-normal">/</span> Bs. {totalVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
                         </div>
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="text-slate-500 font-bold uppercase">Total recibido:</span>
-                          <span className="font-mono font-black text-indigo-700">${paidUsd.toFixed(2)} / Bs. {paidVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <div className="flex justify-between items-center py-1">
+                          <span className="text-xs sm:text-sm text-slate-600 font-bold uppercase tracking-wider">
+                            Total Recibido:
+                          </span>
+                          <span className="font-mono font-black text-sm sm:text-base text-indigo-700 tracking-tight">
+                            ${paidUsd.toFixed(2)} <span className="text-indigo-300 font-normal">/</span> Bs. {paidVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
                         </div>
 
                         {remainingUsd > 0.009 ? (
-                          <div className="flex justify-between items-center p-2.5 bg-rose-50 border border-rose-100 rounded-xl text-xs text-rose-700 font-bold">
-                            <span>Resta cobrar:</span>
-                            <span className="font-mono">${Math.max(0, remainingUsd).toFixed(2)} / Bs. {Math.max(0, remainingVes).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          <div className="flex justify-between items-center p-3 bg-rose-50/90 border border-rose-200/90 rounded-xl text-rose-800 font-bold shadow-2xs animate-in fade-in duration-150">
+                            <span className="text-xs sm:text-sm uppercase tracking-wide">Resta por Cobrar:</span>
+                            <span className="font-mono font-black text-sm sm:text-base text-rose-700">
+                              ${Math.max(0, remainingUsd).toFixed(2)} <span className="text-rose-300 font-normal">/</span> Bs. {Math.max(0, remainingVes).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
                           </div>
                         ) : remainingUsd < -0.009 ? (
-                          <div className="space-y-2.5 p-2.5 bg-emerald-50 border border-emerald-100 rounded-xl text-xs text-emerald-800">
+                          <div className="space-y-3 p-3.5 bg-emerald-50/90 border border-emerald-200/90 rounded-xl text-emerald-900 shadow-2xs animate-in fade-in duration-150">
                             <div className="flex justify-between items-center font-bold">
-                              <span>Vuelto a entregar:</span>
-                              <span className="font-mono">
+                              <span className="text-xs sm:text-sm uppercase tracking-wide">Vuelto a Entregar:</span>
+                              <span className="font-mono font-black text-base sm:text-lg text-emerald-700">
                                 {changeCurrency === 'USD'
                                   ? `$ ${Math.abs(remainingUsd).toFixed(2)}`
                                   : `Bs. ${Math.abs(remainingVes).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -2701,20 +2711,30 @@ export const PosInterface: React.FC = () => {
                               </span>
                             </div>
 
-                            <div className="flex items-center gap-3 pt-1 border-t border-emerald-200">
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 block">Moneda de Vuelto:</span>
+                            <div className="flex items-center justify-between pt-2 border-t border-emerald-200/80">
+                              <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 block">
+                                Moneda de Vuelto:
+                              </span>
                               <div className="flex gap-2">
                                 <button
                                   type="button"
                                   onClick={() => setChangeCurrency('USD')}
-                                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all border ${changeCurrency === 'USD' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-700 border-emerald-200'}`}
+                                  className={`px-3 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all border cursor-pointer ${
+                                    changeCurrency === 'USD'
+                                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                                      : 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50'
+                                  }`}
                                 >
                                   USD ($)
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => setChangeCurrency('VES')}
-                                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all border ${changeCurrency === 'VES' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-700 border-emerald-200'}`}
+                                  className={`px-3 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all border cursor-pointer ${
+                                    changeCurrency === 'VES'
+                                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                                      : 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50'
+                                  }`}
                                 >
                                   VES (Bs.)
                                 </button>
@@ -2722,8 +2742,8 @@ export const PosInterface: React.FC = () => {
                             </div>
                           </div>
                         ) : (
-                          <div className="p-2.5 bg-emerald-500 text-white text-xs font-bold rounded-xl text-center">
-                            ✅ Monto exacto cubierto
+                          <div className="p-3 bg-emerald-600 text-white text-xs sm:text-sm font-black rounded-xl text-center shadow-2xs flex items-center justify-center gap-2">
+                            <span>✅ Monto exacto cubierto</span>
                           </div>
                         )}
                       </div>
