@@ -2673,6 +2673,10 @@ export const PosInterface: React.FC = () => {
                     const remainingUsd = Number((totalUsd - paidUsd).toFixed(4));
                     const remainingVes = Number((totalVes - paidVes).toFixed(2));
 
+                    // Exact change amount depending on selected change currency
+                    const exactChangeUsd = Math.max(0, Number((paidUsd - totalUsd).toFixed(2)));
+                    const exactChangeVes = Math.max(0, Number((exactChangeUsd * exchangeRate).toFixed(2)));
+
                     return (
                       <div className="p-4 sm:p-5 bg-slate-50/90 border border-slate-200/90 rounded-2xl space-y-3.5 shadow-2xs">
                         <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
@@ -2703,12 +2707,20 @@ export const PosInterface: React.FC = () => {
                           <div className="space-y-3 p-3.5 bg-emerald-50/90 border border-emerald-200/90 rounded-xl text-emerald-900 shadow-2xs animate-in fade-in duration-150">
                             <div className="flex justify-between items-center font-bold">
                               <span className="text-xs sm:text-sm uppercase tracking-wide">Vuelto a Entregar:</span>
-                              <span className="font-mono font-black text-base sm:text-lg text-emerald-700">
-                                {changeCurrency === 'USD'
-                                  ? `$ ${Math.abs(remainingUsd).toFixed(2)}`
-                                  : `Bs. ${Math.abs(remainingVes).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                                }
-                              </span>
+                              <div className="text-right">
+                                <span className="font-mono font-black text-base sm:text-lg text-emerald-700">
+                                  {changeCurrency === 'USD'
+                                    ? `$ ${exactChangeUsd.toFixed(2)}`
+                                    : `Bs. ${exactChangeVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                  }
+                                </span>
+                                <span className="block font-mono text-[11px] text-emerald-600 font-semibold">
+                                  {changeCurrency === 'USD'
+                                    ? `(Equivalente: Bs. ${exactChangeVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
+                                    : `(Equivalente: $ ${exactChangeUsd.toFixed(2)})`
+                                  }
+                                </span>
+                              </div>
                             </div>
 
                             <div className="flex items-center justify-between pt-2 border-t border-emerald-200/80">
@@ -2937,6 +2949,25 @@ export const PosInterface: React.FC = () => {
                       {paymentLines.map(l => getPaymentMethodDisplay(l.paymentMethod, l.bankAccountId)).join(', ')}
                     </span>
                   </div>
+
+                  {/* Vuelto a Entregar en Modal de Verificación */}
+                  {(() => {
+                    const { paidUsd } = getTotalsFromLines();
+                    const exactChangeUsd = Math.max(0, Number((paidUsd - totalUsd).toFixed(2)));
+                    const exactChangeVes = Math.max(0, Number((exactChangeUsd * exchangeRate).toFixed(2)));
+
+                    if (exactChangeUsd > 0.009) {
+                      return (
+                        <div className="p-3.5 bg-emerald-50/90 border border-emerald-200/90 rounded-xl flex items-center justify-between text-emerald-900 shadow-2xs">
+                          <span className="font-bold uppercase text-xs">Vuelto ({changeCurrency}):</span>
+                          <span className="font-mono font-black text-sm sm:text-base text-emerald-700">
+                            {changeCurrency === 'USD' ? `$ ${exactChangeUsd.toFixed(2)}` : `Bs. ${exactChangeVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                          </span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
 
                 {/* Advertencia de Operación */}
