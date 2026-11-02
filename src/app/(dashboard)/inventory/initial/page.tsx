@@ -141,8 +141,7 @@ export default function InitialInventoryPage() {
       taxType: p.taxType || (p.taxRate === 0 ? 'EXEMPT' : 'TAXABLE'),
       initialStock: Number(p.initialStock) || 0,
       unitOfMeasure: p.unitOfMeasure || 'unidades',
-      warehouseLocationId: selectedWarehouseId || undefined,
-      warehouseCode: p.warehouseCode || undefined
+      warehouseLocationId: selectedWarehouseId || undefined
     }));
 
     try {
@@ -255,7 +254,7 @@ export default function InitialInventoryPage() {
                       <span>Almacén Destino para Stock Inicial</span>
                     </label>
                     <p className="text-[11px] text-slate-500">
-                      Las existencias iniciales del archivo Excel se registrarán en este almacén (a menos que el archivo contenga la columna <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800 font-mono">ubicación de almacen</code>).
+                      Las existencias iniciales importadas desde el archivo Excel se registrarán y asignarán automáticamente al almacén seleccionado.
                     </p>
                   </div>
                   <div className="sm:w-72">

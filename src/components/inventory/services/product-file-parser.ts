@@ -10,7 +10,6 @@ export interface ParsedProductRow {
   taxType: 'TAXABLE' | 'EXEMPT' | 'EXONERATED';
   initialStock: number;
   unitOfMeasure?: string;
-  warehouseCode?: string;
 }
 
 export interface ParseResult {
@@ -128,7 +127,6 @@ export function parseProductFile(dataBuffer: ArrayBuffer | Uint8Array, selectedS
         if (val.includes('tax') || val.includes('iva')) colIndexes.taxRate = cIdx;
         if (val.includes('stock') || val.includes('cantidad') || val.includes('cant') || val.includes('existencia')) colIndexes.quantity = cIdx;
         if (val.includes('unit') || val.includes('unidad') || val.includes('medida') || val.includes('presentacion') || val.includes('presentación')) colIndexes.unit = cIdx;
-        if (val.includes('warehouse') || val.includes('almacen') || val.includes('almacén') || val.includes('ubicacion') || val.includes('ubicación')) colIndexes.warehouse = cIdx;
       });
       break;
     }
@@ -187,7 +185,6 @@ export function parseProductFile(dataBuffer: ArrayBuffer | Uint8Array, selectedS
     const rawCost = colIndexes.costUsd !== undefined ? row[colIndexes.costUsd] : 0;
     const rawTax = colIndexes.taxRate !== undefined ? row[colIndexes.taxRate] : 16;
     const rawUnit = colIndexes.unit !== undefined ? cleanString(row[colIndexes.unit]) : 'unidades';
-    const rawWarehouse = colIndexes.warehouse !== undefined ? cleanString(row[colIndexes.warehouse]) : undefined;
     const explicitSku = colIndexes.sku !== undefined ? cleanString(row[colIndexes.sku]).toUpperCase() : '';
 
     const priceUsd = parseNumber(rawPrice, 0);
@@ -206,8 +203,7 @@ export function parseProductFile(dataBuffer: ArrayBuffer | Uint8Array, selectedS
       taxRate: taxRate === 0 ? 0 : taxRate,
       taxType: taxRate === 0 ? 'EXEMPT' : 'TAXABLE',
       initialStock,
-      unitOfMeasure: rawUnit || 'unidades',
-      warehouseCode: rawWarehouse
+      unitOfMeasure: rawUnit || 'unidades'
     });
   }
 

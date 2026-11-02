@@ -306,9 +306,29 @@ export default function BankAccountsPage() {
     }
 
     try {
+      // Auto-fallback for bank_name according to account_type to prevent empty string payloads
+      let effectiveBankName = accountForm.bank_name.trim();
+      if (!effectiveBankName) {
+        if (accountForm.account_type === 'EFECTIVO') {
+          effectiveBankName = 'Caja de Efectivo';
+        } else if (accountForm.account_type === 'ZELLE') {
+          effectiveBankName = 'Zelle';
+        } else if (accountForm.account_type === 'BINANCE') {
+          effectiveBankName = 'Binance';
+        } else if (accountForm.currency === 'VES') {
+          effectiveBankName = VENEZUELAN_BANKS[0].name;
+        }
+      }
+
+      if (!effectiveBankName) {
+        setModalError('El campo Banco / Entidad Financiera es obligatorio.');
+        setIsSaving(false);
+        return;
+      }
+
       const payload = {
         name: accountForm.name.trim(),
-        bank_name: accountForm.bank_name.trim(),
+        bank_name: effectiveBankName,
         account_number: accountForm.account_type === 'EFECTIVO' ? undefined : (accountForm.account_number.trim() || undefined),
         account_type: accountForm.account_type,
         currency: accountForm.currency,
@@ -1009,11 +1029,26 @@ export default function BankAccountsPage() {
                       disabled={!!editingAccount || accountForm.account_type === 'ZELLE' || accountForm.account_type === 'BINANCE'}
                       onChange={(e) => {
                         const newCur = e.target.value;
-                        setAccountForm({ 
-                          ...accountForm, 
-                          currency: newCur,
-                          bank_name: newCur === 'VES' ? VENEZUELAN_BANKS[0].name : '',
-                          p2p_bank_code: newCur === 'VES' ? VENEZUELAN_BANKS[0].code : ''
+                        setAccountForm(prev => {
+                          let defaultBank = '';
+                          if (prev.account_type === 'EFECTIVO') {
+                            defaultBank = 'Caja de Efectivo';
+                          } else if (prev.account_type === 'ZELLE') {
+                            defaultBank = 'Zelle';
+                          } else if (prev.account_type === 'BINANCE') {
+                            defaultBank = 'Binance';
+                          } else if (newCur === 'VES') {
+                            defaultBank = VENEZUELAN_BANKS[0].name;
+                          } else {
+                            defaultBank = prev.bank_name || '';
+                          }
+
+                          return {
+                            ...prev,
+                            currency: newCur,
+                            bank_name: defaultBank,
+                            p2p_bank_code: newCur === 'VES' && prev.account_type !== 'EFECTIVO' ? (prev.p2p_bank_code || VENEZUELAN_BANKS[0].code) : ''
+                          };
                         });
                       }}
                     >
