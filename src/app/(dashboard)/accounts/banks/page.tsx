@@ -896,7 +896,7 @@ export default function BankAccountsPage() {
       {/* Create/Edit Modal (Sally Enterprise UX Standard) */}
       {activeModal === 'create' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
             {/* Header Fijo */}
             <div className="flex justify-between items-center px-6 py-4.5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-indigo-50/30 shrink-0">
               <div className="flex items-center gap-3.5">
@@ -1130,33 +1130,59 @@ export default function BankAccountsPage() {
 
                 {/* Pago Móvil section (Only for Venezuelan Bank Accounts) */}
                 {accountForm.currency === 'VES' && accountForm.account_type !== 'EFECTIVO' && (
-                  <div className="border border-indigo-100 bg-indigo-50/40 rounded-2xl p-4 space-y-3">
-                    <span className="text-xs font-bold uppercase tracking-wider text-indigo-900 block">Metadatos de Pago Móvil Interbancario (P2P)</span>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Teléfono</label>
+                  <div className="border border-indigo-100/80 bg-gradient-to-br from-indigo-50/60 via-slate-50/40 to-blue-50/30 rounded-2xl p-4.5 space-y-3.5 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-2 w-2 rounded-full bg-indigo-600 animate-pulse"></span>
+                        <span className="text-xs font-bold uppercase tracking-wider text-indigo-950 block">
+                          Metadatos de Pago Móvil Interbancario (P2P)
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-semibold text-indigo-600 bg-white/90 border border-indigo-100 px-2.5 py-0.5 rounded-lg shadow-2xs">
+                        VES • Enlace Inmediato
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-start">
+                      {/* Teléfono Pago Móvil */}
+                      <div className="md:col-span-5">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                          Teléfono Pago Móvil
+                        </label>
                         <input
-                          type="text"
-                          placeholder="04121234567"
-                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono"
+                          type="tel"
+                          placeholder="Ej. 04121234567"
+                          className="w-full h-[42px] px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-2xs"
                           value={accountForm.p2p_phone}
                           onChange={(e) => setAccountForm({ ...accountForm, p2p_phone: e.target.value })}
                         />
                       </div>
-                      <RifInput
-                        value={accountForm.p2p_tax_id || ''}
-                        label="RIF / Cédula Pago Móvil"
-                        onChange={(formattedRif) => setAccountForm(prev => ({ ...prev, p2p_tax_id: formattedRif }))}
-                      />
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Código Banco</label>
-                        <input
-                          type="text"
-                          disabled
-                          placeholder="0102"
-                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono bg-slate-100 text-slate-600 font-bold"
-                          value={accountForm.p2p_bank_code}
+
+                      {/* RIF / Cédula */}
+                      <div className="md:col-span-7">
+                        <RifInput
+                          value={accountForm.p2p_tax_id || ''}
+                          label="RIF / Cédula Pago Móvil"
+                          onChange={(formattedRif) => setAccountForm(prev => ({ ...prev, p2p_tax_id: formattedRif }))}
                         />
+                      </div>
+
+                      {/* Código de Banco (Badge Informativo Full-width) */}
+                      <div className="md:col-span-12 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 py-2.5 bg-white/90 border border-slate-200/80 rounded-xl shadow-2xs">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 shrink-0">
+                            Código Banco Receptor:
+                          </span>
+                          <span className="font-mono text-xs font-bold text-indigo-900 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 shrink-0">
+                            {accountForm.p2p_bank_code || '0102'}
+                          </span>
+                          <span className="text-xs text-slate-700 font-semibold">
+                            ({accountForm.bank_name || 'Banco Seleccionado'})
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-medium shrink-0">
+                          Asignado automáticamente por cuenta bancaria
+                        </span>
                       </div>
                     </div>
                   </div>
