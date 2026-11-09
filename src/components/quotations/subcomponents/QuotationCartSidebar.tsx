@@ -62,7 +62,7 @@ export const QuotationCartSidebar: React.FC<QuotationCartSidebarProps> = ({
   return (
     <div className="flex flex-col h-full bg-slate-50/50">
       {/* Seller Header Banner */}
-      <div className="p-4 border-b border-slate-200 bg-white flex justify-between items-center gap-3 shrink-0">
+      <div className="px-4 py-3 border-b border-slate-200 bg-white flex justify-between items-center gap-3 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <button
             type="button"
@@ -81,13 +81,13 @@ export const QuotationCartSidebar: React.FC<QuotationCartSidebarProps> = ({
             </span>
           </div>
         </div>
-        <div className="px-2.5 py-1 bg-indigo-50 border border-indigo-100 rounded-lg text-[11px] font-bold text-indigo-700">
+        <div className="px-2.5 py-0.5 bg-indigo-50 border border-indigo-100 rounded-lg text-[11px] font-bold text-indigo-700">
           Cotización
         </div>
       </div>
 
       {/* Client select block */}
-      <div className="p-4 border-b border-slate-200 bg-white space-y-3 shrink-0">
+      <div className="p-3.5 border-b border-slate-200 bg-white space-y-2.5 shrink-0">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
             Cliente Prospecto
@@ -105,7 +105,7 @@ export const QuotationCartSidebar: React.FC<QuotationCartSidebarProps> = ({
         <div className="relative">
           <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
           <select
-            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white cursor-pointer"
+            className="w-full pl-9 pr-4 py-1.5 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white cursor-pointer"
             value={selectedClientId}
             onChange={(e) => onSelectClient(e.target.value)}
           >
@@ -118,7 +118,7 @@ export const QuotationCartSidebar: React.FC<QuotationCartSidebarProps> = ({
           </select>
         </div>
 
-        <div className="flex items-center justify-between pt-1">
+        <div className="flex items-center justify-between pt-0.5">
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-slate-500 font-semibold">Tasa (VES/USD)</span>
             <Link
@@ -132,7 +132,7 @@ export const QuotationCartSidebar: React.FC<QuotationCartSidebarProps> = ({
             <input
               type="number"
               step="0.01"
-              className="w-24 text-right text-xs font-bold text-slate-800 bg-slate-50 focus:bg-white border border-slate-200 rounded-lg px-2 py-1 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+              className="w-24 text-right text-xs font-bold text-slate-800 bg-slate-50 focus:bg-white border border-slate-200 rounded-lg px-2 py-0.5 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
               value={exchangeRate}
               onChange={(e) => onExchangeRateChange(Number(e.target.value))}
             />
@@ -142,15 +142,15 @@ export const QuotationCartSidebar: React.FC<QuotationCartSidebarProps> = ({
       </div>
 
       {/* Cart Items list */}
-      <div className="flex-1 min-h-0 p-4 overflow-y-auto custom-scrollbar space-y-3">
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+      <div className="flex-1 min-h-[140px] max-h-[30vh] lg:max-h-none p-3.5 overflow-y-auto custom-scrollbar space-y-2.5">
+        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 sticky top-0 bg-slate-50/95 py-1 z-10 backdrop-blur-xs">
           <ShoppingCart className="h-4 w-4 text-indigo-600" />
           Productos a Cotizar ({totalItemsCount})
         </h3>
 
         {cart.length === 0 ? (
-          <div className="py-12 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
-            <ShoppingCart className="h-8 w-8 text-slate-300 stroke-[1.5]" />
+          <div className="py-8 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
+            <ShoppingCart className="h-7 w-7 text-slate-300 stroke-[1.5]" />
             <p>Selecciona productos del catálogo para armar la cotización</p>
           </div>
         ) : (
@@ -158,15 +158,15 @@ export const QuotationCartSidebar: React.FC<QuotationCartSidebarProps> = ({
             {cart.map((item, idx) => (
               <div 
                 key={`${item.product.id}-${item.variation?.name || 'main'}-${idx}`} 
-                className="bg-white p-3 rounded-xl border border-slate-200/80 flex items-center justify-between gap-3 shadow-2xs hover:border-indigo-200 transition-all"
+                className="bg-white p-2.5 rounded-xl border border-slate-200/80 flex items-center justify-between gap-2.5 shadow-2xs hover:border-indigo-200 transition-all"
               >
                 <div className="flex-1 min-w-0">
-                  <h5 className="font-bold text-slate-800 text-xs sm:text-sm truncate">
+                  <h5 className="font-bold text-slate-800 text-xs truncate">
                     {item.product.name}
                   </h5>
                   {item.variation && (
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-1.5 py-0.2 rounded">
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-1.5 py-0.2 rounded">
                         {item.variation.name}
                       </span>
                     </div>
@@ -181,15 +181,15 @@ export const QuotationCartSidebar: React.FC<QuotationCartSidebarProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     type="button"
                     onClick={() => onUpdateQuantity(item.product.id, -1, item.variation?.name)}
                     className="p-1 hover:bg-slate-100 rounded text-slate-500 cursor-pointer transition-colors"
                   >
-                    <Minus className="h-3.5 w-3.5" />
+                    <Minus className="h-3 w-3" />
                   </button>
-                  <span className="w-6 text-center font-bold text-xs sm:text-sm text-slate-800 font-mono">
+                  <span className="w-5 text-center font-bold text-xs text-slate-800 font-mono">
                     {item.quantity}
                   </span>
                   <button
@@ -197,12 +197,12 @@ export const QuotationCartSidebar: React.FC<QuotationCartSidebarProps> = ({
                     onClick={() => onUpdateQuantity(item.product.id, 1, item.variation?.name)}
                     className="p-1 hover:bg-slate-100 rounded text-slate-500 cursor-pointer transition-colors"
                   >
-                    <Plus className="h-3.5 w-3.5" />
+                    <Plus className="h-3 w-3" />
                   </button>
                   <button
                     type="button"
                     onClick={() => onRemoveItem(item.product.id, item.variation?.name)}
-                    className="p-1 hover:bg-rose-50 text-rose-500 rounded ml-1 cursor-pointer transition-colors"
+                    className="p-1 hover:bg-rose-50 text-rose-500 rounded ml-0.5 cursor-pointer transition-colors"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
