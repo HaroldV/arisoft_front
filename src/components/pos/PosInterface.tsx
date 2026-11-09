@@ -40,6 +40,9 @@ import { useAuth } from '@/context/AuthContext';
 import { CurrencyInput } from '@/components/CurrencyInput';
 import { BarcodeScannerModal } from '@/components/inventory/subcomponents/BarcodeScannerModal';
 import { SectorAutocompleteInput } from '@/components/pos/subcomponents/SectorAutocompleteInput';
+import { DisassembleBundleModal } from '@/components/pos/subcomponents/DisassembleBundleModal';
+import { SmartDeBundleModal, ParentBundleOption } from '@/components/pos/subcomponents/SmartDeBundleModal';
+import { Layers, Scissors, Sparkles } from 'lucide-react';
 import { 
   DELIVERY_TYPES, 
   DELIVERY_TYPE_LABELS, 
@@ -69,6 +72,7 @@ interface Product {
   costUsd: number;
   priceUsd: number;
   taxRate: number;
+  product_type?: 'SIMPLE' | 'COMPOUND' | string;
   current_stock: number;
   global_stock?: number;
   warehouse_stocks?: WarehouseStockInfo[];
@@ -197,6 +201,9 @@ export const PosInterface: React.FC = () => {
   const isOwner = user?.role === 'OWNER';
   const assignedWarehouseId = user?.branch?.default_warehouse_id || '';
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(assignedWarehouseId || '');
+  const [disassembleProduct, setDisassembleProduct] = useState<Product | null>(null);
+  const [smartDeBundleChild, setSmartDeBundleChild] = useState<Product | null>(null);
+  const [parentBundlesForChild, setParentBundlesForChild] = useState<ParentBundleOption[]>([]);
 
   const fetchData = async (warehouseIdToFilter?: string) => {
     setIsLoading(true);
@@ -229,6 +236,7 @@ export const PosInterface: React.FC = () => {
         priceUsd: p.priceUsd !== undefined ? Number(p.priceUsd) : (p.price_usd !== undefined ? Number(p.price_usd) : 0),
         costUsd: p.costUsd !== undefined ? Number(p.costUsd) : (p.cost_usd !== undefined ? Number(p.cost_usd) : 0),
         taxRate: p.taxRate !== undefined ? Number(p.taxRate) : (p.tax_rate !== undefined ? Number(p.tax_rate) : 0),
+        product_type: p.product_type || p.productType || 'SIMPLE',
         current_stock: p.current_stock !== undefined ? Number(p.current_stock) : 0,
       }));
       setProducts(productList);
@@ -495,12 +503,32 @@ export const PosInterface: React.FC = () => {
   const barcodeBufferRef = useRef<string>('');
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const addToCart = (product: Product, variation?: ProductVariation) => {
+  const addToCart = async (product: Product, variation?: ProductVariation) => {
     // Strict Branch Stock Guard: Prevent selling products that belong to another branch/warehouse
     const localStock = getProductLocalStock(product);
     
-    // Block addition if there is no stock in the cashier's assigned branch/warehouse
+    // Check if there is no stock in the cashier's assigned branch/warehouse
     if (localStock <= 0) {
+      // 1. Asistente Inteligente de Desarmado: Verificar si existen bultos padres disponibles en este almacén
+      const whId = assignedWarehouseId || selectedWarehouseId;
+      try {
+        const bundlesRes = await apiClient.get(`/inventory/products/${product.id}/parent-bundles`, {
+          params: { warehouseId: whId }
+        });
+        const bundles: ParentBundleOption[] = bundlesRes.data || [];
+        const availableBundles = bundles.filter(b => b.available_bundles > 0);
+
+        if (availableBundles.length > 0) {
+          // Abrir modal asistido de desarmado de bulto
+          setSmartDeBundleChild(product);
+          setParentBundlesForChild(availableBundles);
+          return;
+        }
+      } catch (err) {
+        console.error('Error checking parent bundles for product:', err);
+      }
+
+      // Si no hay bultos disponibles en la sede, mostrar advertencia normal
       const alternateStocks = (product.warehouse_stocks || []).filter(ws => ws.stock > 0);
       const targetLocation = alternateStocks[0]?.branch_name || alternateStocks[0]?.warehouse_name || 'otra sucursal';
       playScanBeep(false);
@@ -1330,6 +1358,21 @@ export const PosInterface: React.FC = () => {
                             </div>
                           </div>
 
+                          {/* Quick Disassemble Action for Compound Products in POS List */}
+                          {p.product_type === 'COMPOUND' && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDisassembleProduct(p);
+                              }}
+                              className="p-2 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700 transition-all shadow-2xs cursor-pointer active:scale-90"
+                              title="Desarmar bulto en unidades sueltas"
+                            >
+                              <Scissors className="h-4 w-4" />
+                            </button>
+                          )}
+
                           <button
                             type="button"
                             onClick={(e) => {
@@ -1394,13 +1437,21 @@ export const PosInterface: React.FC = () => {
                         </span>
 
                         {!isOut ? (
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                            isCritical 
-                              ? 'bg-amber-50 text-amber-700 border-amber-200' 
-                              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          }`}>
-                            {isCritical ? 'Crítico' : 'Disponible'}
-                          </span>
+                          <div className="flex items-center gap-1">
+                            {p.product_type === 'COMPOUND' && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md border bg-amber-50 text-amber-800 border-amber-200 flex items-center gap-0.5">
+                                <Layers className="w-2.5 h-2.5 text-amber-600" />
+                                Bulto
+                              </span>
+                            )}
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              isCritical 
+                                ? 'bg-amber-50 text-amber-700 border-amber-200' 
+                                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            }`}>
+                              {isCritical ? 'Crítico' : 'Disponible'}
+                            </span>
+                          </div>
                         ) : hasAlternateStock ? (
                           <span 
                             className="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200 flex items-center gap-1 max-w-[120px] truncate"
@@ -3563,6 +3614,48 @@ export const PosInterface: React.FC = () => {
         onClose={() => setIsScannerOpen(false)}
         onScanSuccess={(code) => handleScanProductInPos(code)}
       />
+
+      {/* Disassemble Bundle Modal */}
+      {disassembleProduct && (
+        <DisassembleBundleModal
+          isOpen={!!disassembleProduct}
+          product={disassembleProduct}
+          warehouseId={assignedWarehouseId || selectedWarehouseId}
+          onClose={() => setDisassembleProduct(null)}
+          onSuccess={() => {
+            setDisassembleProduct(null);
+            fetchData();
+          }}
+        />
+      )}
+
+      {/* Smart De-Bundle Assistant Modal (when unit stock is 0 but bundles exist) */}
+      {smartDeBundleChild && (
+        <SmartDeBundleModal
+          isOpen={!!smartDeBundleChild}
+          childProduct={smartDeBundleChild}
+          parentBundles={parentBundlesForChild}
+          warehouseId={assignedWarehouseId || selectedWarehouseId}
+          onClose={() => setSmartDeBundleChild(null)}
+          onSuccess={(addedUnits) => {
+            const child = smartDeBundleChild;
+            setSmartDeBundleChild(null);
+            showScanToast(`✨ Se rompieron bultos: +${addedUnits} unidades añadidas al stock`, 'success');
+            fetchData().then(() => {
+              if (child) {
+                // Auto-agregar la primera unidad solicitada al carrito tras el abastecimiento
+                setCart(prev => {
+                  const existing = prev.find(item => item.product.id === child.id);
+                  if (existing) {
+                    return prev.map(item => item.product.id === child.id ? { ...item, quantity: item.quantity + 1 } : item);
+                  }
+                  return [...prev, { product: child, quantity: 1 }];
+                });
+              }
+            });
+          }}
+        />
+      )}
 
       {/* Real-time Scan Notification Toast */}
       {scanToast && (

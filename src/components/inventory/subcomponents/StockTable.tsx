@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Package, ArrowUpDown, ArrowUp, ArrowDown, Edit2, Trash2, CheckCircle, XCircle, AlertTriangle, ArrowRightLeft } from 'lucide-react';
+import { Package, ArrowUpDown, ArrowUp, ArrowDown, Edit2, Trash2, CheckCircle, XCircle, AlertTriangle, ArrowRightLeft, Layers } from 'lucide-react';
 import { ActionTooltip } from '@/components/ActionTooltip';
 import { InventoryProduct, SortField, SortOrder } from '../types/stock.types';
 
@@ -13,6 +13,7 @@ interface StockTableProps {
   onToggleSort: (field: SortField) => void;
   onEdit: (product: InventoryProduct) => void;
   onDelete: (productId: string) => void;
+  onManageComponents?: (product: InventoryProduct) => void;
   onBulkTransfer?: (selectedProducts: InventoryProduct[]) => void;
 }
 
@@ -24,6 +25,7 @@ export const StockTable: React.FC<StockTableProps> = ({
   onToggleSort,
   onEdit,
   onDelete,
+  onManageComponents,
   onBulkTransfer,
 }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -237,7 +239,15 @@ export const StockTable: React.FC<StockTableProps> = ({
                 </td>
                 <td className="py-4 px-6">
                   <div>
-                    <p className="font-bold text-slate-900">{product.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-slate-900">{product.name}</p>
+                      {product.product_type === 'COMPOUND' && (
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200/80 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+                          <Layers className="w-3 h-3 text-indigo-600" />
+                          Bulto / Combo
+                        </span>
+                      )}
+                    </div>
                     {product.created_by_user_name && (
                       <p className="text-[10px] text-slate-400 font-normal">
                         Reg: {product.created_by_user_name}
@@ -261,6 +271,16 @@ export const StockTable: React.FC<StockTableProps> = ({
                 <td className="py-4 px-6">{getStockBadge(product.current_stock ?? 0)}</td>
                 <td className="py-4 px-6 text-right">
                   <div className="flex items-center justify-end gap-1.5">
+                    {onManageComponents && (
+                      <ActionTooltip content="Configurar Receta / Bulto / Combo">
+                        <button
+                          onClick={() => onManageComponents(product)}
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/80 rounded-lg transition-all duration-200 cursor-pointer"
+                        >
+                          <Layers className="h-4 w-4" />
+                        </button>
+                      </ActionTooltip>
+                    )}
                     <ActionTooltip content="Editar producto">
                       <button
                         onClick={() => onEdit(product)}

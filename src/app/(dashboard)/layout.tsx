@@ -29,6 +29,7 @@ export default function DashboardLayout({
   const [bcvUsdRate, setBcvUsdRate] = useState<number>(772.54);
   const [bcvEurRate, setBcvEurRate] = useState<number>(894.49);
   const [binanceRate, setBinanceRate] = useState<number>(1013.50);
+  const [copRate, setCopRate] = useState<number>(3240.00);
   const [showBinanceRate, setShowBinanceRate] = useState<boolean>(false);
   const [currencyMode, setCurrencyMode] = useState<string>('BCV');
   const [manualRate, setManualRate] = useState<number>(780.00);
@@ -131,6 +132,7 @@ export default function DashboardLayout({
           else if (bcvRes.data.rate) setBcvUsdRate(Number(bcvRes.data.rate));
           if (bcvRes.data.EUR?.rate) setBcvEurRate(Number(bcvRes.data.EUR.rate));
           if (bcvRes.data.BINANCE?.rate) setBinanceRate(Number(bcvRes.data.BINANCE.rate));
+          if (bcvRes.data.COP?.rate) setCopRate(Number(bcvRes.data.COP.rate));
         }
 
         // 2. Obtener configuración de la empresa
@@ -147,6 +149,7 @@ export default function DashboardLayout({
         const usdR = bcvRes?.data?.USD?.rate ? Number(bcvRes.data.USD.rate) : (bcvRes?.data?.rate ? Number(bcvRes.data.rate) : undefined);
         const eurR = bcvRes?.data?.EUR?.rate ? Number(bcvRes.data.EUR.rate) : undefined;
         const binanceR = bcvRes?.data?.BINANCE?.rate ? Number(bcvRes.data.BINANCE.rate) : undefined;
+        const copR = bcvRes?.data?.COP?.rate ? Number(bcvRes.data.COP.rate) : undefined;
         if (typeof window !== 'undefined' && usdR) {
           window.dispatchEvent(
             new CustomEvent('exchange-rate-updated', {
@@ -154,6 +157,7 @@ export default function DashboardLayout({
                 usdRate: usdR,
                 eurRate: eurR,
                 binanceRate: binanceR,
+                copRate: copR,
                 showBinanceRate: !!settings.showBinanceRate,
                 manualRate: settings.manualRate ? Number(settings.manualRate) : undefined,
                 mode: settings.currencyMode || 'BCV_USD',
@@ -421,6 +425,17 @@ export default function DashboardLayout({
                   </span>
                   <span className="text-[10px] sm:text-xs uppercase tracking-tight text-slate-400 font-bold ml-0.5 hidden md:inline-block leading-none">
                     BCV
+                  </span>
+                </div>
+
+                {/* Badge Tasa Peso Colombiano (COP) */}
+                <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white border border-amber-100/90 text-amber-800 shadow-2xs group-hover:border-amber-300 transition-all">
+                  <span className="text-[10px] sm:text-xs font-black text-amber-600 leading-none">COL$</span>
+                  <span className="font-mono text-xs sm:text-sm font-black text-slate-900 tracking-tight leading-none">
+                    {copRate.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </span>
+                  <span className="text-[10px] sm:text-xs uppercase tracking-tight text-amber-600 font-bold ml-0.5 hidden md:inline-block leading-none">
+                    COP
                   </span>
                 </div>
 

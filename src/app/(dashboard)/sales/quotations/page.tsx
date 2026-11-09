@@ -1,5 +1,8 @@
-import QuotationsList from '@/components/sales/QuotationsList';
+'use client';
+
+import React from 'react';
+import { QuotationsInterface } from '@/components/quotations/QuotationsInterface';
 
 export default function QuotationsPage() {
-  return <QuotationsList />;
+  return <QuotationsInterface />;
 }

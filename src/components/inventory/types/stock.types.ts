@@ -22,6 +22,8 @@ export interface InventoryProduct {
   priceUsd: number;
   taxRate: number;
   tax_type?: ProductTaxType | string;
+  product_type?: 'SIMPLE' | 'COMPOUND' | string;
+  productType?: 'SIMPLE' | 'COMPOUND' | string;
   is_perishable?: boolean;
   has_batch_control?: boolean;
   current_stock: number;
