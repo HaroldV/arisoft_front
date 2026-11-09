@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import apiClient from '@/infrastructure/api/api-client';
 import { QuotationClient, QuotationCartItem } from '../types';
+import { ClientAutocompleteInput } from './ClientAutocompleteInput';
 
 interface GenerateQuotationModalProps {
   isOpen: boolean;
@@ -76,31 +77,48 @@ export const GenerateQuotationModal: React.FC<GenerateQuotationModalProps> = ({
   const totalUsd = Number((subtotalUsd + taxUsd).toFixed(2));
   const totalBs = Number((totalUsd * exchangeRate).toFixed(2));
 
-  // Manejador al seleccionar cliente existente del combobox/select
-  const handleSelectExistingClient = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const cId = e.target.value;
-    setSelectedClientId(cId);
-    if (!cId) {
-      setClientName('');
-      setClientDocNumber('');
-      setClientPhone('');
-      setClientEmail('');
-      return;
-    }
+  const [clientSearchText, setClientSearchText] = useState<string>(
+    initialClient ? `${initialClient.name}${initialClient.tax_id ? ` (${initialClient.tax_id})` : ''}` : ''
+  );
 
-    const found = clients.find(c => c.id === cId);
-    if (found) {
-      setClientName(found.name);
-      setClientPhone(found.phone || '');
-      setClientEmail(found.email || '');
-      
-      const rawTax = found.tax_id || '';
-      const prefixMatch = rawTax.match(/^([VJEGP])-?/i);
-      if (prefixMatch) {
-        setClientDocType(prefixMatch[1].toUpperCase());
-        setClientDocNumber(rawTax.replace(/^([VJEGP])-?/i, ''));
-      } else {
-        setClientDocNumber(rawTax);
+  // Manejador al seleccionar cliente existente desde el buscador/autocompletado
+  const handleSelectClient = (client: QuotationClient) => {
+    setSelectedClientId(client.id);
+    setClientName(client.name);
+    setClientPhone(client.phone || '');
+    setClientEmail(client.email || '');
+    setClientSearchText(`${client.name}${client.tax_id ? ` (${client.tax_id})` : ''}`);
+
+    const rawTax = client.tax_id || '';
+    const prefixMatch = rawTax.match(/^([VJEGP])-?/i);
+    if (prefixMatch) {
+      setClientDocType(prefixMatch[1].toUpperCase());
+      setClientDocNumber(rawTax.replace(/^([VJEGP])-?/i, ''));
+    } else {
+      setClientDocNumber(rawTax);
+    }
+  };
+
+  const handleSearchTextChange = (text: string) => {
+    setClientSearchText(text);
+
+    // Intentar buscar coincidencia directa por RIF o Cédula escrita
+    const cleanQuery = text.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const directMatch = clients.find(c => {
+      const cTax = (c.tax_id || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      return cTax && (cTax === cleanQuery || c.name.toUpperCase() === text.trim().toUpperCase());
+    });
+
+    if (directMatch) {
+      handleSelectClient(directMatch);
+    } else {
+      // Si el usuario escribe algo nuevo, desasociamos el id previo para permitir guardado nuevo
+      setSelectedClientId('');
+      // Si parece un RIF con formato (ej. V-12345678 o J12345678)
+      const rifMatch = text.trim().match(/^([VJEGP])-?([0-9A-Z]+)/i);
+      if (rifMatch) {
+        setClientDocType(rifMatch[1].toUpperCase());
+        setClientDocNumber(rifMatch[2]);
       }
     }
   };
@@ -247,23 +265,29 @@ export const GenerateQuotationModal: React.FC<GenerateQuotationModalProps> = ({
               </div>
             </div>
 
-            {/* Selector de Cliente Registrado */}
+            {/* Selector de Cliente Registrado con Autocompletado */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                Seleccionar Cliente Registrado (Opcional)
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
+                <span>Seleccionar Cliente Registrado (Opcional)</span>
+                {selectedClientId ? (
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3 text-emerald-600" />
+                    Cliente Existente
+                  </span>
+                ) : clientName.trim() ? (
+                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Plus className="w-3 h-3 text-indigo-600" />
+                    Nuevo Cliente
+                  </span>
+                ) : null}
               </label>
-              <select
-                value={selectedClientId}
-                onChange={handleSelectExistingClient}
-                className="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-2xs cursor-pointer"
-              >
-                <option value="">-- Cliente nuevo o de mostrador --</option>
-                {clients.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {c.tax_id ? `(${c.tax_id})` : ''}
-                  </option>
-                ))}
-              </select>
+              <ClientAutocompleteInput
+                value={clientSearchText}
+                clients={clients}
+                onSelectClient={handleSelectClient}
+                onChangeText={handleSearchTextChange}
+                placeholder="Escribe cédula, RIF o razón social para autocompletar..."
+              />
             </div>
 
             {/* Cuadrícula Cliente / Empresa */}
