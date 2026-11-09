@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FileText, 
   Calendar, 
@@ -77,9 +77,26 @@ export const GenerateQuotationModal: React.FC<GenerateQuotationModalProps> = ({
   const totalUsd = Number((subtotalUsd + taxUsd).toFixed(2));
   const totalBs = Number((totalUsd * exchangeRate).toFixed(2));
 
-  const [clientSearchText, setClientSearchText] = useState<string>(
-    initialClient ? `${initialClient.name}${initialClient.tax_id ? ` (${initialClient.tax_id})` : ''}` : ''
-  );
+  const [clientSearchText, setClientSearchText] = useState<string>('');
+
+  useEffect(() => {
+    if (initialClient) {
+      setSelectedClientId(initialClient.id || '');
+      setClientName(initialClient.name || '');
+      setClientPhone(initialClient.phone || '');
+      setClientEmail(initialClient.email || '');
+      setClientSearchText(`${initialClient.name}${initialClient.tax_id ? ` (${initialClient.tax_id})` : ''}`);
+
+      const rawTax = initialClient.tax_id || '';
+      const prefixMatch = rawTax.match(/^([VJEGP])-?/i);
+      if (prefixMatch) {
+        setClientDocType(prefixMatch[1].toUpperCase());
+        setClientDocNumber(rawTax.replace(/^([VJEGP])-?/i, ''));
+      } else {
+        setClientDocNumber(rawTax);
+      }
+    }
+  }, [initialClient]);
 
   // Manejador al seleccionar cliente existente desde el buscador/autocompletado
   const handleSelectClient = (client: QuotationClient) => {
@@ -159,7 +176,7 @@ export const GenerateQuotationModal: React.FC<GenerateQuotationModalProps> = ({
     }
 
     if (cart.length === 0) {
-      setError('La cotización no contiene productos en el carrito.');
+      setError('Debes agregar al menos un producto al carrito antes de generar la cotización.');
       return;
     }
 
@@ -463,8 +480,8 @@ export const GenerateQuotationModal: React.FC<GenerateQuotationModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSaving || cart.length === 0}
-              className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:from-indigo-700 active:to-violet-700 text-white font-semibold rounded-xl text-sm shadow-md shadow-indigo-200 transition-all cursor-pointer disabled:opacity-40"
+              disabled={isSaving}
+              className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:from-indigo-700 active:to-violet-700 text-white font-semibold rounded-xl text-sm shadow-md shadow-indigo-200 transition-all cursor-pointer disabled:opacity-50"
             >
               {isSaving ? (
                 <Loader2 className="animate-spin w-4 h-4" />

@@ -26,6 +26,7 @@ import {
 import { QuotationProductCatalog } from './subcomponents/QuotationProductCatalog';
 import { QuotationCartSidebar } from './subcomponents/QuotationCartSidebar';
 import { GenerateQuotationModal } from './subcomponents/GenerateQuotationModal';
+import { QuickClientModal } from './subcomponents/QuickClientModal';
 import { QuotationsTable } from './subcomponents/QuotationsTable';
 
 export const QuotationsInterface: React.FC = () => {
@@ -55,6 +56,7 @@ export const QuotationsInterface: React.FC = () => {
 
   // Modal states
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
+  const [isQuickClientModalOpen, setIsQuickClientModalOpen] = useState(false);
 
   // Fetch initial data
   const fetchCatalogData = async () => {
@@ -362,7 +364,7 @@ export const QuotationsInterface: React.FC = () => {
                 onUpdateQuantity={handleUpdateQuantity}
                 onRemoveItem={handleRemoveItem}
                 onGenerateQuotationClick={() => setIsGenerateModalOpen(true)}
-                onOpenQuickClientModal={() => setIsGenerateModalOpen(true)}
+                onOpenQuickClientModal={() => setIsQuickClientModalOpen(true)}
                 onCloseMobileCart={() => setMobileTab('CATALOG')}
                 userName={user?.full_name}
               />
@@ -387,6 +389,15 @@ export const QuotationsInterface: React.FC = () => {
           initialClient={selectedClientObj}
           onClose={() => setIsGenerateModalOpen(false)}
           onSuccess={handleQuotationGenerated}
+          onClientCreated={handleClientCreated}
+        />
+      )}
+
+      {/* Quick Client Registration Modal (from Cart Sidebar) */}
+      {isQuickClientModalOpen && (
+        <QuickClientModal
+          isOpen={isQuickClientModalOpen}
+          onClose={() => setIsQuickClientModalOpen(false)}
           onClientCreated={handleClientCreated}
         />
       )}
