@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { User, Search, ChevronDown, Check, Plus, Building2, Phone } from 'lucide-react';
+import { Search, ChevronDown, Check, UserPlus, Building2, User } from 'lucide-react';
 import { QuotationClient } from '../types';
 
 interface ClientAutocompleteInputProps {
@@ -10,6 +10,7 @@ interface ClientAutocompleteInputProps {
   clients: QuotationClient[];
   onSelectClient: (client: QuotationClient) => void;
   onChangeText: (text: string) => void;
+  onQuickRegisterNew?: (queryText: string) => void;
   placeholder?: string;
 }
 
@@ -18,6 +19,7 @@ export const ClientAutocompleteInput: React.FC<ClientAutocompleteInputProps> = (
   clients,
   onSelectClient,
   onChangeText,
+  onQuickRegisterNew,
   placeholder = 'Buscar por RIF, Cédula o Razón Social...'
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -79,6 +81,13 @@ export const ClientAutocompleteInput: React.FC<ClientAutocompleteInputProps> = (
     setIsOpen(false);
   };
 
+  const handleCreateNewClick = () => {
+    if (onQuickRegisterNew) {
+      onQuickRegisterNew(value);
+    }
+    setIsOpen(false);
+  };
+
   return (
     <div className="relative w-full" ref={containerRef}>
       <div className="relative flex items-center">
@@ -95,6 +104,17 @@ export const ClientAutocompleteInput: React.FC<ClientAutocompleteInputProps> = (
             onChangeText(e.target.value);
             updatePosition();
             setIsOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              if (filteredClients.length > 0) {
+                e.preventDefault();
+                handleSelect(filteredClients[0]);
+              } else if (value.trim() && onQuickRegisterNew) {
+                e.preventDefault();
+                handleCreateNewClick();
+              }
+            }
           }}
           className="w-full pl-9 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-2xs placeholder:text-slate-400"
         />
@@ -161,10 +181,16 @@ export const ClientAutocompleteInput: React.FC<ClientAutocompleteInputProps> = (
                 );
               })
             ) : (
-              <div className="p-3 text-center">
-                <p className="text-xs text-slate-600 font-bold">Cliente no encontrado en el sistema.</p>
-                <p className="text-[11px] text-indigo-600 font-semibold mt-0.5">
-                  ✨ Los datos que ingreses se guardarán automáticamente como nuevo cliente.
+              <div 
+                onClick={handleCreateNewClick}
+                className="p-3 text-center rounded-xl bg-indigo-50/70 hover:bg-indigo-50 border border-indigo-100 cursor-pointer transition-colors group"
+              >
+                <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-indigo-700 group-hover:text-indigo-800">
+                  <UserPlus className="w-4 h-4 text-indigo-600" />
+                  <span>Usar &quot;{value.trim()}&quot; como nuevo cliente</span>
+                </div>
+                <p className="text-[11px] text-slate-500 font-medium mt-1">
+                  Click aquí o presiona Enter para transferir automáticamente a Cédula/RIF
                 </p>
               </div>
             )}

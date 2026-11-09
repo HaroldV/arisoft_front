@@ -99,6 +99,29 @@ export const GenerateQuotationModal: React.FC<GenerateQuotationModalProps> = ({
     }
   };
 
+  const parseAndApplyInput = (text: string) => {
+    const raw = text.trim();
+    if (!raw) return;
+
+    // Verificar si empieza con prefijo de documento (V, J, E, G, P) o si son solo números
+    const docWithPrefixMatch = raw.match(/^([VJEGP])-?([0-9A-Z]+)$/i);
+    const pureNumbersMatch = raw.match(/^([0-9]{5,10})$/);
+
+    if (docWithPrefixMatch) {
+      setClientDocType(docWithPrefixMatch[1].toUpperCase());
+      setClientDocNumber(docWithPrefixMatch[2]);
+    } else if (pureNumbersMatch) {
+      // Cédula venezolana por defecto si son números
+      setClientDocType('V');
+      setClientDocNumber(pureNumbersMatch[1]);
+    } else {
+      // Si contiene letras y espacios, es más probable que sea la Razón Social / Nombre
+      if (!clientName.trim()) {
+        setClientName(raw);
+      }
+    }
+  };
+
   const handleSearchTextChange = (text: string) => {
     setClientSearchText(text);
 
@@ -112,15 +135,14 @@ export const GenerateQuotationModal: React.FC<GenerateQuotationModalProps> = ({
     if (directMatch) {
       handleSelectClient(directMatch);
     } else {
-      // Si el usuario escribe algo nuevo, desasociamos el id previo para permitir guardado nuevo
+      // Si el usuario escribe algo que no coincide con un cliente existente:
       setSelectedClientId('');
-      // Si parece un RIF con formato (ej. V-12345678 o J12345678)
-      const rifMatch = text.trim().match(/^([VJEGP])-?([0-9A-Z]+)/i);
-      if (rifMatch) {
-        setClientDocType(rifMatch[1].toUpperCase());
-        setClientDocNumber(rifMatch[2]);
-      }
+      parseAndApplyInput(text);
     }
+  };
+
+  const handleQuickRegisterNew = (queryText: string) => {
+    parseAndApplyInput(queryText);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -286,6 +308,7 @@ export const GenerateQuotationModal: React.FC<GenerateQuotationModalProps> = ({
                 clients={clients}
                 onSelectClient={handleSelectClient}
                 onChangeText={handleSearchTextChange}
+                onQuickRegisterNew={handleQuickRegisterNew}
                 placeholder="Escribe cédula, RIF o razón social para autocompletar..."
               />
             </div>
