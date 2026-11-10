@@ -521,18 +521,25 @@ export default function DashboardLayout({
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 p-3.5 sm:p-6 lg:p-8 min-w-0 w-full overflow-x-hidden">
+        <main className={cn(
+          "flex-1 min-w-0 w-full overflow-x-hidden",
+          pathname === '/pos' || pathname === '/sales/quotations'
+            ? "p-2 sm:p-4 lg:p-6"
+            : "p-3.5 sm:p-6 lg:p-8"
+        )}>
           <div className="max-w-[1600px] mx-auto min-w-0 w-full">
             {children}
           </div>
         </main>
 
-        {/* Footer */}
-        <footer className="py-6 px-8 bg-white border-t border-slate-200 text-center">
-          <p className="text-xs text-slate-400">
-            © 2026 Ari Soft - Administración Resiliente e Inteligente. Todos los derechos reservados.
-          </p>
-        </footer>
+        {/* Footer (Oculto en terminales tipo POS y Cotizaciones para fijar la interfaz sin desbordamiento) */}
+        {pathname !== '/pos' && pathname !== '/sales/quotations' && (
+          <footer className="py-6 px-8 bg-white border-t border-slate-200 text-center">
+            <p className="text-xs text-slate-400">
+              © 2026 Ari Soft - Administración Resiliente e Inteligente. Todos los derechos reservados.
+            </p>
+          </footer>
+        )}
       </div>
     </div>
   );

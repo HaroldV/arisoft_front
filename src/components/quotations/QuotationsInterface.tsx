@@ -192,16 +192,16 @@ export const QuotationsInterface: React.FC = () => {
       )}
 
       {/* Top Header & Navigation Tabs */}
-      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="bg-white px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl p-3">
-            <FileText className="h-6 w-6" />
+          <div className="bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl p-2.5">
+            <FileText className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900">
+            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 leading-tight">
               Cotizaciones de Ventas
             </h1>
-            <p className="text-xs text-slate-500 font-medium">
+            <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
               Alista productos para tus clientes en mostrador o consulta tu historial de cotizaciones
             </p>
           </div>
@@ -212,7 +212,7 @@ export const QuotationsInterface: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab('TERMINAL')}
-            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'TERMINAL'
                 ? 'bg-white text-indigo-600 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
@@ -230,7 +230,7 @@ export const QuotationsInterface: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab('LIST')}
-            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'LIST'
                 ? 'bg-white text-indigo-600 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
@@ -247,7 +247,7 @@ export const QuotationsInterface: React.FC = () => {
 
       {/* Main Content Area */}
       {activeTab === 'TERMINAL' ? (
-        <div className="flex flex-col h-[calc(100dvh-13.5rem)] min-h-[500px] bg-white rounded-2xl overflow-hidden border border-slate-200/80 shadow-sm">
+        <div className="flex flex-col h-[calc(100dvh-12.5rem)] sm:h-[calc(100dvh-14rem)] lg:h-[calc(100vh-14.5rem)] min-h-[480px] bg-white rounded-2xl overflow-hidden border border-slate-200/80 shadow-sm">
           {/* Mobile Tab Switcher */}
           <div className="flex lg:hidden bg-slate-100 border-b border-slate-200 p-1.5 gap-1 shrink-0">
             <button
@@ -344,6 +344,46 @@ export const QuotationsInterface: React.FC = () => {
                   />
                 )}
               </div>
+
+              {/* Bottom Sticky Action Bar on Mobile/Tablet when Cart has items */}
+              {cart.length > 0 && mobileTab === 'CATALOG' && (
+                <div className="lg:hidden p-3 bg-white border-t border-slate-200 flex items-center justify-between gap-3 shadow-lg z-10">
+                  <div
+                    onClick={() => setMobileTab('CART')}
+                    className="flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <div className="h-9 w-9 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 shadow-2xs">
+                      <ShoppingCart className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">
+                        {cart.reduce((sum, i) => sum + i.quantity, 0)} {cart.reduce((sum, i) => sum + i.quantity, 0) === 1 ? 'producto' : 'productos'}
+                      </div>
+                      <div className="text-[11px] font-black text-slate-900 font-mono">
+                        ${cart.reduce((sum, item) => sum + (item.product.priceUsd * item.quantity), 0).toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMobileTab('CART')}
+                      className="px-3 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl"
+                    >
+                      Ver Carrito
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsGenerateModalOpen(true)}
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Generar Cotización</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Cart (Right) */}

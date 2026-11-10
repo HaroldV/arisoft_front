@@ -34,8 +34,8 @@ test.describe('Quotations POS-Style Flow and Modal Validation', () => {
       await page.locator('.cursor-pointer').filter({ hasText: '$' }).first().click();
     }
 
-    // 5. Verify button "Generar Cotización" in cart sidebar is clickable and opens modal
-    const generateBtn = page.locator('button:has-text("Generar Cotización")');
+    // 5. Verify button "Generar Cotización" is clickable and opens modal
+    const generateBtn = page.getByRole('button', { name: 'Generar Cotización' }).last();
     await expect(generateBtn).toBeEnabled();
     await generateBtn.click();
 
