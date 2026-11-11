@@ -42,7 +42,9 @@ import { BarcodeScannerModal } from '@/components/inventory/subcomponents/Barcod
 import { SectorAutocompleteInput } from '@/components/pos/subcomponents/SectorAutocompleteInput';
 import { DisassembleBundleModal } from '@/components/pos/subcomponents/DisassembleBundleModal';
 import { SmartDeBundleModal, ParentBundleOption } from '@/components/pos/subcomponents/SmartDeBundleModal';
-import { Layers, Scissors, Sparkles } from 'lucide-react';
+import { LoadQuotationModal } from '@/components/pos/subcomponents/LoadQuotationModal';
+import { CommercialQuotation } from '@/components/quotations/types';
+import { Layers, Scissors, Sparkles, FileDown } from 'lucide-react';
 import { 
   DELIVERY_TYPES, 
   DELIVERY_TYPE_LABELS, 
@@ -96,9 +98,18 @@ interface CartItem {
   variation?: ProductVariation;
 }
 
-export const PosInterface: React.FC = () => {
+export interface PosInterfaceProps {
+  mode?: 'POS' | 'COMMERCIAL';
+}
+
+export const PosInterface: React.FC<PosInterfaceProps> = ({ mode = 'POS' }) => {
+  const isCommercialMode = mode === 'COMMERCIAL';
   const { user } = useAuth();
   const canApplyDiscount = user?.role === 'OWNER' || (user?.permissions || []).includes('pos:discount');
+
+  // Commercial Mode - Quotation loading and tracking
+  const [isLoadQuotationModalOpen, setIsLoadQuotationModalOpen] = useState(false);
+  const [loadedQuotation, setLoadedQuotation] = useState<CommercialQuotation | null>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
@@ -582,6 +593,75 @@ export const PosInterface: React.FC = () => {
     setCart(prev => prev.filter(item => !(item.product.id === productId && item.variation?.name === variationName)));
   };
 
+  const handleLoadQuotationToCart = (quotation: CommercialQuotation) => {
+    setLoadedQuotation(quotation);
+
+    // 1. Map client if present
+    if (quotation.client_id) {
+      setSelectedClientId(quotation.client_id);
+    } else if (quotation.client_name) {
+      // Find matching client by tax_id or name in loaded clients
+      const matchedClient = clients.find(c => 
+        (quotation.client_tax_id && c.tax_id.toLowerCase() === quotation.client_tax_id.toLowerCase()) ||
+        c.name.toLowerCase() === quotation.client_name.toLowerCase()
+      );
+      if (matchedClient) {
+        setSelectedClientId(matchedClient.id);
+      }
+    }
+
+    // 2. Set exchange rate if present
+    if (quotation.exchange_rate && Number(quotation.exchange_rate) > 0) {
+      setExchangeRate(Number(quotation.exchange_rate));
+    }
+
+    // 3. Populate cart from quotation items
+    const newCart: CartItem[] = [];
+    if (quotation.items && quotation.items.length > 0) {
+      for (const item of quotation.items) {
+        // Try finding matching product in catalog
+        const match = products.find(p => p.id === item.product_id || (item.sku && p.sku === item.sku));
+        const qty = Number(item.quantity) || 1;
+        const price = Number(item.unit_price_usd) || 0;
+
+        if (match) {
+          newCart.push({
+            product: {
+              ...match,
+              priceUsd: price > 0 ? price : match.priceUsd,
+            },
+            quantity: qty,
+          });
+        } else {
+          // Fallback placeholder product if not in local memory yet
+          newCart.push({
+            product: {
+              id: item.product_id || `temp-${Math.random()}`,
+              name: item.product_name,
+              sku: item.sku || 'N/A',
+              priceUsd: price,
+              costUsd: 0,
+              current_stock: 9999,
+              taxRate: 16,
+            },
+            quantity: qty,
+          });
+        }
+      }
+    }
+
+    setCart(newCart);
+
+    // 4. Set tax application state if quotation had tax
+    if (quotation.tax_usd && Number(quotation.tax_usd) > 0) {
+      setApplyTaxInSale(true);
+    }
+
+    // Switch to cart on mobile
+    setMobileTab('CART');
+    showScanToast(`Cotización #${quotation.document_number} cargada exitosamente`, 'success');
+  };
+
   // Calculations with exact 2-decimal financial precision
   const subtotal = Number(cart.reduce((sum, item) => sum + (item.product.priceUsd * item.quantity), 0).toFixed(2));
   const discountAmount = Number((subtotal * (discountPercent / 100)).toFixed(2));
@@ -874,6 +954,7 @@ export const PosInterface: React.FC = () => {
       exchangeRateApplied: exchangeRate,
       negativeStockJustification: goesNegative ? justificationText.trim() : undefined,
       clientId: selectedClientId || undefined,
+      quotationId: loadedQuotation?.id || undefined,
       discountPercent: discountPercent > 0 ? discountPercent : undefined,
       paymentMethod: paymentLines[0]?.paymentMethod || 'CASH_USD',
       documentType: posDocumentType,
@@ -908,6 +989,7 @@ export const PosInterface: React.FC = () => {
         paymentMethod: paymentLines[0]?.paymentMethod || 'CASH_USD'
       });
       setCart([]);
+      setLoadedQuotation(null);
       setSelectedClientId('');
       setDiscountPercent(0);
       setJustificationText('');
@@ -1141,6 +1223,18 @@ export const PosInterface: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              {/* Commercial Mode indicator & Load Quotation Button */}
+              {isCommercialMode && (
+                <button
+                  type="button"
+                  onClick={() => setIsLoadQuotationModalOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl text-xs font-bold shrink-0 shadow-xs transition-all cursor-pointer active:scale-98"
+                >
+                  <FileDown className="w-3.5 h-3.5" />
+                  <span>Cargar Cotización</span>
+                </button>
+              )}
+
               {/* Branch/Warehouse Badge Indicator (Strictly seller's branch) */}
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50/80 border border-indigo-100 rounded-xl text-xs font-bold text-indigo-800 shrink-0 shadow-2xs">
                 <Warehouse className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
@@ -1595,8 +1689,10 @@ export const PosInterface: React.FC = () => {
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <div className="min-w-0">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider truncate">Cajero en Turno</span>
-                <span className="text-xs font-bold text-slate-800 truncate block">{user?.full_name || 'Cajero'}</span>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider truncate">
+                  {isCommercialMode ? 'Asesor Comercial' : 'Cajero en Turno'}
+                </span>
+                <span className="text-xs font-bold text-slate-800 truncate block">{user?.full_name || (isCommercialMode ? 'Asesor' : 'Cajero')}</span>
               </div>
             </div>
             {activeShift ? (
@@ -1621,6 +1717,31 @@ export const PosInterface: React.FC = () => {
               </button>
             )}
           </div>
+
+          {/* Active Quotation Linked Banner */}
+          {loadedQuotation && (
+            <div className="p-3 bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-indigo-100 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileDown className="w-4 h-4 text-indigo-600 shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-[10px] font-bold uppercase text-indigo-600 tracking-wider block">
+                    Cotización Vinculada
+                  </span>
+                  <span className="text-xs font-bold text-slate-800 truncate block">
+                    #{loadedQuotation.document_number} — {loadedQuotation.client_name}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLoadedQuotation(null)}
+                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-white rounded-lg transition-all cursor-pointer shrink-0"
+                title="Desvincular cotización"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
 
           {/* Client select block */}
           <div className="p-4 border-b border-slate-200 bg-white space-y-3">
@@ -3629,6 +3750,7 @@ export const PosInterface: React.FC = () => {
         />
       )}
 
+
       {/* Smart De-Bundle Assistant Modal (when unit stock is 0 but bundles exist) */}
       {smartDeBundleChild && (
         <SmartDeBundleModal
@@ -3656,6 +3778,14 @@ export const PosInterface: React.FC = () => {
           }}
         />
       )}
+
+
+      {/* Load Quotation Modal for Commercial Sales Mode */}
+      <LoadQuotationModal
+        isOpen={isLoadQuotationModalOpen}
+        onClose={() => setIsLoadQuotationModalOpen(false)}
+        onSelectQuotation={handleLoadQuotationToCart}
+      />
 
       {/* Real-time Scan Notification Toast */}
       {scanToast && (

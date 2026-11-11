@@ -72,6 +72,7 @@ export default function DashboardLayout({
 
     const routeMap: Record<string, { label: string; parent?: { label: string; href: string } }> = {
       '/pos': { label: 'Punto de Venta (POS)', parent: { label: 'Ventas', href: '/pos' } },
+      '/sales/commercial': { label: 'Ventas Comerciales', parent: { label: 'Ventas', href: '/sales' } },
       '/sales': { label: 'Historial de Ventas', parent: { label: 'Ventas', href: '/sales' } },
       '/sales/quotations': { label: 'Cotizaciones', parent: { label: 'Ventas', href: '/sales' } },
       '/sales/orders': { label: 'Pedidos', parent: { label: 'Ventas', href: '/sales' } },
@@ -523,7 +524,7 @@ export default function DashboardLayout({
         {/* Main Content Area */}
         <main className={cn(
           "flex-1 min-w-0 w-full overflow-x-hidden",
-          pathname === '/pos' || pathname === '/sales/quotations'
+          pathname === '/pos' || pathname === '/sales/quotations' || pathname === '/sales/commercial'
             ? "p-2 sm:p-4 lg:p-6"
             : "p-3.5 sm:p-6 lg:p-8"
         )}>
@@ -533,7 +534,7 @@ export default function DashboardLayout({
         </main>
 
         {/* Footer (Oculto en terminales tipo POS y Cotizaciones para fijar la interfaz sin desbordamiento) */}
-        {pathname !== '/pos' && pathname !== '/sales/quotations' && (
+        {pathname !== '/pos' && pathname !== '/sales/quotations' && pathname !== '/sales/commercial' && (
           <footer className="py-6 px-8 bg-white border-t border-slate-200 text-center">
             <p className="text-xs text-slate-400">
               © 2026 Ari Soft - Administración Resiliente e Inteligente. Todos los derechos reservados.
