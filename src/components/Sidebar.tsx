@@ -60,9 +60,9 @@ const menuConfig = [
         tenantOnly: true,
         children: [
           { label: 'Punto de Venta', icon: Store, href: '/pos', permission: 'pos:create' },
-          { label: 'Facturación de Venta', icon: Receipt, href: '/sales', permission: 'sales:invoicing' },
+          { label: 'Historial de Ventas', icon: Receipt, href: '/sales', permission: 'sales:invoicing' },
           { label: 'Cotizaciones', icon: FileText, href: '/sales/quotations', permission: 'sales:quotations' },
-          { label: 'Notas de Pedido', icon: ClipboardList, href: '/sales/orders', permission: 'sales:orders' },
+          { label: 'Pedidos', icon: ClipboardList, href: '/sales/orders', permission: 'sales:orders' },
           { label: 'Notas de Entrega', icon: Truck, href: '/sales/deliveries', permission: 'sales:deliveries' },
           { label: 'Clientes', icon: Users, href: '/sales/clients', permission: 'clients:manage' },
           { label: 'Turnos y Arqueos', icon: Clock, href: '/admin/shifts', roles: ['OWNER', 'MANAGER'], permission: 'pos:shifts' },

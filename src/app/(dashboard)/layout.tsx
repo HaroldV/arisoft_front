@@ -72,9 +72,9 @@ export default function DashboardLayout({
 
     const routeMap: Record<string, { label: string; parent?: { label: string; href: string } }> = {
       '/pos': { label: 'Punto de Venta (POS)', parent: { label: 'Ventas', href: '/pos' } },
-      '/sales': { label: 'Facturación de Venta', parent: { label: 'Ventas', href: '/sales' } },
+      '/sales': { label: 'Historial de Ventas', parent: { label: 'Ventas', href: '/sales' } },
       '/sales/quotations': { label: 'Cotizaciones', parent: { label: 'Ventas', href: '/sales' } },
-      '/sales/orders': { label: 'Notas de Pedido', parent: { label: 'Ventas', href: '/sales' } },
+      '/sales/orders': { label: 'Pedidos', parent: { label: 'Ventas', href: '/sales' } },
       '/sales/deliveries': { label: 'Notas de Entrega', parent: { label: 'Ventas', href: '/sales' } },
       '/sales/clients': { label: 'Directorio de Clientes', parent: { label: 'Ventas', href: '/sales' } },
       '/admin/shifts': { label: 'Turnos y Arqueos de Caja', parent: { label: 'Ventas', href: '/pos' } },
