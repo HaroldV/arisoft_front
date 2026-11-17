@@ -29,6 +29,7 @@ export default function DashboardLayout({
   const [bcvUsdRate, setBcvUsdRate] = useState<number>(772.54);
   const [bcvEurRate, setBcvEurRate] = useState<number>(894.49);
   const [binanceRate, setBinanceRate] = useState<number>(1013.50);
+  const [copRate, setCopRate] = useState<number>(3240.00);
   const [showBinanceRate, setShowBinanceRate] = useState<boolean>(false);
   const [currencyMode, setCurrencyMode] = useState<string>('BCV');
   const [manualRate, setManualRate] = useState<number>(780.00);
@@ -71,9 +72,9 @@ export default function DashboardLayout({
 
     const routeMap: Record<string, { label: string; parent?: { label: string; href: string } }> = {
       '/pos': { label: 'Punto de Venta (POS)', parent: { label: 'Ventas', href: '/pos' } },
-      '/sales': { label: 'Facturación de Venta', parent: { label: 'Ventas', href: '/sales' } },
+      '/sales': { label: 'Historial de Ventas', parent: { label: 'Ventas', href: '/sales' } },
       '/sales/quotations': { label: 'Cotizaciones', parent: { label: 'Ventas', href: '/sales' } },
-      '/sales/orders': { label: 'Notas de Pedido', parent: { label: 'Ventas', href: '/sales' } },
+      '/sales/orders': { label: 'Pedidos', parent: { label: 'Ventas', href: '/sales' } },
       '/sales/deliveries': { label: 'Notas de Entrega', parent: { label: 'Ventas', href: '/sales' } },
       '/sales/clients': { label: 'Directorio de Clientes', parent: { label: 'Ventas', href: '/sales' } },
       '/admin/shifts': { label: 'Turnos y Arqueos de Caja', parent: { label: 'Ventas', href: '/pos' } },
@@ -131,6 +132,7 @@ export default function DashboardLayout({
           else if (bcvRes.data.rate) setBcvUsdRate(Number(bcvRes.data.rate));
           if (bcvRes.data.EUR?.rate) setBcvEurRate(Number(bcvRes.data.EUR.rate));
           if (bcvRes.data.BINANCE?.rate) setBinanceRate(Number(bcvRes.data.BINANCE.rate));
+          if (bcvRes.data.COP?.rate) setCopRate(Number(bcvRes.data.COP.rate));
         }
 
         // 2. Obtener configuración de la empresa
@@ -147,6 +149,7 @@ export default function DashboardLayout({
         const usdR = bcvRes?.data?.USD?.rate ? Number(bcvRes.data.USD.rate) : (bcvRes?.data?.rate ? Number(bcvRes.data.rate) : undefined);
         const eurR = bcvRes?.data?.EUR?.rate ? Number(bcvRes.data.EUR.rate) : undefined;
         const binanceR = bcvRes?.data?.BINANCE?.rate ? Number(bcvRes.data.BINANCE.rate) : undefined;
+        const copR = bcvRes?.data?.COP?.rate ? Number(bcvRes.data.COP.rate) : undefined;
         if (typeof window !== 'undefined' && usdR) {
           window.dispatchEvent(
             new CustomEvent('exchange-rate-updated', {
@@ -154,6 +157,7 @@ export default function DashboardLayout({
                 usdRate: usdR,
                 eurRate: eurR,
                 binanceRate: binanceR,
+                copRate: copR,
                 showBinanceRate: !!settings.showBinanceRate,
                 manualRate: settings.manualRate ? Number(settings.manualRate) : undefined,
                 mode: settings.currencyMode || 'BCV_USD',
@@ -506,18 +510,25 @@ export default function DashboardLayout({
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 p-3.5 sm:p-6 lg:p-8 min-w-0 w-full overflow-x-hidden">
+        <main className={cn(
+          "flex-1 min-w-0 w-full overflow-x-hidden",
+          pathname === '/pos' || pathname === '/sales/quotations'
+            ? "p-2 sm:p-4 lg:p-6"
+            : "p-3.5 sm:p-6 lg:p-8"
+        )}>
           <div className="max-w-[1600px] mx-auto min-w-0 w-full">
             {children}
           </div>
         </main>
 
-        {/* Footer */}
-        <footer className="py-6 px-8 bg-white border-t border-slate-200 text-center">
-          <p className="text-xs text-slate-400">
-            © 2026 Ari Soft - Administración Resiliente e Inteligente. Todos los derechos reservados.
-          </p>
-        </footer>
+        {/* Footer (Oculto en terminales tipo POS y Cotizaciones para fijar la interfaz sin desbordamiento) */}
+        {pathname !== '/pos' && pathname !== '/sales/quotations' && (
+          <footer className="py-6 px-8 bg-white border-t border-slate-200 text-center">
+            <p className="text-xs text-slate-400">
+              © 2026 Ari Soft - Administración Resiliente e Inteligente. Todos los derechos reservados.
+            </p>
+          </footer>
+        )}
       </div>
     </div>
   );

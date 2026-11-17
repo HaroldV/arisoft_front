@@ -363,6 +363,7 @@ export const PLAN_DEFAULT_PERMISSIONS: Record<SaasPlanCode, string[]> = {
     'pos:refund',
     'sales:invoicing',
     'clients:manage',
+    'pos:shifts',
     // 2. Módulo Compras (INVENTORY_PURCHASES)
     'purchases:new',
     'purchases:invoices',
@@ -381,7 +382,6 @@ export const PLAN_DEFAULT_PERMISSIONS: Record<SaasPlanCode, string[]> = {
     'company:manage',
     'fiscal:manage',
     'users:manage',
-    'branches:manage',
   ],
   [SAAS_PLAN_CODES.COMERCIAL_PRO]: [
     'pos:create',

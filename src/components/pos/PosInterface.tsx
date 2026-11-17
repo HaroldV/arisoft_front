@@ -40,6 +40,11 @@ import { useAuth } from '@/context/AuthContext';
 import { CurrencyInput } from '@/components/CurrencyInput';
 import { BarcodeScannerModal } from '@/components/inventory/subcomponents/BarcodeScannerModal';
 import { SectorAutocompleteInput } from '@/components/pos/subcomponents/SectorAutocompleteInput';
+import { DisassembleBundleModal } from '@/components/pos/subcomponents/DisassembleBundleModal';
+import { SmartDeBundleModal, ParentBundleOption } from '@/components/pos/subcomponents/SmartDeBundleModal';
+import { LoadQuotationModal } from '@/components/pos/subcomponents/LoadQuotationModal';
+import { CommercialQuotation } from '@/components/quotations/types';
+import { Layers, Scissors, Sparkles, FileDown } from 'lucide-react';
 import { 
   DELIVERY_TYPES, 
   DELIVERY_TYPE_LABELS, 
@@ -69,6 +74,7 @@ interface Product {
   costUsd: number;
   priceUsd: number;
   taxRate: number;
+  product_type?: 'SIMPLE' | 'COMPOUND' | string;
   current_stock: number;
   global_stock?: number;
   warehouse_stocks?: WarehouseStockInfo[];
@@ -92,9 +98,18 @@ interface CartItem {
   variation?: ProductVariation;
 }
 
-export const PosInterface: React.FC = () => {
+export interface PosInterfaceProps {
+  mode?: 'POS' | 'COMMERCIAL';
+}
+
+export const PosInterface: React.FC<PosInterfaceProps> = () => {
   const { user } = useAuth();
   const canApplyDiscount = user?.role === 'OWNER' || (user?.permissions || []).includes('pos:discount');
+  const canLoadQuotation = user?.role === 'OWNER' || (user?.permissions || []).includes('sales:quotations');
+
+  // Quotation loading and tracking
+  const [isLoadQuotationModalOpen, setIsLoadQuotationModalOpen] = useState(false);
+  const [loadedQuotation, setLoadedQuotation] = useState<CommercialQuotation | null>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
@@ -197,6 +212,9 @@ export const PosInterface: React.FC = () => {
   const isOwner = user?.role === 'OWNER';
   const assignedWarehouseId = user?.branch?.default_warehouse_id || '';
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(assignedWarehouseId || '');
+  const [disassembleProduct, setDisassembleProduct] = useState<Product | null>(null);
+  const [smartDeBundleChild, setSmartDeBundleChild] = useState<Product | null>(null);
+  const [parentBundlesForChild, setParentBundlesForChild] = useState<ParentBundleOption[]>([]);
 
   const fetchData = async (warehouseIdToFilter?: string) => {
     setIsLoading(true);
@@ -229,6 +247,7 @@ export const PosInterface: React.FC = () => {
         priceUsd: p.priceUsd !== undefined ? Number(p.priceUsd) : (p.price_usd !== undefined ? Number(p.price_usd) : 0),
         costUsd: p.costUsd !== undefined ? Number(p.costUsd) : (p.cost_usd !== undefined ? Number(p.cost_usd) : 0),
         taxRate: p.taxRate !== undefined ? Number(p.taxRate) : (p.tax_rate !== undefined ? Number(p.tax_rate) : 0),
+        product_type: p.product_type || p.productType || 'SIMPLE',
         current_stock: p.current_stock !== undefined ? Number(p.current_stock) : 0,
       }));
       setProducts(productList);
@@ -495,12 +514,32 @@ export const PosInterface: React.FC = () => {
   const barcodeBufferRef = useRef<string>('');
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const addToCart = (product: Product, variation?: ProductVariation) => {
+  const addToCart = async (product: Product, variation?: ProductVariation) => {
     // Strict Branch Stock Guard: Prevent selling products that belong to another branch/warehouse
     const localStock = getProductLocalStock(product);
     
-    // Block addition if there is no stock in the cashier's assigned branch/warehouse
+    // Check if there is no stock in the cashier's assigned branch/warehouse
     if (localStock <= 0) {
+      // 1. Asistente Inteligente de Desarmado: Verificar si existen bultos padres disponibles en este almacén
+      const whId = assignedWarehouseId || selectedWarehouseId;
+      try {
+        const bundlesRes = await apiClient.get(`/inventory/products/${product.id}/parent-bundles`, {
+          params: { warehouseId: whId }
+        });
+        const bundles: ParentBundleOption[] = bundlesRes.data || [];
+        const availableBundles = bundles.filter(b => b.available_bundles > 0);
+
+        if (availableBundles.length > 0) {
+          // Abrir modal asistido de desarmado de bulto
+          setSmartDeBundleChild(product);
+          setParentBundlesForChild(availableBundles);
+          return;
+        }
+      } catch (err) {
+        console.error('Error checking parent bundles for product:', err);
+      }
+
+      // Si no hay bultos disponibles en la sede, mostrar advertencia normal
       const alternateStocks = (product.warehouse_stocks || []).filter(ws => ws.stock > 0);
       const targetLocation = alternateStocks[0]?.branch_name || alternateStocks[0]?.warehouse_name || 'otra sucursal';
       playScanBeep(false);
@@ -552,6 +591,75 @@ export const PosInterface: React.FC = () => {
 
   const removeFromCart = (productId: string, variationName?: string) => {
     setCart(prev => prev.filter(item => !(item.product.id === productId && item.variation?.name === variationName)));
+  };
+
+  const handleLoadQuotationToCart = (quotation: CommercialQuotation) => {
+    setLoadedQuotation(quotation);
+
+    // 1. Map client if present
+    if (quotation.client_id) {
+      setSelectedClientId(quotation.client_id);
+    } else if (quotation.client_name) {
+      // Find matching client by tax_id or name in loaded clients
+      const matchedClient = clients.find(c => 
+        (quotation.client_tax_id && c.tax_id.toLowerCase() === quotation.client_tax_id.toLowerCase()) ||
+        c.name.toLowerCase() === quotation.client_name.toLowerCase()
+      );
+      if (matchedClient) {
+        setSelectedClientId(matchedClient.id);
+      }
+    }
+
+    // 2. Set exchange rate if present
+    if (quotation.exchange_rate && Number(quotation.exchange_rate) > 0) {
+      setExchangeRate(Number(quotation.exchange_rate));
+    }
+
+    // 3. Populate cart from quotation items
+    const newCart: CartItem[] = [];
+    if (quotation.items && quotation.items.length > 0) {
+      for (const item of quotation.items) {
+        // Try finding matching product in catalog
+        const match = products.find(p => p.id === item.product_id || (item.sku && p.sku === item.sku));
+        const qty = Number(item.quantity) || 1;
+        const price = Number(item.unit_price_usd) || 0;
+
+        if (match) {
+          newCart.push({
+            product: {
+              ...match,
+              priceUsd: price > 0 ? price : match.priceUsd,
+            },
+            quantity: qty,
+          });
+        } else {
+          // Fallback placeholder product if not in local memory yet
+          newCart.push({
+            product: {
+              id: item.product_id || `temp-${Math.random()}`,
+              name: item.product_name,
+              sku: item.sku || 'N/A',
+              priceUsd: price,
+              costUsd: 0,
+              current_stock: 9999,
+              taxRate: 16,
+            },
+            quantity: qty,
+          });
+        }
+      }
+    }
+
+    setCart(newCart);
+
+    // 4. Set tax application state if quotation had tax
+    if (quotation.tax_usd && Number(quotation.tax_usd) > 0) {
+      setApplyTaxInSale(true);
+    }
+
+    // Switch to cart on mobile
+    setMobileTab('CART');
+    showScanToast(`Cotización #${quotation.document_number} cargada exitosamente`, 'success');
   };
 
   // Calculations with exact 2-decimal financial precision
@@ -846,6 +954,7 @@ export const PosInterface: React.FC = () => {
       exchangeRateApplied: exchangeRate,
       negativeStockJustification: goesNegative ? justificationText.trim() : undefined,
       clientId: selectedClientId || undefined,
+      quotationId: loadedQuotation?.id || undefined,
       discountPercent: discountPercent > 0 ? discountPercent : undefined,
       paymentMethod: paymentLines[0]?.paymentMethod || 'CASH_USD',
       documentType: posDocumentType,
@@ -880,6 +989,7 @@ export const PosInterface: React.FC = () => {
         paymentMethod: paymentLines[0]?.paymentMethod || 'CASH_USD'
       });
       setCart([]);
+      setLoadedQuotation(null);
       setSelectedClientId('');
       setDiscountPercent(0);
       setJustificationText('');
@@ -1113,6 +1223,18 @@ export const PosInterface: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              {/* Load Quotation Button (Allowed for OWNER or users with sales:quotations permission) */}
+              {canLoadQuotation && (
+                <button
+                  type="button"
+                  onClick={() => setIsLoadQuotationModalOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl text-xs font-bold shrink-0 shadow-xs transition-all cursor-pointer active:scale-98"
+                >
+                  <FileDown className="w-3.5 h-3.5" />
+                  <span>Cargar Cotización</span>
+                </button>
+              )}
+
               {/* Branch/Warehouse Badge Indicator (Strictly seller's branch) */}
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50/80 border border-indigo-100 rounded-xl text-xs font-bold text-indigo-800 shrink-0 shadow-2xs">
                 <Warehouse className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
@@ -1330,6 +1452,21 @@ export const PosInterface: React.FC = () => {
                             </div>
                           </div>
 
+                          {/* Quick Disassemble Action for Compound Products in POS List */}
+                          {p.product_type === 'COMPOUND' && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDisassembleProduct(p);
+                              }}
+                              className="p-2 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700 transition-all shadow-2xs cursor-pointer active:scale-90"
+                              title="Desarmar bulto en unidades sueltas"
+                            >
+                              <Scissors className="h-4 w-4" />
+                            </button>
+                          )}
+
                           <button
                             type="button"
                             onClick={(e) => {
@@ -1394,13 +1531,21 @@ export const PosInterface: React.FC = () => {
                         </span>
 
                         {!isOut ? (
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                            isCritical 
-                              ? 'bg-amber-50 text-amber-700 border-amber-200' 
-                              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          }`}>
-                            {isCritical ? 'Crítico' : 'Disponible'}
-                          </span>
+                          <div className="flex items-center gap-1">
+                            {p.product_type === 'COMPOUND' && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md border bg-amber-50 text-amber-800 border-amber-200 flex items-center gap-0.5">
+                                <Layers className="w-2.5 h-2.5 text-amber-600" />
+                                Bulto
+                              </span>
+                            )}
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              isCritical 
+                                ? 'bg-amber-50 text-amber-700 border-amber-200' 
+                                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            }`}>
+                              {isCritical ? 'Crítico' : 'Disponible'}
+                            </span>
+                          </div>
                         ) : hasAlternateStock ? (
                           <span 
                             className="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200 flex items-center gap-1 max-w-[120px] truncate"
@@ -1544,7 +1689,9 @@ export const PosInterface: React.FC = () => {
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <div className="min-w-0">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider truncate">Cajero en Turno</span>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider truncate">
+                  Cajero en Turno
+                </span>
                 <span className="text-xs font-bold text-slate-800 truncate block">{user?.full_name || 'Cajero'}</span>
               </div>
             </div>
@@ -1570,6 +1717,31 @@ export const PosInterface: React.FC = () => {
               </button>
             )}
           </div>
+
+          {/* Active Quotation Linked Banner */}
+          {loadedQuotation && (
+            <div className="p-3 bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-indigo-100 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileDown className="w-4 h-4 text-indigo-600 shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-[10px] font-bold uppercase text-indigo-600 tracking-wider block">
+                    Cotización Vinculada
+                  </span>
+                  <span className="text-xs font-bold text-slate-800 truncate block">
+                    #{loadedQuotation.document_number} — {loadedQuotation.client_name}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLoadedQuotation(null)}
+                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-white rounded-lg transition-all cursor-pointer shrink-0"
+                title="Desvincular cotización"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
 
           {/* Client select block */}
           <div className="p-4 border-b border-slate-200 bg-white space-y-3">
@@ -3562,6 +3734,57 @@ export const PosInterface: React.FC = () => {
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
         onScanSuccess={(code) => handleScanProductInPos(code)}
+      />
+
+      {/* Disassemble Bundle Modal */}
+      {disassembleProduct && (
+        <DisassembleBundleModal
+          isOpen={!!disassembleProduct}
+          product={disassembleProduct}
+          warehouseId={assignedWarehouseId || selectedWarehouseId}
+          onClose={() => setDisassembleProduct(null)}
+          onSuccess={() => {
+            setDisassembleProduct(null);
+            fetchData();
+          }}
+        />
+      )}
+
+
+      {/* Smart De-Bundle Assistant Modal (when unit stock is 0 but bundles exist) */}
+      {smartDeBundleChild && (
+        <SmartDeBundleModal
+          isOpen={!!smartDeBundleChild}
+          childProduct={smartDeBundleChild}
+          parentBundles={parentBundlesForChild}
+          warehouseId={assignedWarehouseId || selectedWarehouseId}
+          onClose={() => setSmartDeBundleChild(null)}
+          onSuccess={(addedUnits) => {
+            const child = smartDeBundleChild;
+            setSmartDeBundleChild(null);
+            showScanToast(`✨ Se rompieron bultos: +${addedUnits} unidades añadidas al stock`, 'success');
+            fetchData().then(() => {
+              if (child) {
+                // Auto-agregar la primera unidad solicitada al carrito tras el abastecimiento
+                setCart(prev => {
+                  const existing = prev.find(item => item.product.id === child.id);
+                  if (existing) {
+                    return prev.map(item => item.product.id === child.id ? { ...item, quantity: item.quantity + 1 } : item);
+                  }
+                  return [...prev, { product: child, quantity: 1 }];
+                });
+              }
+            });
+          }}
+        />
+      )}
+
+
+      {/* Load Quotation Modal for Commercial Sales Mode */}
+      <LoadQuotationModal
+        isOpen={isLoadQuotationModalOpen}
+        onClose={() => setIsLoadQuotationModalOpen(false)}
+        onSelectQuotation={handleLoadQuotationToCart}
       />
 
       {/* Real-time Scan Notification Toast */}

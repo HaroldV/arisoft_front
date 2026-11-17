@@ -39,5 +39,11 @@ jobs:
       - name: "Quality Gate 2: ESLint & Strict Typecheck"
         run: npm run lint
 
+      - name: "Quality Gate 2.1: SaaS Plan Access Matrix & Route Parity Validator"
+        run: |
+          echo "🔍 Validating Frontend SaaS Plan permissions, route parity and security boundaries..."
+          node scripts/validate-plan-access-matrix.js
+          echo "✅ Frontend SaaS Plan Access Matrix Passed."
+
       - name: "Quality Gate 3: Production Turbopack Build"
         run: npm run build

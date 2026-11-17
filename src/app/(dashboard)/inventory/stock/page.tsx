@@ -7,7 +7,10 @@ import { useStockData } from '@/components/inventory/hooks/useStockData';
 import { StockFilterBar } from '@/components/inventory/subcomponents/StockFilterBar';
 import { StockTable } from '@/components/inventory/subcomponents/StockTable';
 import { ProductEditModal } from '@/components/inventory/subcomponents/ProductEditModal';
+import { ProductComponentsModal } from '@/components/inventory/subcomponents/ProductComponentsModal';
 import { BulkTransferModal } from '@/components/inventory/subcomponents/BulkTransferModal';
+import { BundlesListView } from '@/components/inventory/subcomponents/BundlesListView';
+import { Layers, Package } from 'lucide-react';
 import { InventoryProduct } from '@/components/inventory/types/stock.types';
 
 export default function StockPage() {
@@ -45,6 +48,8 @@ export default function StockPage() {
   } = useStockData();
 
   const [transferProducts, setTransferProducts] = useState<InventoryProduct[] | null>(null);
+  const [managingComponentsProduct, setManagingComponentsProduct] = useState<InventoryProduct | null>(null);
+  const [activeTab, setActiveTab] = useState<'ALL' | 'BUNDLES'>('ALL');
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -63,6 +68,35 @@ export default function StockPage() {
         </Link>
       </div>
 
+      {/* Tabs Selector Luminoso (Sally Enterprise UX) */}
+      <div className="flex items-center gap-2 p-1.5 bg-slate-100/80 rounded-2xl w-fit border border-slate-200/60 shadow-2xs">
+        <button
+          type="button"
+          onClick={() => setActiveTab('ALL')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'ALL'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Package className="w-4 h-4 text-indigo-600" />
+          <span>Todos los Productos ({products.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('BUNDLES')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'BUNDLES'
+              ? 'bg-white text-indigo-700 shadow-sm'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Layers className="w-4 h-4 text-indigo-600" />
+          <span>Bultos y Empaques al Mayor</span>
+        </button>
+      </div>
+
       {/* Global Error Banner */}
       {error && (
         <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-3 text-rose-700 text-sm animate-in fade-in slide-in-from-top-1 duration-200">
@@ -77,45 +111,56 @@ export default function StockPage() {
         </div>
       )}
 
-      {/* Multidimensional Filter Bar */}
-      <StockFilterBar
-        search={search}
-        setSearch={setSearch}
-        searchField={searchField}
-        setSearchField={setSearchField}
-        selectedCategory={selectedCategory}
-        setSelectedCategory={setSelectedCategory}
-        uniqueCategories={uniqueCategories}
-        warehouses={warehouses}
-        selectedWarehouse={selectedWarehouse}
-        setSelectedWarehouse={setSelectedWarehouse}
-        stockFilter={stockFilter}
-        setStockFilter={setStockFilter}
-        taxFilter={taxFilter}
-        sortField={sortField}
-        sortOrder={sortOrder}
-        totalProductsCount={products.length}
-        filteredProductsCount={processedProducts.length}
-        onResetFilters={handleResetFilters}
-      />
-
-      {/* Loading State or Data Table */}
-      {isLoading && products.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm py-20 flex flex-col items-center justify-center space-y-3">
-          <Loader2 className="h-8 w-8 text-primary-600 animate-spin" />
-          <span className="text-sm font-semibold text-slate-500">Cargando inventario...</span>
-        </div>
-      ) : (
-        <StockTable
-          products={processedProducts}
-          isLoading={isLoading}
-          sortField={sortField}
-          sortOrder={sortOrder}
-          onToggleSort={handleToggleSort}
-          onEdit={(product) => setEditingProduct(product)}
-          onDelete={(id) => setDeletingId(id)}
-          onBulkTransfer={(prods) => setTransferProducts(prods)}
+      {activeTab === 'BUNDLES' ? (
+        <BundlesListView
+          products={products}
+          warehouses={warehouses}
+          onRefresh={() => fetchProducts(search, selectedWarehouse)}
         />
+      ) : (
+        <>
+          {/* Multidimensional Filter Bar */}
+          <StockFilterBar
+            search={search}
+            setSearch={setSearch}
+            searchField={searchField}
+            setSearchField={setSearchField}
+            selectedCategory={selectedCategory}
+            setSelectedCategory={setSelectedCategory}
+            uniqueCategories={uniqueCategories}
+            warehouses={warehouses}
+            selectedWarehouse={selectedWarehouse}
+            setSelectedWarehouse={setSelectedWarehouse}
+            stockFilter={stockFilter}
+            setStockFilter={setStockFilter}
+            taxFilter={taxFilter}
+            sortField={sortField}
+            sortOrder={sortOrder}
+            totalProductsCount={products.length}
+            filteredProductsCount={processedProducts.length}
+            onResetFilters={handleResetFilters}
+          />
+
+          {/* Loading State or Data Table */}
+          {isLoading && products.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm py-20 flex flex-col items-center justify-center space-y-3">
+              <Loader2 className="h-8 w-8 text-primary-600 animate-spin" />
+              <span className="text-sm font-semibold text-slate-500">Cargando inventario...</span>
+            </div>
+          ) : (
+            <StockTable
+              products={processedProducts}
+              isLoading={isLoading}
+              sortField={sortField}
+              sortOrder={sortOrder}
+              onToggleSort={handleToggleSort}
+              onEdit={(product) => setEditingProduct(product)}
+              onDelete={(id) => setDeletingId(id)}
+              onManageComponents={(product) => setManagingComponentsProduct(product)}
+              onBulkTransfer={(prods) => setTransferProducts(prods)}
+            />
+          )}
+        </>
       )}
 
       {/* Bulk Warehouse Transfer Modal */}
@@ -137,6 +182,16 @@ export default function StockPage() {
           product={editingProduct}
           categories={categories}
           onClose={() => setEditingProduct(null)}
+          onSuccess={() => fetchProducts(search, selectedWarehouse)}
+        />
+      )}
+
+      {/* Recipe / Components Modal */}
+      {managingComponentsProduct && (
+        <ProductComponentsModal
+          product={managingComponentsProduct}
+          isOpen={!!managingComponentsProduct}
+          onClose={() => setManagingComponentsProduct(null)}
           onSuccess={() => fetchProducts(search, selectedWarehouse)}
         />
       )}

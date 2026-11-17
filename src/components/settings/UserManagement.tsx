@@ -91,59 +91,64 @@ interface ModuleGroup {
 const permissionGroups: ModuleGroup[] = [
   {
     module: SYSTEM_MODULES.POS,
-    label: '1. Módulo Punto de Venta (POS)',
+    label: '1. Módulo Ventas',
     permissions: [
-      { key: SYSTEM_PERMISSIONS.POS_CREATE, label: 'Caja & Ventas POS', description: 'Permite registrar cobros y emitir tickets en punto de venta' },
+      { key: SYSTEM_PERMISSIONS.POS_CREATE, label: 'Punto de Venta', description: 'Permite registrar cobros y emitir tickets en punto de venta' },
+      { key: SYSTEM_PERMISSIONS.SALES_INVOICING, label: 'Historial de Ventas', description: 'Permite consultar el historial de ventas y emitir facturas fiscales' },
+      { key: SYSTEM_PERMISSIONS.SALES_QUOTATIONS, label: 'Cotizaciones', description: 'Permite emitir y gestionar presupuestos comerciales' },
+      { key: SYSTEM_PERMISSIONS.SALES_ORDERS, label: 'Pedidos', description: 'Permite procesar notas de pedido antes de su despacho' },
+      { key: SYSTEM_PERMISSIONS.SALES_DELIVERIES, label: 'Notas de Entrega', description: 'Permite generar guías y notas de entrega' },
+      { key: SYSTEM_PERMISSIONS.CLIENTS_MANAGE, label: 'Clientes', description: 'Permite registrar y consultar el directorio de clientes' },
+      { key: SYSTEM_PERMISSIONS.POS_SHIFTS, label: 'Turnos y Arqueos', description: 'Permite aperturar, cerrar y auditar turnos de caja' },
       { key: SYSTEM_PERMISSIONS.POS_DISCOUNT, label: 'Aplicar Descuentos en Ventas', description: 'Permite autorizar y aplicar porcentajes de descuento en caja' },
       { key: SYSTEM_PERMISSIONS.POS_REFUND, label: 'Anulaciones y Devoluciones', description: 'Permite anular ventas y emitir devoluciones de mercancía' },
-      { key: SYSTEM_PERMISSIONS.POS_SHIFTS, label: 'Turnos y Arqueos', description: 'Permite aperturar, cerrar y auditar turnos de caja' },
-      { key: SYSTEM_PERMISSIONS.SALES_INVOICING, label: 'Facturación Fiscal', description: 'Permite generar facturas fiscales SENIAT' },
-      { key: SYSTEM_PERMISSIONS.CLIENTS_MANAGE, label: 'Directorio de Clientes', description: 'Permite registrar y consultar clientes' },
-    ],
-  },
-  {
-    module: SYSTEM_MODULES.SALES,
-    label: '2. Módulo Ventas & Documentos',
-    permissions: [
-      { key: SYSTEM_PERMISSIONS.SALES_QUOTATIONS, label: 'Cotizaciones', description: 'Permite emitir y gestionar presupuestos comerciales' },
-      { key: SYSTEM_PERMISSIONS.SALES_ORDERS, label: 'Notas de Pedido', description: 'Permite procesar pedidos antes de su despacho' },
-      { key: SYSTEM_PERMISSIONS.SALES_DELIVERIES, label: 'Notas de Entrega', description: 'Permite generar guías y notas de entrega' },
     ],
   },
   {
     module: SYSTEM_MODULES.INVENTORY_PURCHASES,
-    label: '3. Módulo Compras & Proveedores',
+    label: '2. Módulo Compras',
     permissions: [
-      { key: SYSTEM_PERMISSIONS.PURCHASES_NEW, label: 'Compra Directa', description: 'Permite cargar compras directas al inventario' },
       { key: SYSTEM_PERMISSIONS.PURCHASES_ORDERS, label: 'Órdenes de Compra', description: 'Permite generar órdenes formales a proveedores' },
-      { key: SYSTEM_PERMISSIONS.PURCHASES_RECEPTIONS, label: 'Recepciones de Almacén', description: 'Permite registrar entradas físicas de mercancía' },
-      { key: SYSTEM_PERMISSIONS.PURCHASES_INVOICES, label: 'Facturas de Compra', description: 'Permite validar facturas de compras de proveedores' },
-      { key: SYSTEM_PERMISSIONS.PROVIDERS_MANAGE, label: 'Directorio de Proveedores', description: 'Permite crear y editar proveedores' },
+      { key: SYSTEM_PERMISSIONS.PURCHASES_RECEPTIONS, label: 'Notas de Recepción', description: 'Permite registrar entradas físicas de mercancía en almacén' },
+      { key: SYSTEM_PERMISSIONS.PURCHASES_NEW, label: 'Compra Directa', description: 'Permite registrar compras directas sin requerir orden o nota de recepción previa' },
+      { key: SYSTEM_PERMISSIONS.PURCHASES_INVOICES, label: 'Listado de Facturas de Compras', description: 'Permite consultar y gestionar el historial de facturas de compras' },
+      { key: SYSTEM_PERMISSIONS.PROVIDERS_MANAGE, label: 'Proveedores', description: 'Permite crear y editar el directorio de proveedores' },
     ],
   },
   {
     module: SYSTEM_MODULES.INVENTORY,
-    label: '4. Módulo Control de Inventario',
+    label: '3. Módulo Control de Inventario',
     permissions: [
       { key: SYSTEM_PERMISSIONS.INVENTORY_CREATE, label: 'Crear Productos', description: 'Permite registrar nuevos ítems en el catálogo' },
-      { key: SYSTEM_PERMISSIONS.INVENTORY_STOCK, label: 'Existencias & Stock', description: 'Permite consultar existencias en tiempo real' },
-      { key: SYSTEM_PERMISSIONS.INVENTORY_WAREHOUSE, label: 'Almacenes y Sucursales', description: 'Permite gestionar múltiples depósitos' },
-      { key: SYSTEM_PERMISSIONS.INVENTORY_CATEGORIES, label: 'Categorías de Producto', description: 'Permite organizar líneas y familias' },
-      { key: SYSTEM_PERMISSIONS.INVENTORY_MOVES, label: 'Movimientos Kardex', description: 'Permite auditar el historial de entradas y salidas' },
-      { key: SYSTEM_PERMISSIONS.INVENTORY_BULK_PRICES, label: 'Ajuste Masivo de Precios', description: 'Permite actualizar precios por lote' },
-      { key: SYSTEM_PERMISSIONS.INVENTORY_VALUATION, label: 'Reportes de Valuación', description: 'Permite calcular el valor total del inventario' },
+      { key: SYSTEM_PERMISSIONS.INVENTORY_STOCK, label: 'Listado de Productos', description: 'Permite consultar existencias e inventario en tiempo real' },
+      { key: SYSTEM_PERMISSIONS.INVENTORY_BULK_PRICES, label: 'Actualizar Precios Masivo', description: 'Permite actualizar precios por lote' },
+      { key: SYSTEM_PERMISSIONS.INVENTORY_VALUATION, label: 'Valuación de Inventario', description: 'Permite calcular el valor total del inventario y reportes' },
+      { key: SYSTEM_PERMISSIONS.INVENTORY_WAREHOUSE, label: 'Almacenes', description: 'Permite gestionar múltiples almacenes y depósitos' },
+      { key: SYSTEM_PERMISSIONS.INVENTORY_CATEGORIES, label: 'Categorías', description: 'Permite organizar líneas y familias de productos' },
+      { key: SYSTEM_PERMISSIONS.INVENTORY_MOVES, label: 'Movimientos', description: 'Permite auditar el historial de movimientos y Kardex' },
     ],
   },
   {
     module: SYSTEM_MODULES.BANKS,
-    label: '5. Módulo Cuentas y Finanzas',
+    label: '4. Módulo Cuentas',
     permissions: [
       { key: SYSTEM_PERMISSIONS.BANKS_ACCOUNTS, label: 'Cuentas Bancarias', description: 'Permite gestionar cuentas bancarias y conciliar saldos' },
       { key: SYSTEM_PERMISSIONS.BANKS_LEDGER, label: 'Libro Mayor', description: 'Permite auditar movimientos y libro mayor contable' },
       { key: SYSTEM_PERMISSIONS.BANKS_SHIFTS, label: 'Cierres de Caja & Arqueos', description: 'Permite supervisar y auditar cierres de turnos en cajas' },
       { key: SYSTEM_PERMISSIONS.ACCOUNTS_RECEIVABLES, label: 'Cuentas por Cobrar (CxC)', description: 'Permite gestionar créditos y cobranzas a clientes' },
       { key: SYSTEM_PERMISSIONS.ACCOUNTS_PAYABLES, label: 'Cuentas por Pagar (CxP)', description: 'Permite controlar deudas y pagos a proveedores' },
-      { key: SYSTEM_PERMISSIONS.ACCOUNTS_HISTORY, label: 'Historial Financiero', description: 'Permite auditar movimientos y libros auxiliares', inConstruction: true },
+      { key: SYSTEM_PERMISSIONS.ACCOUNTS_HISTORY, label: 'Historial', description: 'Permite auditar movimientos y libros auxiliares', inConstruction: true },
+    ],
+  },
+  {
+    module: SYSTEM_MODULES.SETTINGS,
+    label: '5. Módulo Configuración',
+    permissions: [
+      { key: SYSTEM_PERMISSIONS.COMPANY_MANAGE, label: 'Perfil de Empresa', description: 'Permite editar datos de la empresa y monedas' },
+      { key: SYSTEM_PERMISSIONS.BRANCHES_MANAGE, label: 'Sucursales & Tiendas', description: 'Permite administrar depósitos y tiendas físicas' },
+      { key: SYSTEM_PERMISSIONS.FISCAL_MANAGE, label: 'Configuración Fiscal', description: 'Permite configurar correlativos e impresoras fiscales' },
+      { key: SYSTEM_PERMISSIONS.USERS_MANAGE, label: 'Usuarios y Roles', description: 'Permite registrar personal y administrar roles' },
+      { key: SYSTEM_PERMISSIONS.SETTINGS_SECURITY, label: 'Seguridad', description: 'Permite gestionar políticas de autenticación y seguridad', inConstruction: true },
     ],
   },
   {
@@ -151,25 +156,14 @@ const permissionGroups: ModuleGroup[] = [
     label: '6. Módulo Nómina & RRHH',
     permissions: [
       { key: SYSTEM_PERMISSIONS.PAYROLL_MANAGE, label: 'Procesamiento de Nómina', description: 'Permite calcular recibos y asignaciones salariales', inConstruction: true },
-      { key: SYSTEM_PERMISSIONS.PAYROLL_FORMULAS, label: 'Fórmulas Legales de Nómina', description: 'Permite personalizar fórmulas de cálculo laboral', inConstruction: true },
+      { key: SYSTEM_PERMISSIONS.PAYROLL_FORMULAS, label: 'Fórmulas Legales', description: 'Permite personalizar fórmulas de cálculo laboral', inConstruction: true },
     ],
   },
   {
     module: SYSTEM_MODULES.REPORTS,
-    label: '7. Módulo Reportes & BI',
+    label: '7. Módulo Reportes & Analítica',
     permissions: [
-      { key: SYSTEM_PERMISSIONS.REPORTS_VIEW, label: 'Métricas y Tableros BI', description: 'Permite acceder a estadísticas y reportes ejecutivos', inConstruction: true },
-    ],
-  },
-  {
-    module: SYSTEM_MODULES.SETTINGS,
-    label: '8. Módulo Configuración de Empresa',
-    permissions: [
-      { key: SYSTEM_PERMISSIONS.COMPANY_MANAGE, label: 'Perfil de Empresa', description: 'Permite editar datos de la empresa y monedas' },
-      { key: SYSTEM_PERMISSIONS.BRANCHES_MANAGE, label: 'Sucursales & Tiendas', description: 'Permite administrar depósitos y tiendas físicas' },
-      { key: SYSTEM_PERMISSIONS.FISCAL_MANAGE, label: 'Parámetros Fiscales', description: 'Permite configurar correlativos e impresoras fiscales' },
-      { key: SYSTEM_PERMISSIONS.USERS_MANAGE, label: 'Gestión de Usuarios', description: 'Permite registrar personal y administrar roles' },
-      { key: SYSTEM_PERMISSIONS.SETTINGS_SECURITY, label: 'Seguridad del Sistema', description: 'Permite gestionar políticas de autenticación y seguridad', inConstruction: true },
+      { key: SYSTEM_PERMISSIONS.REPORTS_VIEW, label: 'Tablero General & Métricas BI', description: 'Permite acceder a estadísticas y reportes ejecutivos', inConstruction: true },
     ],
   },
 ];
@@ -338,9 +332,10 @@ export default function UserManagement() {
     : planDefaultPermissions;
 
   const hasPermissionToDelegate = (perm: string) => {
-    if (currentUser?.role === SYSTEM_ROLES.OWNER || currentUser?.role === SYSTEM_ROLES.SUPER_ADMIN) {
+    if (currentUser?.role === SYSTEM_ROLES.SUPER_ADMIN) {
       return true;
     }
+    // El Owner (y cualquier usuario) solo puede delegar permisos que realmente pertenezcan a su suscripción / plan
     return allowedPermissions.includes(perm);
   };
 
@@ -430,9 +425,9 @@ export default function UserManagement() {
     setIsModalOpen(true);
   };
 
-  // Preset Template loader
+  // Preset Template loader filtrado estrictamente por los permisos permitidos del plan
   const applyPresetTemplate = (type: 'SELLER' | 'SUPERVISOR' | 'MANAGER') => {
-    const presetPerms = [...ROLE_PRESET_PERMISSIONS[type]];
+    const presetPerms = ROLE_PRESET_PERMISSIONS[type].filter(p => hasPermissionToDelegate(p));
     setSelectedPermissions(presetPerms);
     setSelectedModules(getModulesForPermissions(presetPerms));
   };
@@ -1396,7 +1391,7 @@ export default function UserManagement() {
                         onClick={() => setShowCustomPermissions(prev => !prev)}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 active:bg-slate-200 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs shrink-0"
                       >
-                        <span>{showCustomPermissions ? 'Ocultar Detalle' : 'Ver Permisos del Rol'}</span>
+                        <span>{showCustomPermissions ? 'Ocultar Permisos' : 'Personalizar Permisos'}</span>
                         {showCustomPermissions ? (
                           <ChevronUp className="w-3.5 h-3.5 text-slate-500" />
                         ) : (
@@ -1410,7 +1405,7 @@ export default function UserManagement() {
                       <div className="space-y-4 max-h-[35vh] overflow-y-auto pr-2 custom-scrollbar p-1 animate-in fade-in duration-150">
                         <div className="p-3 bg-indigo-50/70 border border-indigo-100/80 rounded-xl text-indigo-900 text-xs">
                           <p className="leading-relaxed">
-                            💡 <strong>Gobernanza por Rol:</strong> Los permisos mostrados corresponden fielmente al rol asignado. Para modificar los accesos de este cargo, puedes editar el rol o crear uno nuevo en la sección <strong>Roles Personalizados</strong>.
+                            💡 <strong>Personalización Directa:</strong> Puedes marcar o desmarcar permisos individuales para este usuario según las necesidades de su puesto. Solo los permisos incluidos en tu plan de suscripción están disponibles para asignación.
                           </p>
                         </div>
 
@@ -1427,34 +1422,31 @@ export default function UserManagement() {
                               <div className="space-y-2.5">
                                 {group.permissions.map(perm => {
                                   const isUnderConstruction = Boolean(perm.inConstruction);
-                                  const isAllowedByRole = !isUnderConstruction && selectedPermissions.includes(perm.key);
+                                  const isChecked = selectedPermissions.includes(perm.key);
+                                  const canDelegate = !isUnderConstruction && hasPermissionToDelegate(perm.key);
 
                                   return (
-                                    <div
+                                    <label
                                       key={perm.key}
                                       className={`flex items-center justify-between p-3 bg-white rounded-xl border transition-all duration-200 select-none text-xs ${
                                         isUnderConstruction
-                                          ? 'opacity-70 bg-amber-50/20 border-amber-200/60'
-                                          : isAllowedByRole
-                                            ? 'border-indigo-100 bg-indigo-50/15'
-                                            : 'border-slate-200/70 opacity-60 bg-slate-50/50'
-                                      }`}
+                                          ? 'cursor-not-allowed opacity-75 bg-amber-50/20 border-amber-200/60'
+                                          : canDelegate 
+                                            ? 'cursor-pointer hover:border-indigo-200 hover:shadow-2xs' 
+                                            : 'cursor-not-allowed opacity-50 bg-slate-50'
+                                      } ${isChecked ? 'border-indigo-200 bg-indigo-50/20' : 'border-slate-200/80'}`}
                                     >
                                       <div className="flex items-start gap-3 flex-1 pr-4">
-                                        <div className="mt-0.5 shrink-0">
-                                          {isAllowedByRole ? (
-                                            <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                                              <Check className="w-2.5 h-2.5 stroke-[3]" />
-                                            </div>
-                                          ) : (
-                                            <div className="w-4 h-4 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center">
-                                              <X className="w-2.5 h-2.5 stroke-[3]" />
-                                            </div>
-                                          )}
-                                        </div>
+                                        <input
+                                          type="checkbox"
+                                          checked={isChecked}
+                                          disabled={isUnderConstruction || !canDelegate}
+                                          onChange={() => handleTogglePermission(perm.key, group.module)}
+                                          className="w-4 h-4 rounded text-indigo-600 bg-slate-50 border-slate-200 focus:ring-indigo-500 shrink-0 mt-0.5 cursor-pointer disabled:cursor-not-allowed"
+                                        />
                                         <div>
                                           <div className="flex items-center gap-2">
-                                            <span className={`font-bold block text-xs ${isAllowedByRole ? 'text-slate-900' : 'text-slate-500'}`}>
+                                            <span className={`font-bold block text-xs ${isChecked ? 'text-slate-900' : 'text-slate-600'}`}>
                                               {perm.label}
                                             </span>
                                             {isUnderConstruction && (
@@ -1469,13 +1461,15 @@ export default function UserManagement() {
                                       <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${
                                         isUnderConstruction
                                           ? 'bg-amber-50 text-amber-600 border border-amber-200'
-                                          : isAllowedByRole
-                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                            : 'bg-slate-100 text-slate-400 border border-slate-200'
+                                          : !canDelegate
+                                            ? 'bg-slate-100 text-slate-400 border border-slate-200'
+                                            : isChecked
+                                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                              : 'bg-slate-100 text-slate-500 border border-slate-200'
                                       }`}>
-                                        {isUnderConstruction ? 'Próximamente' : isAllowedByRole ? 'Incluido en Rol' : 'No Permitido'}
+                                        {isUnderConstruction ? 'Próximamente' : !canDelegate ? 'No Incluido en Plan' : isChecked ? 'Asignado' : 'Sin Asignar'}
                                       </span>
-                                    </div>
+                                    </label>
                                   );
                                 })}
                               </div>
