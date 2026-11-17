@@ -65,18 +65,6 @@ export const GenerateQuotationModal: React.FC<GenerateQuotationModalProps> = ({
 
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  if (!isOpen) return null;
-
-  // Calculos de totales
-  const subtotalUsd = cart.reduce((acc, item) => acc + (item.product.priceUsd * item.quantity), 0);
-  const taxUsd = cart.reduce((acc, item) => {
-    const rate = item.product.taxRate || 0;
-    return acc + (item.product.priceUsd * item.quantity * (rate / 100));
-  }, 0);
-  const totalUsd = Number((subtotalUsd + taxUsd).toFixed(2));
-  const totalBs = Number((totalUsd * exchangeRate).toFixed(2));
-
   const [clientSearchText, setClientSearchText] = useState<string>('');
 
   useEffect(() => {
@@ -97,6 +85,17 @@ export const GenerateQuotationModal: React.FC<GenerateQuotationModalProps> = ({
       }
     }
   }, [initialClient]);
+
+  if (!isOpen) return null;
+
+  // Calculos de totales
+  const subtotalUsd = cart.reduce((acc, item) => acc + (item.product.priceUsd * item.quantity), 0);
+  const taxUsd = cart.reduce((acc, item) => {
+    const rate = item.product.taxRate || 0;
+    return acc + (item.product.priceUsd * item.quantity * (rate / 100));
+  }, 0);
+  const totalUsd = Number((subtotalUsd + taxUsd).toFixed(2));
+  const totalBs = Number((totalUsd * exchangeRate).toFixed(2));
 
   // Manejador al seleccionar cliente existente desde el buscador/autocompletado
   const handleSelectClient = (client: QuotationClient) => {
