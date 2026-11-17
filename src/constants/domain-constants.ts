@@ -179,7 +179,6 @@ export const SYSTEM_PERMISSIONS = {
   CLIENTS_MANAGE: 'clients:manage',
 
   // 2. Módulo Ventas
-  SALES_COMMERCIAL: 'sales:commercial',
   SALES_QUOTATIONS: 'sales:quotations',
   SALES_ORDERS: 'sales:orders',
   SALES_DELIVERIES: 'sales:deliveries',
@@ -364,6 +363,7 @@ export const PLAN_DEFAULT_PERMISSIONS: Record<SaasPlanCode, string[]> = {
     'pos:refund',
     'sales:invoicing',
     'clients:manage',
+    'pos:shifts',
     // 2. Módulo Compras (INVENTORY_PURCHASES)
     'purchases:new',
     'purchases:invoices',
@@ -382,14 +382,12 @@ export const PLAN_DEFAULT_PERMISSIONS: Record<SaasPlanCode, string[]> = {
     'company:manage',
     'fiscal:manage',
     'users:manage',
-    'branches:manage',
   ],
   [SAAS_PLAN_CODES.COMERCIAL_PRO]: [
     'pos:create',
     'pos:discount',
     'pos:refund',
     'sales:invoicing',
-    'sales:commercial',
     'sales:quotations',
     'sales:orders',
     'sales:deliveries',
@@ -425,7 +423,6 @@ export const PLAN_DEFAULT_PERMISSIONS: Record<SaasPlanCode, string[]> = {
     'pos:discount',
     'pos:refund',
     'sales:invoicing',
-    'sales:commercial',
     'sales:quotations',
     'sales:orders',
     'sales:deliveries',

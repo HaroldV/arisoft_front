@@ -60,7 +60,6 @@ const menuConfig = [
         tenantOnly: true,
         children: [
           { label: 'Punto de Venta', icon: Store, href: '/pos', permission: 'pos:create' },
-          { label: 'Ventas Comerciales', icon: ShoppingBag, href: '/sales/commercial', permission: 'sales:commercial' },
           { label: 'Historial de Ventas', icon: Receipt, href: '/sales', permission: 'sales:invoicing' },
           { label: 'Cotizaciones', icon: FileText, href: '/sales/quotations', permission: 'sales:quotations' },
           { label: 'Pedidos', icon: ClipboardList, href: '/sales/orders', permission: 'sales:orders' },

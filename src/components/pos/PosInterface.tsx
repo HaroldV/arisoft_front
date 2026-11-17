@@ -102,12 +102,12 @@ export interface PosInterfaceProps {
   mode?: 'POS' | 'COMMERCIAL';
 }
 
-export const PosInterface: React.FC<PosInterfaceProps> = ({ mode = 'POS' }) => {
-  const isCommercialMode = mode === 'COMMERCIAL';
+export const PosInterface: React.FC<PosInterfaceProps> = () => {
   const { user } = useAuth();
   const canApplyDiscount = user?.role === 'OWNER' || (user?.permissions || []).includes('pos:discount');
+  const canLoadQuotation = user?.role === 'OWNER' || (user?.permissions || []).includes('sales:quotations');
 
-  // Commercial Mode - Quotation loading and tracking
+  // Quotation loading and tracking
   const [isLoadQuotationModalOpen, setIsLoadQuotationModalOpen] = useState(false);
   const [loadedQuotation, setLoadedQuotation] = useState<CommercialQuotation | null>(null);
 
@@ -1223,8 +1223,8 @@ export const PosInterface: React.FC<PosInterfaceProps> = ({ mode = 'POS' }) => {
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {/* Commercial Mode indicator & Load Quotation Button */}
-              {isCommercialMode && (
+              {/* Load Quotation Button (Allowed for OWNER or users with sales:quotations permission) */}
+              {canLoadQuotation && (
                 <button
                   type="button"
                   onClick={() => setIsLoadQuotationModalOpen(true)}
@@ -1690,9 +1690,9 @@ export const PosInterface: React.FC<PosInterfaceProps> = ({ mode = 'POS' }) => {
               </button>
               <div className="min-w-0">
                 <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider truncate">
-                  {isCommercialMode ? 'Asesor Comercial' : 'Cajero en Turno'}
+                  Cajero en Turno
                 </span>
-                <span className="text-xs font-bold text-slate-800 truncate block">{user?.full_name || (isCommercialMode ? 'Asesor' : 'Cajero')}</span>
+                <span className="text-xs font-bold text-slate-800 truncate block">{user?.full_name || 'Cajero'}</span>
               </div>
             </div>
             {activeShift ? (

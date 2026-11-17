@@ -72,7 +72,6 @@ export default function DashboardLayout({
 
     const routeMap: Record<string, { label: string; parent?: { label: string; href: string } }> = {
       '/pos': { label: 'Punto de Venta (POS)', parent: { label: 'Ventas', href: '/pos' } },
-      '/sales/commercial': { label: 'Ventas Comerciales', parent: { label: 'Ventas', href: '/sales' } },
       '/sales': { label: 'Historial de Ventas', parent: { label: 'Ventas', href: '/sales' } },
       '/sales/quotations': { label: 'Cotizaciones', parent: { label: 'Ventas', href: '/sales' } },
       '/sales/orders': { label: 'Pedidos', parent: { label: 'Ventas', href: '/sales' } },
@@ -429,17 +428,6 @@ export default function DashboardLayout({
                   </span>
                 </div>
 
-                {/* Badge Tasa Peso Colombiano (COP) */}
-                <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white border border-amber-100/90 text-amber-800 shadow-2xs group-hover:border-amber-300 transition-all">
-                  <span className="text-[10px] sm:text-xs font-black text-amber-600 leading-none">COL$</span>
-                  <span className="font-mono text-xs sm:text-sm font-black text-slate-900 tracking-tight leading-none">
-                    {copRate.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                  </span>
-                  <span className="text-[10px] sm:text-xs uppercase tracking-tight text-amber-600 font-bold ml-0.5 hidden md:inline-block leading-none">
-                    COP
-                  </span>
-                </div>
-
                 {/* Badge Tasa Binance P2P (Condicional según configuración) */}
                 {showBinanceRate && (
                   <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white border border-amber-200 text-amber-800 shadow-2xs group-hover:border-amber-300 transition-all animate-in fade-in duration-200">
@@ -524,7 +512,7 @@ export default function DashboardLayout({
         {/* Main Content Area */}
         <main className={cn(
           "flex-1 min-w-0 w-full overflow-x-hidden",
-          pathname === '/pos' || pathname === '/sales/quotations' || pathname === '/sales/commercial'
+          pathname === '/pos' || pathname === '/sales/quotations'
             ? "p-2 sm:p-4 lg:p-6"
             : "p-3.5 sm:p-6 lg:p-8"
         )}>
@@ -534,7 +522,7 @@ export default function DashboardLayout({
         </main>
 
         {/* Footer (Oculto en terminales tipo POS y Cotizaciones para fijar la interfaz sin desbordamiento) */}
-        {pathname !== '/pos' && pathname !== '/sales/quotations' && pathname !== '/sales/commercial' && (
+        {pathname !== '/pos' && pathname !== '/sales/quotations' && (
           <footer className="py-6 px-8 bg-white border-t border-slate-200 text-center">
             <p className="text-xs text-slate-400">
               © 2026 Ari Soft - Administración Resiliente e Inteligente. Todos los derechos reservados.

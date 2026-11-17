@@ -84,10 +84,10 @@ export const LoadQuotationModal: React.FC<LoadQuotationModalProps> = ({
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                Cargar Cotización a Venta Comercial
+                Cargar Cotización a Venta
               </h3>
               <p className="text-xs text-slate-500 font-medium">
-                Selecciona una cotización activa para poblar el carrito y sincronizar existencias
+                Selecciona una cotización activa para poblar el carrito y facturar en caja
               </p>
             </div>
           </div>
