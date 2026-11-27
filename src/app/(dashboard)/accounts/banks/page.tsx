@@ -30,56 +30,23 @@ import apiClient from '@/infrastructure/api/api-client';
 import { VENEZUELAN_BANKS } from '@/constants/venezuela';
 import { formatPaymentMethod } from '@/constants/domain-constants';
 import { SaleDetailModal } from './subcomponents/SaleDetailModal';
-
-interface BankAccount {
-  id: string;
-  name: string;
-  bank_name: string;
-  account_number?: string;
-  account_type: 'CORRIENTE' | 'AHORRO' | 'EFECTIVO' | 'ZELLE' | 'BINANCE' | 'DIGITAL' | string;
-  currency: 'USD' | 'VES';
-  current_balance: number;
-  p2p_phone?: string;
-  p2p_tax_id?: string;
-  p2p_bank_code?: string;
-}
-
-interface BankMovementItem {
-  id: string;
-  type: string;
-  amount: number;
-  reference?: string;
-  description?: string;
-  created_at: string;
-  account: {
-    id: string;
-    name: string;
-    bank_name: string;
-    currency: 'USD' | 'VES';
-    account_type: string;
-  };
-  payment_metadata?: {
-    payment_method: string;
-    last_four_digits?: string;
-    sender_identifier?: string;
-    transaction_reference?: string;
-  };
-  sale?: {
-    id: string;
-    invoice_number?: string;
-    control_number?: string;
-    client_name?: string;
-    client_tax_id?: string;
-  };
-  created_by?: {
-    name: string;
-  };
-}
+import { BankMovementFilters, DateFilterPreset } from './subcomponents/BankMovementFilters';
+import { BankAccount, BankMovementItem } from './types';
+import {
+  formatLocalDate,
+  getLocalDayRange,
+  getLocalWeekRange,
+  getLocalMonthRange,
+  parseCustomRange,
+} from './utils/date-range.utils';
 
 export default function BankAccountsPage() {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [movements, setMovements] = useState<BankMovementItem[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('ALL');
+  const [datePreset, setDatePreset] = useState<DateFilterPreset>('TODAY');
+  const [startDate, setStartDate] = useState<string>(() => formatLocalDate(new Date()));
+  const [endDate, setEndDate] = useState<string>(() => formatLocalDate(new Date()));
   const [isLoadingMovements, setIsLoadingMovements] = useState(false);
   const [exchangeRate, setExchangeRate] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -100,7 +67,8 @@ export default function BankAccountsPage() {
     initial_balance: 0,
     p2p_phone: '',
     p2p_tax_id: '',
-    p2p_bank_code: ''
+    p2p_bank_code: '',
+    color_theme: 'INDIGO'
   });
 
   const [adjustForm, setAdjustForm] = useState({
@@ -168,12 +136,8 @@ export default function BankAccountsPage() {
       ]);
       const data = Array.isArray(accRes.data) ? accRes.data : [];
       setAccounts(data);
-      if (data.length > 0) {
-        setSelectedAccountId(data[0].id);
-        fetchMovements(data[0].id);
-      } else {
-        fetchMovements('ALL');
-      }
+      setSelectedAccountId('ALL');
+      fetchMovements('ALL', 'TODAY');
     } catch (err: any) {
       setError('Error al obtener la lista de cuentas bancarias.');
     } finally {
@@ -181,12 +145,51 @@ export default function BankAccountsPage() {
     }
   };
 
-  const fetchMovements = async (accId?: string) => {
+  const fetchMovements = async (
+    accId?: string,
+    preset?: DateFilterPreset,
+    customStart?: string,
+    customEnd?: string
+  ) => {
     setIsLoadingMovements(true);
     try {
-      const endpoint = accId && accId !== 'ALL'
-        ? `/bank-accounts/${accId}/movements`
-        : '/bank-accounts/movements';
+      const activeAccount = accId !== undefined ? accId : selectedAccountId;
+      const activePreset = preset !== undefined ? preset : datePreset;
+
+      let start = '';
+      let end = '';
+
+      const now = new Date();
+      if (activePreset === 'TODAY') {
+        const dayRange = getLocalDayRange(now);
+        start = dayRange.startISO;
+        end = dayRange.endISO;
+      } else if (activePreset === 'WEEK') {
+        const weekRange = getLocalWeekRange(now);
+        start = weekRange.startISO;
+        end = weekRange.endISO;
+      } else if (activePreset === 'MONTH') {
+        const monthRange = getLocalMonthRange(now);
+        start = monthRange.startISO;
+        end = monthRange.endISO;
+      } else if (activePreset === 'CUSTOM') {
+        const s = customStart !== undefined ? customStart : startDate;
+        const e = customEnd !== undefined ? customEnd : endDate;
+        const customRange = parseCustomRange(s, e);
+        start = customRange.startISO;
+        end = customRange.endISO;
+      }
+
+      const params = new URLSearchParams();
+      if (start) params.append('startDate', start);
+      if (end) params.append('endDate', end);
+      if (activeAccount && activeAccount !== 'ALL') params.append('accountId', activeAccount);
+
+      const queryString = params.toString() ? `?${params.toString()}` : '';
+      const endpoint = activeAccount && activeAccount !== 'ALL'
+        ? `/bank-accounts/${activeAccount}/movements${queryString}`
+        : `/bank-accounts/movements${queryString}`;
+
       const response = await apiClient.get(endpoint);
       setMovements(Array.isArray(response.data) ? response.data : []);
     } catch (err: any) {
@@ -202,7 +205,40 @@ export default function BankAccountsPage() {
 
   const handleSelectAccountFilter = (accId: string) => {
     setSelectedAccountId(accId);
-    fetchMovements(accId);
+    fetchMovements(accId, datePreset);
+  };
+
+  const handleSelectDatePreset = (preset: DateFilterPreset) => {
+    setDatePreset(preset);
+    const now = new Date();
+    if (preset === 'TODAY') {
+      const dayRange = getLocalDayRange(now);
+      setStartDate(dayRange.dateStr);
+      setEndDate(dayRange.dateStr);
+    } else if (preset === 'WEEK') {
+      const weekRange = getLocalWeekRange(now);
+      setStartDate(weekRange.startStr);
+      setEndDate(weekRange.endStr);
+    } else if (preset === 'MONTH') {
+      const monthRange = getLocalMonthRange(now);
+      setStartDate(monthRange.startStr);
+      setEndDate(monthRange.endStr);
+    }
+    fetchMovements(selectedAccountId, preset);
+  };
+
+  const handleStartDateChange = (val: string) => {
+    setStartDate(val);
+    if (datePreset === 'CUSTOM') {
+      fetchMovements(selectedAccountId, 'CUSTOM', val, endDate);
+    }
+  };
+
+  const handleEndDateChange = (val: string) => {
+    setEndDate(val);
+    if (datePreset === 'CUSTOM') {
+      fetchMovements(selectedAccountId, 'CUSTOM', startDate, val);
+    }
   };
 
   const handleAccountTypeChange = (newType: string) => {
@@ -262,7 +298,8 @@ export default function BankAccountsPage() {
       initial_balance: 0,
       p2p_phone: '',
       p2p_tax_id: '',
-      p2p_bank_code: VENEZUELAN_BANKS[0].code
+      p2p_bank_code: VENEZUELAN_BANKS[0].code,
+      color_theme: 'BLUE'
     });
     setModalError(null);
     setModalSuccess(false);
@@ -280,7 +317,8 @@ export default function BankAccountsPage() {
       initial_balance: Number(acc.current_balance),
       p2p_phone: acc.p2p_phone || '',
       p2p_tax_id: acc.p2p_tax_id || '',
-      p2p_bank_code: acc.p2p_bank_code || ''
+      p2p_bank_code: acc.p2p_bank_code || '',
+      color_theme: acc.color_theme || (acc.currency === 'VES' ? 'BLUE' : 'INDIGO')
     });
     setModalError(null);
     setModalSuccess(false);
@@ -335,7 +373,8 @@ export default function BankAccountsPage() {
         initial_balance: Number(accountForm.initial_balance) || 0,
         p2p_phone: accountForm.account_type === 'EFECTIVO' ? undefined : (accountForm.p2p_phone.trim() || undefined),
         p2p_tax_id: accountForm.account_type === 'EFECTIVO' ? undefined : (accountForm.p2p_tax_id.trim().toUpperCase() || undefined),
-        p2p_bank_code: accountForm.account_type === 'EFECTIVO' ? undefined : (accountForm.p2p_bank_code.trim() || undefined)
+        p2p_bank_code: accountForm.account_type === 'EFECTIVO' ? undefined : (accountForm.p2p_bank_code.trim() || undefined),
+        color_theme: accountForm.color_theme || undefined
       };
 
       if (editingAccount) {
@@ -446,6 +485,30 @@ export default function BankAccountsPage() {
 
   const totalDivisasUsd = accounts.filter(a => a.currency === 'USD').reduce((sum, a) => sum + Number(a.current_balance), 0);
   const totalMonedaVES = accounts.filter(a => a.currency === 'VES').reduce((sum, a) => sum + Number(a.current_balance), 0);
+
+  // Period Movements Metrics calculation
+  const totalIngresosUsd = movements
+    .filter(m => m.type === 'DEPOSIT')
+    .reduce((sum, m) => {
+      const isUsd = m.account?.currency === 'USD';
+      const amt = Number(m.amount);
+      return sum + (isUsd ? amt : (exchangeRate > 0 ? amt / exchangeRate : 0));
+    }, 0);
+
+  const totalIngresosVes = totalIngresosUsd * (exchangeRate || 1);
+
+  const totalEgresosUsd = movements
+    .filter(m => m.type === 'WITHDRAWAL')
+    .reduce((sum, m) => {
+      const isUsd = m.account?.currency === 'USD';
+      const amt = Number(m.amount);
+      return sum + (isUsd ? amt : (exchangeRate > 0 ? amt / exchangeRate : 0));
+    }, 0);
+
+  const totalEgresosVes = totalEgresosUsd * (exchangeRate || 1);
+
+  const netoUsd = totalIngresosUsd - totalEgresosUsd;
+  const netoVes = netoUsd * (exchangeRate || 1);
 
   // Check if there is an account number starting with a code that doesn't match selected bank
   const getAccountNumberMismatchWarning = () => {
@@ -565,7 +628,7 @@ export default function BankAccountsPage() {
           <p className="text-xs text-slate-400">Registra tus cuentas bancarias o cajas de efectivo para comenzar.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           {accounts.map((acc) => {
             const isVes = acc.currency === 'VES';
             const balanceNum = Number(acc.current_balance);
@@ -576,20 +639,129 @@ export default function BankAccountsPage() {
               : balanceNum * (exchangeRate || 1);
             const equivCurrency = isVes ? 'USD' : 'VES';
 
-            // Custom colorful gradient styles based on bank/currency
             const isCash = acc.account_type === 'EFECTIVO' || acc.name.toUpperCase().includes('EFECTIVO') || acc.bank_name.toUpperCase().includes('EFECTIVO');
             const isZelle = acc.account_type === 'ZELLE' || acc.name.toUpperCase().includes('ZELLE') || acc.bank_name.toUpperCase().includes('ZELLE');
             const isBinance = acc.account_type === 'BINANCE' || acc.name.toUpperCase().includes('BINANCE') || acc.bank_name.toUpperCase().includes('BINANCE');
 
-            const gradientClass = isVes 
-              ? 'from-blue-600 to-indigo-700 text-white shadow-blue-600/15' 
-              : isCash
-              ? 'from-emerald-600 to-teal-700 text-white shadow-emerald-600/15'
-              : isZelle
-              ? 'from-purple-600 to-indigo-800 text-white shadow-purple-600/15'
-              : isBinance
-              ? 'from-amber-500 to-yellow-600 text-white shadow-amber-500/15'
-              : 'from-indigo-600 to-violet-700 text-white shadow-indigo-600/15';
+            // Resolve color theme: prioritize explicit account.color_theme if chosen, otherwise use semantic defaults
+            const effectiveTheme = acc.color_theme || (
+              isCash ? 'EMERALD' :
+              isZelle ? 'PURPLE' :
+              isBinance ? 'AMBER' :
+              isVes ? 'BLUE' : 'INDIGO'
+            );
+
+            const themeStyles: Record<string, {
+              cardBg: string;
+              border: string;
+              hoverBorder: string;
+              iconBg: string;
+              badge: string;
+              subtextColor: string;
+              balanceColor: string;
+              equivColor: string;
+              dividerColor: string;
+              selectedRing: string;
+            }> = {
+              BLUE: {
+                cardBg: 'bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white',
+                border: 'border-blue-500/50',
+                hoverBorder: 'hover:border-blue-300',
+                iconBg: 'bg-white/20 text-white backdrop-blur-xs',
+                badge: 'bg-white/20 text-white border-white/30 backdrop-blur-xs',
+                subtextColor: 'text-blue-100',
+                balanceColor: 'text-white',
+                equivColor: 'text-blue-200',
+                dividerColor: 'border-white/15',
+                selectedRing: 'ring-4 ring-blue-400 ring-offset-2 scale-[1.02] shadow-lg shadow-blue-900/30',
+              },
+              EMERALD: {
+                cardBg: 'bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 text-white',
+                border: 'border-emerald-500/50',
+                hoverBorder: 'hover:border-emerald-300',
+                iconBg: 'bg-white/20 text-white backdrop-blur-xs',
+                badge: 'bg-white/20 text-white border-white/30 backdrop-blur-xs',
+                subtextColor: 'text-emerald-100',
+                balanceColor: 'text-white',
+                equivColor: 'text-emerald-200',
+                dividerColor: 'border-white/15',
+                selectedRing: 'ring-4 ring-emerald-400 ring-offset-2 scale-[1.02] shadow-lg shadow-emerald-900/30',
+              },
+              PURPLE: {
+                cardBg: 'bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-900 text-white',
+                border: 'border-purple-500/50',
+                hoverBorder: 'hover:border-purple-300',
+                iconBg: 'bg-white/20 text-white backdrop-blur-xs',
+                badge: 'bg-white/20 text-white border-white/30 backdrop-blur-xs',
+                subtextColor: 'text-purple-100',
+                balanceColor: 'text-white',
+                equivColor: 'text-purple-200',
+                dividerColor: 'border-white/15',
+                selectedRing: 'ring-4 ring-purple-400 ring-offset-2 scale-[1.02] shadow-lg shadow-purple-900/30',
+              },
+              AMBER: {
+                cardBg: 'bg-gradient-to-br from-amber-500 via-amber-600 to-yellow-700 text-white',
+                border: 'border-amber-400/50',
+                hoverBorder: 'hover:border-amber-200',
+                iconBg: 'bg-slate-900/20 text-white backdrop-blur-xs',
+                badge: 'bg-slate-900/20 text-white border-white/30 backdrop-blur-xs',
+                subtextColor: 'text-amber-100',
+                balanceColor: 'text-white',
+                equivColor: 'text-amber-100',
+                dividerColor: 'border-white/15',
+                selectedRing: 'ring-4 ring-amber-400 ring-offset-2 scale-[1.02] shadow-lg shadow-amber-900/30',
+              },
+              ROSE: {
+                cardBg: 'bg-gradient-to-br from-rose-600 via-rose-700 to-pink-800 text-white',
+                border: 'border-rose-500/50',
+                hoverBorder: 'hover:border-rose-300',
+                iconBg: 'bg-white/20 text-white backdrop-blur-xs',
+                badge: 'bg-white/20 text-white border-white/30 backdrop-blur-xs',
+                subtextColor: 'text-rose-100',
+                balanceColor: 'text-white',
+                equivColor: 'text-rose-200',
+                dividerColor: 'border-white/15',
+                selectedRing: 'ring-4 ring-rose-400 ring-offset-2 scale-[1.02] shadow-lg shadow-rose-900/30',
+              },
+              CYAN: {
+                cardBg: 'bg-gradient-to-br from-cyan-600 via-teal-700 to-blue-800 text-white',
+                border: 'border-cyan-500/50',
+                hoverBorder: 'hover:border-cyan-300',
+                iconBg: 'bg-white/20 text-white backdrop-blur-xs',
+                badge: 'bg-white/20 text-white border-white/30 backdrop-blur-xs',
+                subtextColor: 'text-cyan-100',
+                balanceColor: 'text-white',
+                equivColor: 'text-cyan-200',
+                dividerColor: 'border-white/15',
+                selectedRing: 'ring-4 ring-cyan-400 ring-offset-2 scale-[1.02] shadow-lg shadow-cyan-900/30',
+              },
+              DARK: {
+                cardBg: 'bg-gradient-to-br from-slate-800 via-slate-900 to-zinc-950 text-white',
+                border: 'border-slate-700/60',
+                hoverBorder: 'hover:border-slate-500',
+                iconBg: 'bg-white/15 text-white backdrop-blur-xs',
+                badge: 'bg-white/15 text-white border-white/20 backdrop-blur-xs',
+                subtextColor: 'text-slate-300',
+                balanceColor: 'text-white',
+                equivColor: 'text-slate-400',
+                dividerColor: 'border-white/15',
+                selectedRing: 'ring-4 ring-slate-400 ring-offset-2 scale-[1.02] shadow-lg shadow-slate-950/40',
+              },
+              INDIGO: {
+                cardBg: 'bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 text-white',
+                border: 'border-indigo-500/50',
+                hoverBorder: 'hover:border-indigo-300',
+                iconBg: 'bg-white/20 text-white backdrop-blur-xs',
+                badge: 'bg-white/20 text-white border-white/30 backdrop-blur-xs',
+                subtextColor: 'text-indigo-100',
+                balanceColor: 'text-white',
+                equivColor: 'text-indigo-200',
+                dividerColor: 'border-white/15',
+                selectedRing: 'ring-4 ring-indigo-400 ring-offset-2 scale-[1.02] shadow-lg shadow-indigo-900/30',
+              },
+            };
+
+            const themeConfig = themeStyles[effectiveTheme] || themeStyles.INDIGO;
 
             const isSelected = selectedAccountId === acc.id;
 
@@ -597,110 +769,94 @@ export default function BankAccountsPage() {
               <div 
                 key={acc.id} 
                 onClick={() => handleSelectAccountFilter(acc.id)}
-                className={`bg-gradient-to-br ${gradientClass} rounded-2xl p-5 shadow-md border border-white/10 flex flex-col justify-between relative overflow-hidden h-48 group transition-all duration-200 cursor-pointer ${
+                className={`${themeConfig.cardBg} rounded-2xl p-4 border transition-all duration-200 cursor-pointer relative group flex flex-col justify-between overflow-hidden shadow-sm ${
                   isSelected 
-                    ? 'ring-4 ring-indigo-400 ring-offset-2 scale-[1.02] shadow-xl' 
-                    : 'hover:-translate-y-1 hover:shadow-lg opacity-95 hover:opacity-100'
+                    ? themeConfig.selectedRing 
+                    : `${themeConfig.border} ${themeConfig.hoverBorder} hover:shadow-md hover:-translate-y-0.5`
                 }`}
               >
-                {/* Background decorative patterns */}
-                <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none -mr-4 -mb-4">
-                  <Landmark className="h-40 w-40" />
-                </div>
-
-                <div className="flex justify-between items-start z-10">
-                  <div className="space-y-0.5 min-w-0 pr-2">
-                    <span className="text-[10px] font-bold tracking-widest uppercase opacity-80 block truncate">
-                      {isCash ? 'Custodia en Efectivo' : isZelle ? 'Cuenta Zelle' : isBinance ? 'Binance Pay' : acc.bank_name}
-                    </span>
-                    <h3 className="font-extrabold text-base truncate" title={acc.name}>
-                      {acc.name}
-                    </h3>
+                {/* Header card: Icon, Account Name, Currency Badge */}
+                <div className="flex items-start justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`p-2 rounded-xl shrink-0 ${themeConfig.iconBg}`}>
+                      {isCash ? (
+                        <CreditCard className="w-4 h-4" />
+                      ) : (
+                        <Landmark className="w-4 h-4" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-sm text-white truncate" title={acc.name}>
+                        {acc.name}
+                      </h3>
+                      <p className={`text-[11px] ${themeConfig.subtextColor} font-medium truncate`}>
+                        {isCash ? 'Caja Físico' : isZelle ? 'Zelle' : isBinance ? 'Binance Pay' : acc.bank_name}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {isSelected && (
-                      <span className="px-2 py-0.5 bg-white text-slate-900 rounded-md text-[9px] font-black uppercase tracking-wider shadow-xs">
-                        Activa
-                      </span>
-                    )}
-                    <span className="px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-bold font-mono tracking-wider backdrop-blur-xs">
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold font-mono border ${themeConfig.badge}`}>
                       {acc.currency}
                     </span>
+                    {/* Action buttons (reachable on hover) */}
+                    <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleOpenEdit(acc); }}
+                        className="p-1 hover:bg-white/20 rounded-md text-white/80 hover:text-white transition-all cursor-pointer backdrop-blur-xs"
+                        title="Editar cuenta"
+                      >
+                        <Edit2 className="h-3 w-3" />
+                      </button>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setDeletingId(acc.id); }}
+                        className="p-1 hover:bg-rose-500/80 rounded-md text-white/80 hover:text-white transition-all cursor-pointer backdrop-blur-xs"
+                        title="Eliminar cuenta"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
                 {/* Account Details / Real Identifiers */}
-                <div className="my-1 z-10 min-h-[32px] flex flex-col justify-center">
-                  {isCash ? (
-                    <span className="text-[11px] font-semibold text-emerald-100 uppercase tracking-wider flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-300"></span>
-                      Caja de Efectivo Físico
-                    </span>
-                  ) : isZelle ? (
-                    <div className="text-xs font-mono tracking-tight text-purple-100">
-                      <span className="text-[9px] font-sans uppercase font-bold opacity-75 block">Identificador Zelle</span>
-                      <span className="font-semibold truncate block">{acc.account_number || acc.p2p_phone || 'Registrado'}</span>
-                    </div>
-                  ) : isBinance ? (
-                    <div className="text-xs font-mono tracking-tight text-amber-100">
-                      <span className="text-[9px] font-sans uppercase font-bold opacity-75 block">Binance Pay ID / UID</span>
-                      <span className="font-semibold truncate block">{acc.account_number || 'Billetera Digital'}</span>
-                    </div>
-                  ) : (
-                    <div>
-                      {acc.account_number ? (
-                        <p className="text-xs font-mono tracking-wider opacity-90">
-                          {acc.account_number.length >= 20 
-                            ? `${acc.account_number.substring(0, 4)}-••••-••-${acc.account_number.slice(-4)}`
-                            : `•••• ${acc.account_number.slice(-4)}`
-                          }
-                        </p>
-                      ) : (
-                        <p className="text-[10px] font-semibold opacity-75 uppercase tracking-wider">
-                          Cuenta Operativa
-                        </p>
-                      )}
-                      {acc.p2p_phone && (
-                        <p className="text-[10px] font-mono opacity-80 mt-0.5">
-                          📱 PM: {acc.p2p_phone}
-                        </p>
-                      )}
-                    </div>
-                  )}
+                <div className={`my-2.5 pt-2 border-t ${themeConfig.dividerColor} flex items-center justify-between text-[11px]`}>
+                  <span className={`${themeConfig.subtextColor} font-medium`}>
+                    {isCash ? 'Custodia local' : isZelle ? 'Correo/Tlf' : isBinance ? 'Pay ID' : 'Número de cuenta'}
+                  </span>
+                  <span className="font-mono font-semibold text-white truncate max-w-[150px]">
+                    {isCash ? (
+                      'Efectivo en Caja'
+                    ) : isZelle ? (
+                      acc.account_number || acc.p2p_phone || 'Registrado'
+                    ) : isBinance ? (
+                      acc.account_number || 'Billetera'
+                    ) : acc.account_number ? (
+                      acc.account_number.length >= 20 
+                        ? `•••• ${acc.account_number.slice(-4)}`
+                        : acc.account_number
+                    ) : (
+                      'Operativa'
+                    )}
+                  </span>
                 </div>
 
                 {/* Main balance display */}
-                <div className="mt-auto z-10">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-xl sm:text-2xl font-black font-mono tracking-tight">
+                <div className={`pt-2 border-t ${themeConfig.dividerColor} flex items-baseline justify-between`}>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${themeConfig.subtextColor}`}>
+                    Balance
+                  </span>
+                  <div className="text-right">
+                    <div className={`text-base sm:text-lg font-black font-mono ${themeConfig.balanceColor} tracking-tight leading-none`}>
                       {isVes ? '' : '$'}
                       {balanceNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       {isVes ? ' Bs.' : ''}
-                    </span>
+                    </div>
+                    <div className={`text-[10px] font-semibold ${themeConfig.equivColor} font-mono mt-0.5`}>
+                      ≈ {equivCurrency === 'USD' ? '$' : 'Bs. '}
+                      {equivBalance.toLocaleString(equivCurrency === 'USD' ? 'en-US' : 'es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
                   </div>
-                  <p className="text-[10px] font-bold opacity-75 mt-0.5">
-                    Equivalente: {equivCurrency === 'USD' ? '$' : ''}
-                    {equivBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    {equivCurrency === 'VES' ? ' Bs.' : ''}
-                  </p>
-                </div>
-
-                {/* Floating controls inside card */}
-                <div className="absolute right-3 top-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); handleOpenEdit(acc); }}
-                    className="p-1.5 hover:bg-white/25 rounded-lg text-white/90 hover:text-white transition-all cursor-pointer backdrop-blur-xs"
-                    title="Editar cuenta"
-                  >
-                    <Edit2 className="h-3.5 w-3.5" />
-                  </button>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); setDeletingId(acc.id); }}
-                    className="p-1.5 hover:bg-rose-500/80 rounded-lg text-white/90 hover:text-white transition-all cursor-pointer backdrop-blur-xs"
-                    title="Eliminar cuenta"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
                 </div>
               </div>
             );
@@ -747,6 +903,26 @@ export default function BankAccountsPage() {
           </div>
         </div>
 
+        {/* Period & Date Filters Control Panel */}
+        <BankMovementFilters
+          accounts={accounts}
+          selectedAccountId={selectedAccountId}
+          onSelectAccount={handleSelectAccountFilter}
+          datePreset={datePreset}
+          onSelectDatePreset={handleSelectDatePreset}
+          startDate={startDate}
+          endDate={endDate}
+          onStartDateChange={handleStartDateChange}
+          onEndDateChange={handleEndDateChange}
+          totalIngresosUsd={totalIngresosUsd}
+          totalIngresosVes={totalIngresosVes}
+          totalEgresosUsd={totalEgresosUsd}
+          totalEgresosVes={totalEgresosVes}
+          netoUsd={netoUsd}
+          netoVes={netoVes}
+          movementsCount={movements.length}
+        />
+
         {/* Movements Data Table */}
         {isLoadingMovements ? (
           <div className="py-16 flex flex-col items-center justify-center space-y-2">
@@ -769,14 +945,57 @@ export default function BankAccountsPage() {
                   <th className="py-3 px-4">Tipo / Concepto</th>
                   <th className="py-3 px-4">Detalle de Emisor & Referencia</th>
                   <th className="py-3 px-4">Cliente / Responsable</th>
-                  <th className="py-3 px-4 text-right">Monto</th>
+                  <th className="py-3 px-4 text-right">Monto ($ USD)</th>
+                  <th className="py-3 px-4 text-right">Monto (Bs. VES)</th>
                   <th className="py-3 px-4 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {movements.map((mov) => {
                   const isPositive = Number(mov.amount) >= 0;
-                  const isSale = !!mov.sale;
+                  const isSale = !!mov.sale && mov.type !== 'CREDIT_NOTE' && mov.type !== 'DEBIT_NOTE';
+                  const isFiscalNote = mov.type === 'CREDIT_NOTE' || mov.type === 'DEBIT_NOTE' || !!mov.fiscal_note;
+                  const isVesAccount = mov.account?.currency === 'VES';
+
+                  // Calculate exact USD and VES values
+                  let valUsd = 0;
+                  let valVes = 0;
+
+                  if (mov.amount_usd !== undefined && mov.amount_usd !== null && mov.amount_ves !== undefined && mov.amount_ves !== null) {
+                    valUsd = Number(mov.amount_usd);
+                    valVes = Number(mov.amount_ves);
+                  } else if (isVesAccount) {
+                    valVes = Number(mov.amount);
+                    const rate = Number(mov.exchange_rate || exchangeRate || 1);
+                    valUsd = rate > 0 ? valVes / rate : 0;
+                  } else {
+                    valUsd = Number(mov.amount);
+                    const rate = Number(mov.exchange_rate || exchangeRate || 1);
+                    valVes = valUsd * rate;
+                  }
+
+                  const absUsd = Math.abs(valUsd);
+                  const absVes = Math.abs(valVes);
+
+                  // Account color dot configuration
+                  const rawTheme = mov.account?.color_theme || (
+                    mov.account?.name?.toUpperCase().includes('EFECTIVO') || mov.account?.account_type === 'EFECTIVO' ? 'EMERALD' :
+                    mov.account?.name?.toUpperCase().includes('ZELLE') || mov.account?.account_type === 'ZELLE' ? 'PURPLE' :
+                    mov.account?.name?.toUpperCase().includes('BINANCE') || mov.account?.account_type === 'BINANCE' ? 'AMBER' :
+                    isVesAccount ? 'BLUE' : 'INDIGO'
+                  );
+
+                  const dotColorMap: Record<string, string> = {
+                    BLUE: 'bg-blue-500 ring-blue-300',
+                    EMERALD: 'bg-emerald-500 ring-emerald-300',
+                    PURPLE: 'bg-purple-500 ring-purple-300',
+                    INDIGO: 'bg-indigo-500 ring-indigo-300',
+                    AMBER: 'bg-amber-500 ring-amber-300',
+                    ROSE: 'bg-rose-500 ring-rose-300',
+                    CYAN: 'bg-cyan-500 ring-cyan-300',
+                    DARK: 'bg-slate-800 ring-slate-400',
+                  };
+                  const dotColor = dotColorMap[rawTheme] || 'bg-indigo-500 ring-indigo-300';
 
                   return (
                     <tr key={mov.id} className="hover:bg-slate-50/60 transition-colors">
@@ -790,12 +1009,28 @@ export default function BankAccountsPage() {
                         })}
                       </td>
                       <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900">{mov.account?.name || 'Cuenta'}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">{mov.account?.bank_name} ({mov.account?.currency})</div>
+                        <div className="flex items-center gap-2">
+                          <span 
+                            className={`w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-offset-1 ${dotColor}`}
+                            title={`Cuenta: ${mov.account?.name || 'Cuenta'}`}
+                          />
+                          <div>
+                            <div className="font-bold text-slate-900 leading-tight">{mov.account?.name || 'Cuenta'}</div>
+                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">{mov.account?.bank_name} ({mov.account?.currency})</div>
+                          </div>
+                        </div>
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          {isSale ? (
+                          {isFiscalNote ? (
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 border ${
+                              mov.type === 'CREDIT_NOTE' 
+                                ? 'bg-rose-50 text-rose-700 border-rose-200' 
+                                : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                            }`}>
+                              {mov.type === 'CREDIT_NOTE' ? '⚡ Nota de Crédito' : '⚡ Nota de Débito'} #{mov.fiscal_note?.document_number || mov.reference || 'S/N'}
+                            </span>
+                          ) : isSale ? (
                             <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
                               Factura #{mov.sale?.invoice_number || 'S/N'}
                             </span>
@@ -820,7 +1055,13 @@ export default function BankAccountsPage() {
                             {mov.payment_metadata.payment_method && (
                               <div className="text-slate-800 font-semibold text-[11px]">
                                 <span className="text-[10px] font-bold text-slate-400 uppercase font-sans">Método: </span>
-                                <span className={mov.payment_metadata.payment_method.toUpperCase().includes('CHANGE') ? 'text-amber-700 font-bold' : 'text-indigo-700 font-bold'}>
+                                <span className={
+                                  mov.type === 'CREDIT_NOTE'
+                                    ? 'text-rose-700 font-bold'
+                                    : mov.payment_metadata.payment_method.toUpperCase().includes('CHANGE') 
+                                      ? 'text-amber-700 font-bold' 
+                                      : 'text-indigo-700 font-bold'
+                                }>
                                   {formatPaymentMethod(mov.payment_metadata.payment_method)}
                                 </span>
                               </div>
@@ -862,16 +1103,23 @@ export default function BankAccountsPage() {
                           <span>{mov.created_by?.name || 'Sistema'}</span>
                         )}
                       </td>
+                      {/* USD Amount Column */}
                       <td className="py-3 px-4 text-right font-mono font-bold text-sm whitespace-nowrap">
                         <span className={isPositive ? 'text-emerald-600' : 'text-rose-600'}>
-                          {isPositive ? '+' : ''}
-                          {mov.account?.currency === 'USD' ? '$' : 'Bs. '}
-                          {Math.abs(Number(mov.amount)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {isPositive ? '+' : '-'}
+                          ${absUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </td>
+                      {/* VES Amount Column */}
+                      <td className="py-3 px-4 text-right font-mono font-bold text-sm whitespace-nowrap">
+                        <span className={isPositive ? 'text-emerald-700' : 'text-rose-700'}>
+                          {isPositive ? '+' : '-'}
+                          Bs. {absVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-center whitespace-nowrap">
-                        {isSale && mov.sale?.id ? (
-                          <ActionTooltip content="Ver Productos y Tasa Aplicada">
+                        {mov.sale?.id ? (
+                          <ActionTooltip content="Ver Factura Original">
                             <button
                               type="button"
                               onClick={() => setViewingSaleId(mov.sale!.id)}
@@ -1068,6 +1316,52 @@ export default function BankAccountsPage() {
                       value={accountForm.initial_balance}
                       onChange={(e) => setAccountForm({ ...accountForm, initial_balance: Number(e.target.value) })}
                     />
+                  </div>
+                </div>
+
+                {/* Selector de Color y Tema para la Tarjeta */}
+                <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
+                      Color de Identificación de la Tarjeta
+                    </label>
+                    <span className="text-[10px] font-semibold text-slate-400">
+                      Personaliza el color de la tarjeta para identificarla al instante
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+                    {[
+                      { id: 'BLUE', label: 'Azul', bg: 'bg-blue-600', ring: 'ring-blue-500' },
+                      { id: 'EMERALD', label: 'Verde', bg: 'bg-emerald-600', ring: 'ring-emerald-500' },
+                      { id: 'PURPLE', label: 'Morado', bg: 'bg-purple-600', ring: 'ring-purple-500' },
+                      { id: 'INDIGO', label: 'Índigo', bg: 'bg-indigo-600', ring: 'ring-indigo-500' },
+                      { id: 'AMBER', label: 'Dorado', bg: 'bg-amber-500', ring: 'ring-amber-500' },
+                      { id: 'ROSE', label: 'Coral', bg: 'bg-rose-600', ring: 'ring-rose-500' },
+                      { id: 'CYAN', label: 'Turquesa', bg: 'bg-cyan-600', ring: 'ring-cyan-500' },
+                      { id: 'DARK', label: 'Oscuro', bg: 'bg-slate-900', ring: 'ring-slate-700' },
+                    ].map((c) => {
+                      const isSelected = (accountForm.color_theme || 'INDIGO') === c.id;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => setAccountForm({ ...accountForm, color_theme: c.id })}
+                          className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all cursor-pointer ${
+                            isSelected 
+                              ? 'bg-white border-indigo-500 shadow-xs ring-2 ring-indigo-500/30' 
+                              : 'bg-white/60 border-slate-200/80 hover:bg-white hover:border-slate-300'
+                          }`}
+                        >
+                          <span className={`w-6 h-6 rounded-lg ${c.bg} shadow-xs flex items-center justify-center text-white`}>
+                            {isSelected && <CheckCircle className="w-3.5 h-3.5" />}
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-700 truncate max-w-full">
+                            {c.label}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
