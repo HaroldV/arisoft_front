@@ -47,6 +47,7 @@ interface SaleDetailItem {
   price_at_time_usd: number;
   product_sku: string;
   product_name: string;
+  tax_rate?: number;
   justification?: string | null;
 }
 
@@ -55,6 +56,14 @@ interface SaleDetail {
   total_amount_usd: number;
   exchange_rate_applied: number;
   status: string;
+  is_annulled?: boolean;
+  total_credited_usd?: number;
+  fiscal_notes?: Array<{
+    id: string;
+    document_number: string;
+    type: string;
+    total_usd: number;
+  }>;
   created_at: string;
   invoice_number?: string;
   control_number?: string;
@@ -107,6 +116,7 @@ export default function SalesHistoryPage() {
     originalQty: number;
     quantity: number;
     unitPriceUsd: number;
+    taxRate: number;
     selected: boolean;
   }[]>([]);
 
@@ -163,17 +173,32 @@ export default function SalesHistoryPage() {
     setIsLoadingDetail(true);
     try {
       const response = await apiClient.get(`/sales/${id}`);
-      setSaleDetail(response.data);
-      const itemsPayload = response.data.items.map((item: SaleDetailItem) => ({
-        productId: item.product_id,
-        name: item.product_name,
-        originalQty: item.quantity,
-        quantity: item.quantity,
-        unitPriceUsd: item.price_at_time_usd,
-        selected: true,
-      }));
+      const saleData = response.data;
+      setSaleDetail(saleData);
+
+      // Determine if the original sale had tax added to the items base
+      const originalItemsSubtotal = saleData.items.reduce(
+        (acc: number, item: SaleDetailItem) => acc + (Number(item.quantity) * Number(item.price_at_time_usd)),
+        0
+      );
+      const saleHadTax = Number(saleData.total_amount_usd) > (originalItemsSubtotal + 0.01);
+
+      const itemsPayload = saleData.items.map((item: SaleDetailItem) => {
+        // If sale had tax applied, respect the item's tax rate (or default 16%), otherwise 0%
+        const effectiveTaxRate = saleHadTax ? (item.tax_rate !== undefined ? Number(item.tax_rate) : 16) : 0;
+        const parsedQty = Math.round(Number(item.quantity)) || 1;
+        return {
+          productId: item.product_id,
+          name: item.product_name,
+          originalQty: parsedQty,
+          quantity: parsedQty,
+          unitPriceUsd: Number(item.price_at_time_usd),
+          taxRate: effectiveTaxRate,
+          selected: true,
+        };
+      });
       setNoteItems(itemsPayload);
-      setNoteExchangeRate(response.data.exchange_rate_applied);
+      setNoteExchangeRate(saleData.exchange_rate_applied);
       
       if (autoOpenEmitForm) {
         fetchLocations();
@@ -235,6 +260,9 @@ export default function SalesHistoryPage() {
   const handleQtyChange = (productId: string, val: number) => {
     setNoteItems(prev => prev.map(item => {
       if (item.productId === productId) {
+        if (val === 0) {
+          return { ...item, quantity: 0 };
+        }
         const limited = Math.min(item.originalQty, Math.max(1, val));
         return { ...item, quantity: limited };
       }
@@ -302,7 +330,9 @@ export default function SalesHistoryPage() {
   const selectedSubtotalUsd = noteItems
     .filter(i => i.selected)
     .reduce((sum, i) => sum + i.quantity * i.unitPriceUsd, 0);
-  const selectedTaxUsd = selectedSubtotalUsd * 0.16;
+  const selectedTaxUsd = noteItems
+    .filter(i => i.selected)
+    .reduce((sum, i) => sum + (i.quantity * i.unitPriceUsd * (i.taxRate / 100)), 0);
   const selectedTotalUsd = selectedSubtotalUsd + selectedTaxUsd;
   const selectedTotalVes = selectedTotalUsd * noteExchangeRate;
 
@@ -617,13 +647,31 @@ export default function SalesHistoryPage() {
 
                 {/* Action buttons */}
                 <div className="flex flex-col gap-2 pt-2">
-                  <button
-                    onClick={handleOpenEmitNoteForm}
-                    className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-indigo-600 hover:bg-indigo-550 active:bg-indigo-700 text-white rounded-xl font-medium text-xs transition-colors cursor-pointer"
-                  >
-                    <ArrowRightLeft className="h-4 w-4" />
-                    Emitir Nota de Crédito / Débito
-                  </button>
+                  {saleDetail.status === 'ANULADA' || saleDetail.is_annulled ? (
+                    <div className="w-full p-2.5 bg-rose-50 border border-rose-200/80 rounded-xl text-center">
+                      <span className="text-xs font-bold text-rose-700 flex items-center justify-center gap-1.5">
+                        <AlertTriangle className="h-4 w-4 text-rose-600" />
+                        Factura Anulada por Nota de Crédito Total
+                      </span>
+                      {saleDetail.fiscal_notes && saleDetail.fiscal_notes.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1 justify-center">
+                          {saleDetail.fiscal_notes.map(fn => (
+                            <span key={fn.id} className="text-[10px] font-mono font-semibold bg-white border border-rose-200 text-rose-800 px-2 py-0.5 rounded-md">
+                              {fn.document_number} (${fn.total_usd.toFixed(2)})
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleOpenEmitNoteForm}
+                      className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-indigo-600 hover:bg-indigo-550 active:bg-indigo-700 text-white rounded-xl font-medium text-xs transition-colors cursor-pointer shadow-sm shadow-indigo-200"
+                    >
+                      <ArrowRightLeft className="h-4 w-4" />
+                      Emitir Nota de Crédito / Débito
+                    </button>
+                  )}
                   <div className="flex gap-2">
                     <button
                       onClick={() => window.print()}
@@ -743,9 +791,20 @@ export default function SalesHistoryPage() {
                           <span className="text-xs text-slate-500 font-bold">Cant:</span>
                           <input 
                             type="number"
-                            value={item.quantity}
-                            onChange={(e) => handleQtyChange(item.productId, parseInt(e.target.value) || 1)}
-                            className="w-16 px-2.5 py-1 bg-slate-50 border border-slate-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 rounded-lg text-center text-xs font-bold text-slate-955"
+                            min="1"
+                            max={item.originalQty}
+                            value={item.quantity === 0 ? '' : item.quantity}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
+                              if (isNaN(val)) return;
+                              handleQtyChange(item.productId, val);
+                            }}
+                            onBlur={() => {
+                              if (item.quantity < 1) {
+                                handleQtyChange(item.productId, 1);
+                              }
+                            }}
+                            className="w-16 px-2.5 py-1 bg-slate-50 border border-slate-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 rounded-lg text-center text-xs font-bold text-slate-900 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                         </div>
                       )}
